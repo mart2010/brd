@@ -19,7 +19,7 @@ source_websites = {
 
 isbn_db = ''
 
-# database connection 
+# resource connection
 
 
 

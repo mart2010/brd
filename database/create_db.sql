@@ -1,0 +1,15 @@
+
+/* As superuser, create role brd */
+	create role brd with login password 'brd';
+	alter role brd CREATEROLE;
+	create database brd owner= brd;
+	
+/* As superuser, switch to new db and revoke privileges to other users */
+	\c brd
+	revoke connect on database brd from public;
+	revoke all on schema public from public;
+	grant all on schema public to brd;
+	
+	
+
+
