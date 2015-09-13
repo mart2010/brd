@@ -1,0 +1,8 @@
+({"total":"44875",
+	"data":[{"id":"100","titre":"100-<to be ignored!>","nbrcrit":"1","cover":"\/img\/cover\/S\/9782221027202.jpg","cote":"0.0000","hits":"11","auteurstring":""},
+			{"id":"200","titre":"200-<to be scraped, 1 new critics in loading period>","nbrcrit":"3","cover":"\/img\/cover\/S\/9782221137093.jpg","cote":"0.0000","hits":"62","auteurstring":"Halter, Marek"},
+			{"id":"300","titre":"300-<to be scraped, but print-version still has no critic eclaire>","nbrcrit":"6","cover":"\/img\/cover\/S\/9791093606231.jpg","cote":"0.0000","hits":"22","auteurstring":"Cosnay, Marie"},
+			{"id":"400","titre":"400-<to be scraped, no new critics in loading period>","nbrcrit":"3","cover":"\/img\/cover\/S\/9782203040885.jpg","cote":"6.3807","hits":"80","auteurstring":"Ipp\u00f3liti,"},
+			{"id":"500","titre":"500-<Not to be scraped, all critics already loaded>","nbrcrit":"17","cover":"\/img\/cover\/S\/9782203040885.jpg","cote":"6.3807","hits":"80","auteurstring":"Ipp\u00f3liti,"}
+		]
+	,"success":0,"message":""})

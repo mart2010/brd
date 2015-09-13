@@ -1,42 +1,78 @@
 __author__ = 'mouellet'
 
 import psycopg2
-import ConfigParser
+import brd.config as config
+import uuid
+
+# Note one psycopg2 transaction :
+# Psycopg module and connection objects are thread-safe: many threads can access the same database either using separate sessions and creating
+# a connection per thread or using the same connection and creating separate cursors. In DB API 2.0 parlance, Psycopg is level 2 thread safe.
+# The difference between the above two approaches is that, using different connections, the commands will be executed in different sessions and
+# will be served by different server processes. On the other hand, using many cursors on the same connection, all the commands will be executed
+# in the same session (and in the same transaction if the connection is not in autocommit mode), but they will be serialized.
 
 
-def get_config():
-    conf = ConfigParser.SafeConfigParser()
-    conf.read('../config.conf')
-    return conf
+
 
 class DbConnection(object):
     """
-    This allows reusing psycopg2 heavyweight connection.  Use read-only mode to avoid any
-    sort of database lock done?? by session (all cursors created are executed in the same session,
-    and long query could cause concurrency issue)
+    Class to allow for interacting with psycopg2, reusing psycopg2 heavyweight connection,
+    managing transaction, ... etc.
     """
-    def __init__(self, conf, readonly):
-        try:
-            self._connection = psycopg2.connect(host= conf.get('Database','host'),
-                                database= conf.get('Database','name'),
-                                port=conf.get('Database','port'),
-                                user=conf.get('Database','user'),
-                                password=conf.get('Database','pwd') )
-            if readonly:
-                self._connection.set_session(readonly= readonly)
-        except Exception, msg:
-            # do some logging and send alert
-            raise Exception("Database connection error: " + msg)
+    def __init__(self, conn=config.DATABASE, readonly=False):
+        self._connection = psycopg2.connect(host=conn['host'],
+                                            database=conn['name'],
+                                            port=conn['port'],
+                                            user=conn['user'],
+                                            password=conn['pwd'])
+        if readonly:
+            self._connection.set_session(readonly=readonly)
 
-    def getConnection(self):
+    def get_connection(self):
         return self._connection
 
-    def query(self, query, params):
-        """Cursor are lightweight and created as often as needed (each time method called)
-        (note: cursors used to fetch result cache data and use memory according to result set size)
+
+    def execute_transaction(self, sql, params=None):
         """
-        cursor = self._connection.cursor()
-        return cursor.execute(query, params)
+        Execute sql statement as a single transaction.
+        """
+        # connection context manager: if no exception raised within block then transaction is committed (otherwise rolled back)
+        with self._connection as c:
+            # cursor context manager : will close/release any resource held by cursor (ex. result cache)
+            with c.cursor() as curs:
+                return curs.execute(sql, params)
+
+    def execute(self, sql, params=None):
+        """
+        Execute sql statement and return result while leaving open the transaction.
+        """
+        with self._connection.cursor() as curs:
+            return curs.execute(sql, params)
+
+
+    def fetch_all_transaction(self, query, params=None):
+        """
+        Execute query, fetch all records into a list and return it as a single transaction.
+        """
+        with self._connection as c:
+            with c.cursor() as curs:
+                curs.execute(query, params)
+                result = curs.fetchall()
+                return result
+
+
+    def fetch_all(self, query, params=None):
+        """
+        Execute query, fetch all records into a list and return it while leaving open the transaction.
+        """
+        with self._connection.cursor() as curs:
+            curs.execute(query, params)
+            result = curs.fetchall()
+            return result
+
+
+    def commit(self):
+        self._connection.commit()
 
     def __del__(self):
         self._connection.close()
@@ -45,14 +81,17 @@ class DbConnection(object):
         return self._connection.__str__()
 
 
-import uuid
 
 # impl tentative for Conn Obj that can chain CTAS stmt...
-class CTAStage(DbConnection):
+class CTAStage(object):
     temptables = []
 
-    def __init__(self, conf):
-        DbConnection.__init__(self, conf, False )
+    def __init__(self, conn=config.DATABASE):
+        self._connection = psycopg2.connect(host=conn['host'],
+                                            database=conn['name'],
+                                            port=conn['port'],
+                                            user=conn['user'],
+                                            password=conn['pwd'])
         self._cursor = self._connection.cursor()
 
     def stage(self, sql, params):
@@ -79,48 +118,41 @@ class CTAStage(DbConnection):
         :param params: name params stored as dict
         :return: self
         """
-        assert(len(self.temptables) > 0, "Can only insert from previously created temp table")
+        # assert(len(self.temptables) > 0, "Can only insert from previously created temp table")
         self._cursor.execute(insertsql, params)
         self._connection.commit()
         return self
 
 
-# the usage
-
-stmt1 = "sssss"
-stmt2 = "dddd"
-ctas = CTAStage(get_config()).stage(stmt1, {'datemin' : '12-03-2011'})\
-                                .stage(stmt2, {})\
-                                    .stage(stmt1, {})\
-                                        .insert(stmt2, {})
-
+# possible usage
+# stmt1 = "sssss"
+# stmt2 = "dddd"
+# ctas = CTAStage(get_conn_param()).stage(stmt1, {'datemin' : '12-03-2011'})\
+#                                 .stage(stmt2, {})\
+#                                     .stage(stmt1, {})\
+#                                         .insert(stmt2, {})
 
 
 
-CONN_READONLY = None
+
+# Singleton connections handy for client code that can share same connection
+# All commands will be run withon same session and serialized
+# may not have a good use-case in this app ?
+conn_readonly = None
 def get_ro_connection():
-    global CONN_READONLY
-    if CONN_READONLY is None:
-        CONN_READONLY = DbConnection(get_config(), True)
-    return CONN_READONLY
+    global conn_readonly
+    if conn_readonly is None:
+        conn_readonly = DbConnection(readonly=True)
+    return conn_readonly
 
-CONN = None
+conn = None
 def get_connection():
-    global CONN
-    if CONN is None:
-        CONN = DbConnection(get_config(), False)
-    return CONN
+    global conn
+    if conn is None:
+        conn = DbConnection(readonly=False)
+    return conn
 
 
-
-def fetch_critiqueslibres_stat():
-    squery = """select title, nb_reviews
-                from staging.critiques
-             """
-    result = {}
-    for row in get_ro_connection().query(squery):
-        result[row[0]] = row[1]
-    return result
 
 
 

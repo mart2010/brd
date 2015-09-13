@@ -12,6 +12,16 @@
 BOT_NAME = 'critiqueslibres'
 SPIDER_MODULES = ['brd.scrapy.spiders']
 
+# Disable cookies (some sites use cookies to spot bot)
+COOKIES_ENABLED = False
+
+
+# Configure item pipelines
+# See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
+ITEM_PIPELINES = {
+    'brd.scrapy.pipelines.ReviewStageLoader': 300,
+}
+
 
 # NEWSPIDER_MODULE = 'brd_tuto.spiders'
 
@@ -30,8 +40,6 @@ SPIDER_MODULES = ['brd.scrapy.spiders']
 #CONCURRENT_REQUESTS_PER_DOMAIN=16
 #CONCURRENT_REQUESTS_PER_IP=16
 
-# Disable cookies (enabled by default)
-#COOKIES_ENABLED=False
 
 # Disable Telnet Console (enabled by default)
 #TELNETCONSOLE_ENABLED=False
@@ -60,11 +68,6 @@ SPIDER_MODULES = ['brd.scrapy.spiders']
 #    'scrapy.telnet.TelnetConsole': None,
 #}
 
-# Configure item pipelines
-# See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'brd_tuto.pipelines.SomePipeline': 300,
-#}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html

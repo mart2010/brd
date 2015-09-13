@@ -1,4 +1,12 @@
 
+DATABASE = {
+    'host': 'localhost',
+    'name': 'brd',
+    'port': '5432',
+    'user': 'brd',
+    'pwd' : 'brd'
+}
+
 
 # website section (to be stored in DB...)
 
@@ -15,7 +23,7 @@ source_websites = {
     'guidelecture': 'http://www.guidelecture.com',
     'critique-livre': 'http://www.critique-livre.fr',
     '':'',
-    }
+}
 
 isbn_db = ''
 

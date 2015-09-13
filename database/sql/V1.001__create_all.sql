@@ -15,53 +15,54 @@ TODO:
 
 -------------------------------------- Staging layer -------------------------------------
 
--- Goals:   - Layer where raw data is loaded as fast as possible, so that ETL process can leverage
---            as much RDBMS functions with minimum resorting to external app process
+-- Goals:   - Layer where raw data is loaded straight so remaining processes is done by DB-engine (ELT)
+--            using sql and possible stored proc with minimum resorting to external app process
 
 --reviews per source better...
 -------------------------------------- Staging layer -------------------------------------
 
-create table staging.reviews (
-        id bigserial primary key,
-		hostname varchar(100),
-        reviewer_pseudo varchar(100),
-		review_rating_code varchar(20),
-		book_siteid int,
-		book_title_text varchar(200),
-		book_title_sform varchar(200),
-        review_dts timestamp,
-        --here maybe add a bnch of generic fields? maybo not worth it as data here is volatile (no history kept)
+create table staging.load_audit (
+    id serial primary key,
+    batch_name varchar(200),
+    batch_status varchar(20),
+    period_begin date,
+    period_end date,   --excluded (12/11/15 -> 11/11/15 23:59:59)
+    batch_start_dts timestamp,
+    batch_finish_dts timestamp
+);
+
+comment on table staging.load_audit is 'Metadata used to manage each job that insert/update batch of records';
+
+
+create table staging.review (
+        id serial primary key,
+		hostname varchar(50) not null,
+        reviewer_pseudo varchar(25) not null,
+        reviewer_uid varchar(50),
+		review_rating varchar(10) not null,
+        review_date varchar(50) not null,
+        review_text varchar(500),
+		book_title varchar(200) not null,
+		book_lang varchar(3) not null,
+        book_uid varchar(100),
+        book_isbn varchar(40),
+		derived_title_sform varchar(200),
+		derived_review_date timestamp,
 		loading_dts timestamp,
-		batch_id int   -- to link to a Audit_metadata table
+		load_audit_id int   -- to link to the Load_Audit metadata table
 );
 
 
---note: critiqueslibres is loaded in 2 stages:
--- 1) flag all newly reviewed books from global list: take all books with nb_reviews > 1, either not yet staged or having new reviews (staging.nb_review is less)
--- 2) for all flag books, fetch reviews dating inside logical date period : LOAD_START_DATE -> LOAD_END_DATE (could be date of review or date of review with no more edit possible)
-
-create table staging.critiqueslibres_lookup (
-        bookid_site int,                   -- book-id as used by the site
-        title  varchar(200) unique,        -- as found in website
-        title_sform varchar(200),          -- transform form from title
-        title_sform_cor varchar(200),      -- the corrected std form if_sform lead to an unrecognized uuid
-        book_id uuid,    -- the lookup form must match book table, can easily spot issue with the _sform when uuid is NULL (to correct manually/automatically)
-        nb_reviews int,
-        creation_dts timestamp,
-        update_dts timestamp
-);
-
-comment on table staging.critiqueslibres_lookup is 'Used to find new/update book/reviews to load (having 2 or more reviews) with the title_sform';
-
-
+comment on table staging.review is 'Raw data scraped from website and derived data done exceptionnally in python app (ex. sform)';
+comment on column staging.review.book_uid is 'Unique identifier of the book (i.e. review) used by website';
 
 
 -------------------------------------- Integration layer -------------------------------------
 
--- Principles:  - should not try to store all parameters, config stuff here (these can be managed at app level)
---              - goal is to capture all elements tracked down by the scrapy app, as-is without applying any business rules
---              - also, here we could add business-integration:  add rules and transfor for data harmoinzation, standardisation...
---              - or else, we could have a separate/dedicated layer for that needs?
+-- Principles:  - goal is to capture 1) all web scraper app data as-is without applying any business rules
+--              - 2) add business-integration: some transformation to integrate/harmonize/standardize data (key integration, dedup...)
+--              - should not try to store all parameters, config stuff here (these can be managed at app level)
+--
 
 -------------------------------------- Integration layer -------------------------------------
 
@@ -104,7 +105,7 @@ create table integration.site_info (
 
 
 create table integration.language (
-    lang_code varchar(3) primary key,
+    lang_code varchar(2) primary key,
     lang_name varchar(30),
     --add more info and code , etc...
     creation_dts timestamp
@@ -116,16 +117,52 @@ comment on table integration.language is 'Language look-up using immutable langu
 create table integration.book (
     id uuid primary key,
     title_sform varchar(200) unique,
-    title_text varchar(200) unique,
-    lang_code varchar(3),
-    creation_dts timestamp
+    lang_code varchar(2) not null,
+    source_site_id int not null,
+    last_seen_date timestamp,
+    creation_dts timestamp,
+    load_audit_id int
 );
 
-comment on table integration.book is 'Book reviewed as a single piece of "work" and having possibly different editions';
+comment on table integration.book is 'Book reviewed as a single piece of "work" identified by the title found on websites (regardless of editions)';
 comment on column integration.book.id is 'Primary id generated by the MD5 hashing of title_sform';
---exact rule to transform title_text to title_sform should be stored somewhere
-comment on column integration.book.title_sform is 'Capitalised and std form of title: remove one or more blanks by a single dash: -';
+--Ignore title collision as book title are copyright so conflict should be very rare.
+comment on column integration.book.title_sform is 'Std title form with capitalisation and (redundant) blanks replaced by single dash: -';
 comment on column integration.book.lang_code is 'Book and reviews in different languages considered distinctly to accounted for cultural and language specific';
+comment on column integration.book.source_site_id is 'Site for which a first review was loaded for that book';
+
+
+create table integration.book_site (
+    book_id uuid not null,
+    site_id int not null,
+    book_uid varchar(100) not null,
+    title_text varchar(200) not null,
+    creation_dts timestamp,
+    load_audit_id int,
+    primary key (book_id, site_id),
+    foreign key (book_id) references integration.book(id) on delete cascade,
+    foreign key (site_id) references integration.site(id) on delete cascade
+);
+
+comment on table integration.book_site is 'Book identity by site, useful to find book duplications in book table from title spelling differences';
+comment on column integration.book_site.book_uid is 'Book alternative identifier managed by website (ex. critiqueslibres used unique integer)';
+comment on column integration.book_site.title_text is 'Title as seen in websites with only leading/trailing blanks removed';
+
+
+
+-- this will be manually maintained, at least at the beginning
+create table integration.book_sameas (
+    book_id uuid not null,
+    same_book_id uuid not null,
+    creation_dts timestamp,
+    update_dts timestamp,
+    primary key (book_id, same_book_id),
+    foreign key (book_id) references integration.book(id) on delete cascade,
+    foreign key (same_book_id) references integration.book(id) on delete cascade
+);
+
+comment on table integration.book_sameas is 'Used to match identical book (reviews are recorded as-is from webistes, leading to possible duplication)';
+comment on column integration.book_sameas.book_id is 'Not all permutation of (book_id, same_book_id) stored, hence same book_id is used in case more than 2 sites have duplicates';
 
 
 
@@ -133,14 +170,16 @@ create table integration.book_detail (
     book_id uuid,
     category varchar(100),
     nb_pages int,  --this could vary by editions
-    editor varchar(100)
+    editor varchar(100),
+    load_audit_id int
     --etc...
 );
 
 
 create table integration.author (
     id serial primary key,
-    creation_dts timestamp
+    creation_dts timestamp,
+    load_audit_id int
 );
 
 
@@ -150,6 +189,7 @@ create table integration.book_edition (
     ean_13 bigint not null,
     isbn_13 varchar(13) not null,
     isbn_10 varchar(10),
+    load_audit_id int,
     primary key (book_id, ean_13),
     foreign key (book_id) references integration.book(id) on delete cascade
 );
@@ -160,14 +200,13 @@ comment on column integration.book_edition.ean_13 is 'Numerical representation n
 comment on column integration.book_edition.isbn_13 is 'ISBN text representation (ex. 978-2-86889-006-1 )';
 
 
-
-
 create table integration.reviewer (
     id uuid primary key,
     site_id int not null,
     pseudo varchar(100) not null,
     last_seen_date date,
     creation_dts timestamp not null,
+    load_audit_id int,
     foreign key (site_id) references integration.site(id) on delete cascade
 );
 
@@ -188,6 +227,7 @@ create table integration.reviewer_info (
     valid_to timestamp,
     creation_dts timestamp,
     update_dts timestamp,
+    load_audit_id int,
     primary key (reviewer_id, valid_from),
     foreign key (reviewer_id) references integration.reviewer(id) on delete cascade
 );
@@ -200,6 +240,7 @@ create table integration.reviewer_sameas (
     valid_to timestamp,
     creation_dts timestamp,
     update_dts timestamp,
+    load_audit_id int,
     primary key (reviewer_id, same_reviewer_id, valid_from),
     foreign key (reviewer_id) references integration.reviewer(id) on delete cascade,
     foreign key (same_reviewer_id) references integration.reviewer(id) on delete cascade
@@ -213,6 +254,7 @@ create table integration.review (
     rating_code varchar(20) not null,
     last_seen_date date,
     creation_dts timestamp,
+    load_audit_id int,
     foreign key (book_id) references integration.book(id) on delete cascade,
     foreign key (reviewer_id) references integration.reviewer(id) on delete cascade
 );
@@ -228,10 +270,30 @@ create table integration.rating_def (
     value int not null,
     normal_value int not null,
     creation_dts timestamp,
+    load_audit_id int,
     primary key (code, class)
 );
 
 comment on table integration.rating_def is 'Simple rating code with its hierarchy class';
+
+
+
+---------------------- View -------------------------
+
+
+--note: critiqueslibres is loaded in 2 stages:
+-- 1) flag all newly reviewed books from global list: take all books with nb_reviews > 1, either not yet staged or having new reviews (staging.nb_review is less)
+-- 2) for all flag books, fetch reviews dating inside logical date period : LOAD_START_DATE -> LOAD_END_DATE (could be date of review or date of review with no more edit possible)
+
+create or replace view integration.critiqueslibres_lookup as
+    select
+        book_uid,
+        count(*) as nb_reviews
+    from integration.book_site b
+    join integration.review r on (r.book_id = b.book_id)
+    group by b.book_uid;
+
+comment on view integration.critiqueslibres_lookup is 'Used to find how many reviews currently pesisted';
 
 
 

@@ -9,26 +9,27 @@ from scrapy import Item, Field
 
 
 class ReviewBaseItem(Item):
-
+    """Make sure these match with staging.review table, since
+    we rely on these name for building insert statement
+    """
+    hostname = Field()
     reviewer_pseudo = Field()
-    reviewer_uuid = Field()    #optional
-    reviewer_name = Field()    #optional
-
-    book_title = Field()
-    book_isbn = Field()
-    book_author = Field()
-    book_lang = Field()
-
-
+    reviewer_uid = Field()
     review_rating = Field()
     review_date = Field()
     review_text = Field()
-    review_url = Field()    #handy for increment updating..
+
+    book_isbn = Field()
+    book_title = Field()
+    book_uid = Field()
+    derived_title_sform = Field()
+    derived_review_date = Field()
+    book_lang = Field()
 
 
 
 
-class BookBaseItem(scrapy.Item):
+class BookBaseItem(Item):
     pass
 
 
