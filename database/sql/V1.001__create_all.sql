@@ -94,6 +94,7 @@ comment on column integration.site_identifier.hostname is 'Hostname such as www.
 create table integration.site_info (
     site_id int not null,
     url varchar(250),
+    scraper_name varchar(50),
     --other info..
     valid_from timestamp not null,
     valid_to timestamp,
@@ -102,6 +103,8 @@ create table integration.site_info (
     primary key (site_id, valid_from),
     foreign key (site_id) references integration.site(id) on delete cascade
 );
+
+comment on column integration.site_info.scraper_name is 'Name defined in python scraper module and used as a lookup for site_id';
 
 
 create table integration.language (
@@ -285,6 +288,7 @@ comment on table integration.rating_def is 'Simple rating code with its hierarch
 -- 1) flag all newly reviewed books from global list: take all books with nb_reviews > 1, either not yet staged or having new reviews (staging.nb_review is less)
 -- 2) for all flag books, fetch reviews dating inside logical date period : LOAD_START_DATE -> LOAD_END_DATE (could be date of review or date of review with no more edit possible)
 
+-- TODO: if same process is used for more website, change this view to make site_name appears in where clause ... to make it generic
 create or replace view integration.critiqueslibres_lookup as
     select
         book_uid,

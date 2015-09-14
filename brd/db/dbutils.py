@@ -40,14 +40,15 @@ class DbConnection(object):
         with self._connection as c:
             # cursor context manager : will close/release any resource held by cursor (ex. result cache)
             with c.cursor() as curs:
-                return curs.execute(sql, params)
+                print "about to execute " + sql + ", with params:" + str(params)
+                curs.execute(sql, params)
 
     def execute(self, sql, params=None):
         """
         Execute sql statement and return result while leaving open the transaction.
         """
         with self._connection.cursor() as curs:
-            return curs.execute(sql, params)
+            curs.execute(sql, params)
 
 
     def fetch_all_transaction(self, query, params=None):

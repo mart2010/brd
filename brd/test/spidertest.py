@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from brd.scrapy.items import ReviewBaseItem
 
 __author__ = 'mouellet'
@@ -24,24 +26,25 @@ import brd.scrapy.spiders.reviewspiders as reviewspiders
 class TestCritiqueslibres(unittest.TestCase):
 
     def setUp(self):
-        self.clibresSpider = reviewspiders.CritiquesLibresSpider()
-        # overwrite rules for test purposes
-        self.clibresSpider.min_nb_reviews = 2
-        self.clibresSpider.nbreviews_stored = {"200": "1", "400": "1", "500": "16"}
-
+        pass
 
     def tearDown(self):
         pass
 
 
     def test_scrape_review_stat_is_ok(self):
+        clibresSpider = reviewspiders.CritiquesLibresSpider(begin_period='1/1/2001', end_period='31/12/2015')
+        # overwrite rules for test purposes
+        clibresSpider.min_nb_reviews = 2
+        clibresSpider.nbreviews_stored = {"200": "1", "400": "1", "500": "16"}
+
         review_url = "file://mockobject/Critiques-%d.html"
-        self.clibresSpider.review_url_param = review_url
+        clibresSpider.review_url_param = review_url
 
         # ---------- Trigger the first parse() with mock json ---------- #
         # Spider running outside the engine (not using scrapy shell command)
         # and it seems we have to callback explicitly with the Response
-        request_asresp = self.clibresSpider.parse(fake_response_from_file("mockobject/review_list.json"))
+        request_asresp = clibresSpider.parse(fake_response_from_file("mockobject/review_list.json"))
 
         requests_actual = set()
         for r in request_asresp:
@@ -53,21 +56,19 @@ class TestCritiqueslibres(unittest.TestCase):
 
         self.assertEqual(requests_expected, requests_actual)
 
-
         # ---------- Trigger manually 2nd parse() with 1st response ---------- #
         item_param = ReviewBaseItem()
-        item_param['hostname'] = self.clibresSpider.allowed_domains[0]
+        item_param['hostname'] = clibresSpider.allowed_domains[0]
 
         for ri in bookid_expected:
             item_param['book_uid'] = ri
+            item_param['book_title'] = {200: u"Le Chevalier Oublié", 300: u"Eden Hôtel, Tome 2 : Ernesto", 400: u"Le Chevalier Oublié2"}[ri]
+
             meta  = {'item': item_param}
-            items = self.clibresSpider.parse_review(fake_response_from_file("mockobject/Critiques-%d.html" % ri,
-                                                                            response_type="Html",
-                                                                            meta=meta))
+            items = clibresSpider.parse_review(fake_response_from_file("mockobject/Critiques-%d.html" % ri, response_type="Html", meta=meta))
             countrev = 0
             for i in items: countrev += 1
 
-            #TODO: adjust for begin/end-date once it is implemented
             if ri == "200":
                 self.assertEquals(2, countrev)
             elif ri == "300":
