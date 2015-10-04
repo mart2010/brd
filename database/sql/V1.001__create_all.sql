@@ -23,18 +23,44 @@ TODO:
 
 create table staging.load_audit (
     id serial primary key,
-    batch_name varchar(200),
-    batch_status varchar(20),
+    batch_job varchar(100),
+    status varchar(500),  -- will store err msg when fail, other wise OK for each step.
+    step_name varchar(50),
+    start_dts timestamp,
+    finish_dts timestamp,
+    rows_impacted int,
     period_begin date,
     period_end date,   --excluded (12/11/15 -> 11/11/15 23:59:59)
-    batch_start_dts timestamp,
-    batch_finish_dts timestamp
 );
 
 comment on table staging.load_audit is 'Metadata used to manage each job that insert/update batch of records';
 
 
 create table staging.review (
+        id serial primary key,
+		hostname varchar(50) not null,
+		site_logical_name varchar(50),
+        reviewer_pseudo varchar(25) not null,
+        reviewer_uid varchar(50),
+		review_rating varchar(10) not null,
+        review_date varchar(50) not null,
+        review_text varchar(500),
+		book_title varchar(200) not null,
+		book_lang varchar(3) not null,
+        book_uid varchar(100),
+        book_isbn varchar(40),
+		derived_title_sform varchar(200),
+		derived_book_id uuid,   -- to ease the integgration bit, we derive and store the uuid hash during the load here
+		derived_review_date date,
+		loading_dts timestamp,
+		load_audit_id int   -- to link to the Load_Audit metadata table
+);
+
+comment on table staging.review is 'Review data scraped from website with derived data done in app-layer (ex. derived_title_sform)';
+comment on column staging.review.book_uid is 'Unique identifier of the book as used by website';
+
+
+create table staging.rejected_review (
         id serial primary key,
 		hostname varchar(50) not null,
         reviewer_pseudo varchar(25) not null,
@@ -50,11 +76,11 @@ create table staging.review (
 		derived_review_date timestamp,
 		loading_dts timestamp,
 		load_audit_id int   -- to link to the Load_Audit metadata table
-);
+)
 
 
-comment on table staging.review is 'Raw data scraped from website and derived data done exceptionnally in python app (ex. sform)';
-comment on column staging.review.book_uid is 'Unique identifier of the book (i.e. review) used by website';
+comment on table staging.review is 'Review record not loaded into integration layer (ex. because book data could not be linked) and store for future processing';
+
 
 
 -------------------------------------- Integration layer -------------------------------------
@@ -67,22 +93,25 @@ comment on column staging.review.book_uid is 'Unique identifier of the book (i.e
 -------------------------------------- Integration layer -------------------------------------
 
 
-
 create table integration.site (
     id int primary key,
-    last_seen_date date,
-    creation_dts timestamp not null
+    logical_name varchar(50) unique,
+    status varchar(10),
+    create_dts timestamp not null
 );
 
-comment on table integration.site is 'Website with book reviews scraped.  Design as Anchor model for greater flexibility (only a few of these expected anyway)';
-comment on column integration.site.last_seen_date is 'Flag used for sites that have disappeared';
+comment on table integration.site is 'Website with book reviews scraped.  Design as Anchor model for greater flexibility (only a few expected)';
+comment on column integration.site.logical_name is 'Name defined independently from evolving domain/url and used as a lookup for site_id';
+comment on column integration.site.status is 'Flag used to get status for sites';
+
 
 create table integration.site_identifier (
     site_id int not null,
     hostname varchar(100) not null,
+    full_url varchar(250),
     valid_from timestamp not null,
     valid_to timestamp,
-    creation_dts timestamp,
+    create_dts timestamp,
     update_dts timestamp,
     primary key (site_id, valid_from),
     foreign key (site_id) references integration.site(id) on delete cascade
@@ -91,81 +120,43 @@ create table integration.site_identifier (
 comment on table integration.site_identifier is 'Natural-key <hostname> is decoupled from site_id to accommodate change in time';
 comment on column integration.site_identifier.hostname is 'Hostname such as www.amazon.fr, www.amazon.com, www.thelibrary.fr';
 
-create table integration.site_info (
-    site_id int not null,
-    url varchar(250),
-    scraper_name varchar(50),
-    --other info..
-    valid_from timestamp not null,
-    valid_to timestamp,
-    creation_dts timestamp,
-    update_dts timestamp,
-    primary key (site_id, valid_from),
-    foreign key (site_id) references integration.site(id) on delete cascade
-);
-
-comment on column integration.site_info.scraper_name is 'Name defined in python scraper module and used as a lookup for site_id';
-
 
 create table integration.language (
     lang_code varchar(2) primary key,
     lang_name varchar(30),
     --add more info and code , etc...
-    creation_dts timestamp
+    create_dts timestamp
 );
 
 comment on table integration.language is 'Language look-up using immutable language_code (ISO?) as PK';
 
+/*
+--Choice for Book row definition:
+--1- one row per distinct value of title_sform resulting after conversion of titles scrapped in websites (using fct: convert_to_sform)
+--2- one row per distinct book
+
+-- 1: is easier to implement but will result in duplicates to be managed downstream
+-- 2: involves more managed/controlled integration workflow (potentionally involving manual interactions) to avoid generating duplicates originating from slight differences in title  spelling)
+
+-- For now: let's use #2, so Book will be fed from different jobs, and no REviewScaper will add new title (simply log title not found)!!
+
+*/
 
 create table integration.book (
     id uuid primary key,
     title_sform varchar(200) unique,
     lang_code varchar(2) not null,
     source_site_id int not null,
-    last_seen_date timestamp,
-    creation_dts timestamp,
+    create_dts timestamp,
     load_audit_id int
 );
 
-comment on table integration.book is 'Book reviewed as a single piece of "work" identified by the title found on websites (regardless of editions)';
+comment on table integration.book is 'Book reviewed as a single piece of "work" identified by its offical title (regardless of editions)';
 comment on column integration.book.id is 'Primary id generated by the MD5 hashing of title_sform';
 --Ignore title collision as book title are copyright so conflict should be very rare.
 comment on column integration.book.title_sform is 'Std title form with capitalisation and (redundant) blanks replaced by single dash: -';
 comment on column integration.book.lang_code is 'Book and reviews in different languages considered distinctly to accounted for cultural and language specific';
 comment on column integration.book.source_site_id is 'Site for which a first review was loaded for that book';
-
-
-create table integration.book_site (
-    book_id uuid not null,
-    site_id int not null,
-    book_uid varchar(100) not null,
-    title_text varchar(200) not null,
-    creation_dts timestamp,
-    load_audit_id int,
-    primary key (book_id, site_id),
-    foreign key (book_id) references integration.book(id) on delete cascade,
-    foreign key (site_id) references integration.site(id) on delete cascade
-);
-
-comment on table integration.book_site is 'Book identity by site, useful to find book duplications in book table from title spelling differences';
-comment on column integration.book_site.book_uid is 'Book alternative identifier managed by website (ex. critiqueslibres used unique integer)';
-comment on column integration.book_site.title_text is 'Title as seen in websites with only leading/trailing blanks removed';
-
-
-
--- this will be manually maintained, at least at the beginning
-create table integration.book_sameas (
-    book_id uuid not null,
-    same_book_id uuid not null,
-    creation_dts timestamp,
-    update_dts timestamp,
-    primary key (book_id, same_book_id),
-    foreign key (book_id) references integration.book(id) on delete cascade,
-    foreign key (same_book_id) references integration.book(id) on delete cascade
-);
-
-comment on table integration.book_sameas is 'Used to match identical book (reviews are recorded as-is from webistes, leading to possible duplication)';
-comment on column integration.book_sameas.book_id is 'Not all permutation of (book_id, same_book_id) stored, hence same book_id is used in case more than 2 sites have duplicates';
 
 
 
@@ -181,10 +172,9 @@ create table integration.book_detail (
 
 create table integration.author (
     id serial primary key,
-    creation_dts timestamp,
+    create_dts timestamp,
     load_audit_id int
 );
-
 
 
 create table integration.book_edition (
@@ -208,7 +198,7 @@ create table integration.reviewer (
     site_id int not null,
     pseudo varchar(100) not null,
     last_seen_date date,
-    creation_dts timestamp not null,
+    create_dts timestamp not null,
     load_audit_id int,
     foreign key (site_id) references integration.site(id) on delete cascade
 );
@@ -228,20 +218,20 @@ create table integration.reviewer_info (
     any_other_demogr varchar(100),
     valid_from timestamp not null,
     valid_to timestamp,
-    creation_dts timestamp,
+    create_dts timestamp,
     update_dts timestamp,
     load_audit_id int,
     primary key (reviewer_id, valid_from),
     foreign key (reviewer_id) references integration.reviewer(id) on delete cascade
 );
 
---here I could use reviewer info to find "same-as" reviewer from different site
+--Potential usage : here I could use reviewer info to find "same-as" reviewer from different site
 create table integration.reviewer_sameas (
     reviewer_id uuid not null,
     same_reviewer_id uuid not null,
     valid_from timestamp not null,
     valid_to timestamp,
-    creation_dts timestamp,
+    create_dts timestamp,
     update_dts timestamp,
     load_audit_id int,
     primary key (reviewer_id, same_reviewer_id, valid_from),
@@ -255,15 +245,35 @@ create table integration.review (
     book_id uuid not null,
     reviewer_id uuid not null,
     rating_code varchar(20) not null,
-    last_seen_date date,
-    creation_dts timestamp,
+    review_date date not null,
+    create_dts timestamp,
     load_audit_id int,
     foreign key (book_id) references integration.book(id) on delete cascade,
     foreign key (reviewer_id) references integration.reviewer(id) on delete cascade
 );
 
---for now this table is not a-la-DV style.  It contains rating that should be ingested after it can no longer be updated from user (ex. some site offering update has an expiration date to allow for these updates..)
-comment on table integration.review is 'An association representing review for one book given by one reviewer';
+--for now this table is not a-la-DV style.  It contains rating to be loaded after it can no longer be updated from reviewer (ex. some site offering update has an expiration date to allow for these updates..)
+comment on table integration.review is 'A review done by one reviewer for a given book';
+
+
+create table integration.book_site_review (
+    book_id uuid not null,
+    site_id int not null,
+    book_uid varchar(200) not null,
+    title_text varchar(200) not null,
+    last_seen_date timestamp,
+    create_dts timestamp,
+    load_audit_id int,
+    primary key (book_id, site_id),
+    foreign key (book_id) references integration.book(id) on delete cascade,
+    foreign key (site_id) references integration.site(id) on delete cascade
+);
+
+comment on table integration.book_site_review is 'Book with review scrapped by site';
+comment on column integration.book_site_review.book_uid is 'Book identifier managed by website (ex. critiqueslibres used integer)';
+comment on column integration.book_site_review.title_text is 'Title in website as they appear, except for removal of any leading/trailing blanks';
+
+
 
 
 create table integration.rating_def (
@@ -272,7 +282,7 @@ create table integration.rating_def (
     class varchar(50) not null,
     value int not null,
     normal_value int not null,
-    creation_dts timestamp,
+    create_dts timestamp,
     load_audit_id int,
     primary key (code, class)
 );
@@ -283,23 +293,17 @@ comment on table integration.rating_def is 'Simple rating code with its hierarch
 
 ---------------------- View -------------------------
 
+-- View that return how many reviews already persisted per website logical name (i.e. defined in site_info.logical_name)
 
---note: critiqueslibres is loaded in 2 stages:
--- 1) flag all newly reviewed books from global list: take all books with nb_reviews > 1, either not yet staged or having new reviews (staging.nb_review is less)
--- 2) for all flag books, fetch reviews dating inside logical date period : LOAD_START_DATE -> LOAD_END_DATE (could be date of review or date of review with no more edit possible)
+create or replace view integration.reviews_persisted_lookup  as
+    select   logical_name
+            ,book_uid
+            ,1 as one_review
+    from integration.book_with_review b
+    join integration.site s on (s.id = b.site_id)
+    join integration.review r on (r.book_id = b.book_id);
 
--- TODO: if same process is used for more website, change this view to make site_name appears in where clause ... to make it generic
-create or replace view integration.critiqueslibres_lookup as
-    select
-        book_uid,
-        count(*) as nb_reviews
-    from integration.book_site b
-    join integration.review r on (r.book_id = b.book_id)
-    group by b.book_uid;
-
-comment on view integration.critiqueslibres_lookup is 'Used to find how many reviews currently pesisted';
-
-
+comment on view integration.reviews_persisted_lookup is 'Report the number of reviews currently persisted by website (logical_name)' ;
 
 
 

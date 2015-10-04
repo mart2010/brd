@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 __author__ = 'mouellet'
 
 import unittest
@@ -10,33 +12,33 @@ class TestDbUtils(unittest.TestCase):
     def setUp(self):
         self.dbconn = dbutils.get_connection()
         try:
-            cr = self.dbconn.execute_transaction("create table test_1(id int, val varchar(20))")
-            self.assertIsNone(cr, "Create table stmt returns None")
+            cr = self.dbconn.execute_inTransaction("create table test(id int, val varchar(20))")
+            self.assertEqual(-1, cr, "Create table stmt should have returned -1")
         except psycopg2.ProgrammingError, err:
-            # this is the exception raised by psycopg2 when table already exist
-            self.dbconn.execute_transaction("truncate table test_1")
+            print str(err)
 
 
     def tearDown(self):
-        self.dbconn.execute_transaction("drop table test_1")
+        self.dbconn.execute_inTransaction("drop table if exists test")
 
 
     def test_execute_and_fetch_all_transaction_ok(self):
 
-        insert = "insert into test_1(id, val) values(%s, %s)"
+        insert = "insert into test(id, val) values(%s, %s)"
         for i in range(10):
             params = (i, "val" + str(i))
-            self.dbconn.execute_transaction(insert, params)
+            ret = self.dbconn.execute_inTransaction(insert, params)
+            self.assertEqual(1, ret)
             self.assertEquals(psycopg2.extensions.TRANSACTION_STATUS_IDLE,
-                              self.dbconn.get_connection().get_transaction_status(),
+                              self.dbconn.connection.get_transaction_status(),
                               "Execute_transaction() should've committed, leaving no transaction active")
 
         # verify that rollback here has no impact
-        self.dbconn.get_connection().rollback()
+        self.dbconn.rollback()
 
-        res = self.dbconn.fetch_all_transaction("select * from test_1")
+        res = self.dbconn.fetch_all_inTransaction("select * from test")
         self.assertEquals(psycopg2.extensions.TRANSACTION_STATUS_IDLE,
-                              self.dbconn.get_connection().get_transaction_status(),
+                              self.dbconn.connection.get_transaction_status(),
                               "Fecth_all_transaction() should've committed, leaving no current transaction active")
 
         self.assertEquals(10, len(res))
@@ -46,19 +48,33 @@ class TestDbUtils(unittest.TestCase):
 
 
     def test_execute_without_commit_ok(self):
-        insert = "insert into test_1(id, val) values(%s, %s)"
+        insert = "insert into test(id, val) values(%s, %s)"
         for i in range(10):
             params = (i, "val" + str(i))
-            self.dbconn.execute(insert, params)
+            ret = self.dbconn.execute(insert, params)
+            self.assertEqual(1, ret)
             self.assertEquals(psycopg2.extensions.TRANSACTION_STATUS_INTRANS,
-                              self.dbconn.get_connection().get_transaction_status(),
+                              self.dbconn.connection.get_transaction_status(),
                               "Execute_transaction() does NOT commit, so should leaving current transaction active")
 
-        res = self.dbconn.fetch_all("select * from test_1")
+        res = self.dbconn.fetch_all("select * from test")
         self.assertEquals(10, len(res))
-        self.dbconn.get_connection().rollback()
-        res = self.dbconn.fetch_all("select * from test_1")
+        self.dbconn.rollback()
+        res = self.dbconn.fetch_all("select * from test")
         self.assertEquals(0, len(res), "Insert never committed, so the rollback should have removed all rows")
 
+
+    def test_insert_and_fetch_id_ok(self):
+        self.dbconn.execute("drop table if exists auto_table")
+        self.dbconn.execute("create table auto_table(id serial, t varchar(10))")
+        id = self.dbconn.insert_row_and_fetch_id("insert into auto_table(t) values('ttt')")
+        self.assertEquals(1, id)
+        self.assertTrue(type(id) == int)
+        self.dbconn.execute("drop table auto_table")
+
+
+    def test_fetch_one(self):
+        # TODO: implement-me
+        pass
 
 

@@ -1,0 +1,18 @@
+
+- Should use supervisord.org for managing/scheduling/monitor the runtime of jobs running
+
+
+- Should test the hashing MD5 fct from both python runtime and PS... should be SAME!!!
+
+
+
+
+
+
+
+
+# when installing psycopg2  or cryptography with my version of xcode, need to convert certain  error into warnng by appending:
+# ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
+
+ex. ARCH.... pip install psycopg2
+

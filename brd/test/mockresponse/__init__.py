@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 
 from scrapy.http import Response, Request, TextResponse, HtmlResponse

@@ -6,7 +6,7 @@ import re
 import brd.db.dbutils as dbutils
 
 
-# TODO: eventually refactor these garbage utils fcts into separate module
+# TODO: eventually refactor these various utils fcts into fct-based modules
 
 # maybe use locale later, but I know this simple solution works for exact mois name used!
 mois = {
@@ -33,30 +33,51 @@ def convert_to_sform(title):
     r"""
     Convert raw title found in websites and transform into a format used after for MD5 hashing
     For doctest to work, I need to flag this text as raw (r)
-    >>> convert_title(" title blank with leading/trailing  ")
+    >>> convert_to_sform(" title blank with leading/trailing  ")
     'TITLE-BLANK-WITH-LEADING/TRAILING'
-    >>> convert_title(" Here's a good \"garden\", to convert!!?")
+    >>> convert_to_sform(" Here's a good \"garden\", to convert!!?")
     'HERE\'S-A-GOOD-"GARDEN",-TO-CONVERT!!?'
     """
     ctrim = title.strip().upper()
     return compile_regex.sub("-", ctrim)
 
 
-def fetch_nbreviews_stored(scraper_name):
-    query = """select book_uid, nb_reviews
-                from integration.%s
+def fetch_nbreviews(scraper_name):
+    query = """select  book_uid
+                      ,count(one_review) as nb_reviews
+                from integration.reviews_persisted_lookup
+                where logical_name = %s
+                group by book_uid
              """
-    # tablename cannot be set as parameter, TODO: make View generic and filter on specific site domain or id instead..
-    tablename = scraper_name + "_lookup"
-    squery = query % tablename
 
-    res = dbutils.get_ro_connection().execute_transaction(squery)
+    res = dbutils.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
 
     nbreviews_stored = {}
     if res is not None:
-        for row in dbutils.get_ro_connection().execute_transaction(squery):
+        for row in res:
             nbreviews_stored[row[0]] = row[1]
     return nbreviews_stored
+
+
+def fetch_book_titles(scraper_name):
+    """
+    Fetch titles scrapped by other spiders but not for 'scraper_name'.
+    Useful for site scrapping new revews through search (ex. babelio where no global list exist)
+    :param scraper_name:
+    :return:
+    """
+    query = """
+        select max(title_text) as title_not_scraped
+        from integration.book_site_review b
+        where b.book_id not exists
+            (select c.*
+            from integration.book_site_review c
+            join integration.site s on (s.id = c.site_id)
+            where
+            s.logical_name = %s  --logical name of babelio
+            and c.book_id = b.book_id)
+    """
+    return dbutils.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
 
 
 
