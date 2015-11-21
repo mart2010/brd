@@ -13,25 +13,33 @@ DATABASE = {
 # website section (to be stored in DB...)
 
 #for now, in french:
-source_websites = {
-    'librarything': 'http://www.librarything.fr',
+SOURCE_WEBSITES_FR = {
+    'critiqueslibres': 'http://www.critiqueslibres.com',  # 15K livres
     'decitre':'http://www.decitre.fr',
-    'goodreads': 'http://www.goodreads.com',
     'amazon': 'http://www.amazon.fr',
     'fnac': 'http://www.fnac.com',
-    'critiqueslibres': 'http://www.critiqueslibres.com',  # 15K livres
     'senscritique': 'http://www.senscritique.com',
     'babelio': 'http://www.babelio.com',
-    'guidelecture': 'http://www.guidelecture.com',
     'critique-livre': 'http://www.critique-livre.fr',
-    '':'',
+    # these sites are quite outdated and/or just too few reviews to be considered
+    'guidelecture': 'http://www.guidelecture.com'
 }
 
-isbn_db = ''
 
-# resource connection
+SOURCE_WEBSITES_EN = {
+    'goodreads': 'http://www.goodreads.com',
+    'librarything': 'http://www.librarything.com'
+}
 
 
+
+
+
+
+# resource
+
+SCRAPED_OUTPUT_DIR = "/Users/mouellet/Temp/"
+SCRAPED_ARCHIVE_DIR = "~/Temp/archive"
 
 # business rules
 

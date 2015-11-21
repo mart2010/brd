@@ -4,16 +4,19 @@
 #
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
-
-import brd.db.dbutils as dbutils
+from brd import config
 import brd.scrapy.utils as utils
 from scrapy.exceptions import DropItem
+from scrapy import signals
+import csv
+from scrapy.exporters import CsvItemExporter
 
 
-class ReviewFilterAndConverter:
+class ReviewFilterAndConverter(object):
     """
-    This pipeline is responsible in filtering out review not within load period and
-    in parsing/converting some fields (ex. derived_title_sform, derived_review_date)
+    This pipeline is responsible of
+    1) filtering out Reviews not within load period
+    2) parsing/converting some fields (ex. derived_title_sform, derived_review_date)
     """
 
     def __init__(self):
@@ -40,22 +43,57 @@ class ReviewFilterAndConverter:
 
 
 
-class ReviewStageLoader(object):
 
-    # TODO: All DB interactions should be migrated to service.py
-    sql_insert_review = 'insert into staging.review(%s) values (%s)'
-    sql_insert_reviewer = 'insert into staging.reviewer(%s) values (%s)'
+class CsvExporter(object):
+    """
+    Dump scraped data into flat file
+    # Could be done by Feed-Exporters with no extra-code (scrapy crawl spider_name -o output.csv -t csv)
+    # but is less integrated with the code base (output setting must be redefined...)
+
+    """
 
     def __init__(self):
-        """ The pipeline instantiates dedicate connection to manage transaction explicitly
-        """
-        self.db_conn = dbutils.DbConnection()
+        self.files = {}
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        pipeline = cls()
+        # TODO: is this needed to do someking of registration of spider_closed/opened event?
+        crawler.signals.connect(pipeline.spider_opened, signals.spider_opened)
+        crawler.signals.connect(pipeline.spider_closed, signals.spider_closed)
+        return pipeline
+
+    def get_filename(self, prefix, begin_period, end_period):
+        b = str(begin_period.day) + '-' + str(begin_period.month) + '-' + str(begin_period.year)
+        e = str(end_period.day) + '-' + str(end_period.month) + '-' + str(end_period.year)
+        return prefix + '_' + b + '_' + e + '.dat'
+
+
+    def spider_opened(self, spider):
+        fn = config.SCRAPED_OUTPUT_DIR + self.get_filename(spider.name, spider.begin_period, spider.end_period)
+        f = open(fn, 'w')
+        self.files[spider] = f
+        self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|')
+        self.exporter.start_exporting()
+
+    def spider_closed(self, spider):
+        self.exporter.finish_exporting()
+        f = self.files.pop(spider)
+        f.close()
 
     def process_item(self, item, spider):
-        # here I will adjust insert_sql depending whether spider is of type Reviews, Reviewer, ..
-        self.insert_data(item, self.sql_insert_review)
-        # process_item() must return item as specified by contract (for downstream consumption)
+        self.exporter.export_item(item)
         return item
+
+
+
+
+
+
+
+
+
+class OldIdeaToLoadDB(object):
 
     def insert_data(self, item, insert_sql):
         keys = item.fields.keys()

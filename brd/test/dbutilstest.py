@@ -31,15 +31,15 @@ class TestDbUtils(unittest.TestCase):
             self.assertEqual(1, ret)
             self.assertEquals(psycopg2.extensions.TRANSACTION_STATUS_IDLE,
                               self.dbconn.connection.get_transaction_status(),
-                              "Execute_transaction() should've committed, leaving no transaction active")
+                              "Commit expected, leaving no transaction active")
 
         # verify that rollback here has no impact
         self.dbconn.rollback()
 
         res = self.dbconn.fetch_all_inTransaction("select * from test")
         self.assertEquals(psycopg2.extensions.TRANSACTION_STATUS_IDLE,
-                              self.dbconn.connection.get_transaction_status(),
-                              "Fecth_all_transaction() should've committed, leaving no current transaction active")
+                          self.dbconn.connection.get_transaction_status(),
+                          "Commit expected, leaving no transaction active")
 
         self.assertEquals(10, len(res))
         self.assertEquals(0, res[0][0])

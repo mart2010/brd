@@ -4,8 +4,9 @@
 
 - Should test the hashing MD5 fct from both python runtime and PS... should be SAME!!!
 
+- to export using the out-of-the-box Feed-Exporters:
 
-
+scrapy crawl critiqueslibres --set FEED_URI="//Temp/%(name)s/%(time)s" --set FEED_FORMAT=csv
 
 
 

@@ -113,6 +113,26 @@ class DbConnection(object):
 
 
 
+# Singleton connections for client code that can share same connection
+# All commands will be run within same session and serialized
+# may not have a good use-case in this app ?
+conn_readonly = None
+def get_ro_connection():
+    global conn_readonly
+    if conn_readonly is None:
+        conn_readonly = DbConnection(readonly=True)
+    return conn_readonly
+
+conn = None
+def get_connection():
+    global conn
+    if conn is None:
+        conn = DbConnection(readonly=False)
+    return conn
+
+
+
+
 # impl tentative for Conn Obj that can chain CTAS stmt...
 class CTAStage(object):
     temptables = []
@@ -164,23 +184,6 @@ class CTAStage(object):
 
 
 
-
-# Singleton connections handy for client code that can share same connection
-# All commands will be run withon same session and serialized
-# may not have a good use-case in this app ?
-conn_readonly = None
-def get_ro_connection():
-    global conn_readonly
-    if conn_readonly is None:
-        conn_readonly = DbConnection(readonly=True)
-    return conn_readonly
-
-conn = None
-def get_connection():
-    global conn
-    if conn is None:
-        conn = DbConnection(readonly=False)
-    return conn
 
 
 

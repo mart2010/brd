@@ -1,18 +1,55 @@
 # -*- coding: utf-8 -*-
 __author__ = 'mouellet'
 
+import shutil
 import datetime
 import brd.db.dbutils as dbutils
+import brd.config as config
+import os
+import fnmatch
 
 
-
-def persist_scraped_review(period):
+def get_pending_files(repdir, pattern):
     """
-    Persist a new review into staging (pipeline should call this instead..?)
-    Here.. I should actually trigger scraping session with each spiders and store auditing meta related to...
+    Get all files under repdir and below (recursively)
+    :param repdir:
+    :param pattern:
+    :return: list of files matching pattern
+    """
+    if not os.path.lexists(repdir):
+        raise EnvironmentError("Invalid directory defined :'" + repdir + "'")
+
+    pending_files = []
+    for root, dirnames, filenames in os.walk(repdir):
+        for filename in fnmatch.filter(filenames, pattern):
+            pending_files.append(os.path.join(root, filename))
+    return pending_files
+
+
+def treat_loaded_file(processed_file, remove, archive_dir):
+    if remove:
+        os.remove(processed_file)
+    else:
+        shutil.move(processed_file, archive_dir)
+
+
+
+def bulkload_review_files(period):
+    """
     :return:
     """
-    pass
+    pending_files = get_pending_files(config.SCRAPED_OUTPUT_DIR, "Reviews*.dat")
+
+    for datfile in pending_files:
+        #TODO: to be tested if ok, otherwise use copy_from or copy_expert method on cur object with psycopg2
+        sql = "copy staging.review from " + datfile + " (delimiter('|'))"
+        dbutils.get_connection().execute_inTransaction(sql)
+
+        # TODO: move the file to archive
+        treat_loaded_file(datfile, False, config.SCRAPED_ARCHIVE_DIR )
+
+
+
 
 
 def load_staged_reviews():
@@ -135,7 +172,7 @@ def update_auditing(named_params):
 def load_review(named_params):
     sql = \
         """
-        insert into integration.review( book_id, reviewer_id, review_date, rating_code, create_dts, load_audit_id )
+        insert into integration.review(book_id, reviewer_id, review_date, rating_code, create_dts, load_audit_id)
         select
             b.id
             , reviewer_id
@@ -152,7 +189,7 @@ def load_review(named_params):
 def load_book_site_review(named_params):
     sql = \
         """
-        insert into integration.book_site_review( book_id, site_id, book_uid, title_text, create_dts, load_audit_id )
+        insert into integration.book_site_review(book_id, site_id, book_uid, title_text, create_dts, load_audit_id)
         select distinct
             b.id
             , s.id
@@ -176,7 +213,7 @@ def load_book_site_review(named_params):
 def load_reviewer(named_params):
     sql = \
         """
-        insert into integration.reviewer( id, site_id, pseudo, create_dts, load_audit_id)
+        insert into integration.reviewer(id, site_id, pseudo, create_dts, load_audit_id)
         select
             b.id
             , s.id

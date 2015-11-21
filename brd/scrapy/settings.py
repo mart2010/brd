@@ -19,10 +19,11 @@ COOKIES_ENABLED = False
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 
-#ITEM_PIPELINES = {
-#    'brd.scrapy.pipelines.ReviewStageLoader': 300,
-#}
+ITEM_PIPELINES = {
+    'brd.scrapy.pipelines.pipelines.CsvExporter': 100
+}
 
+# 'brd.scrapy.pipelines.pipelines.ReviewStageLoader': 300,
 
 # NEWSPIDER_MODULE = 'brd_tuto.spiders'
 
