@@ -35,7 +35,7 @@ class DbConnection(object):
         Execute sql statement as a single transaction
         :return rowcount impacted
         """
-        # connection context manager: if no exception raised within block then transaction is committed (otherwise rolled back)
+        # connection context manager: if no exception raised in context then trx is committed (otherwise rolled back)
         with self.connection as c:
             # cursor context manager : will close/release any resource held by cursor (ex. result cache)
             with c.cursor() as curs:
@@ -50,6 +50,17 @@ class DbConnection(object):
         with self.connection.cursor() as curs:
             curs.execute(sql, params)
             return curs.rowcount
+
+
+    def copy_expert(self, sql, infile, size=8192):
+        """
+        Execute copy_expert as a single transaction and commit
+        :return rowcount impacted
+        """
+        with self.connection as c:
+            with c.cursor() as curs:
+                curs.copy_expert(sql, infile, size)
+                return curs.rowcount
 
 
     def insert_row_get_id(self, insert, params=None):

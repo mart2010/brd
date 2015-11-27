@@ -13,6 +13,7 @@ class ReviewBaseItem(Item):
     we rely on these name for building insert statement
     """
     hostname = Field()
+    site_logical_name = Field()
     reviewer_pseudo = Field()
     reviewer_uid = Field()
     review_rating = Field()
@@ -26,7 +27,7 @@ class ReviewBaseItem(Item):
     derived_review_date = Field()
     book_lang = Field()
 
-
+    load_audit_id = Field()
 
 
 class BookBaseItem(Item):

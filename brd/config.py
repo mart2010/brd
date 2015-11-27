@@ -39,7 +39,7 @@ SOURCE_WEBSITES_EN = {
 # resource
 
 SCRAPED_OUTPUT_DIR = "/Users/mouellet/Temp/"
-SCRAPED_ARCHIVE_DIR = "~/Temp/archive"
+SCRAPED_ARCHIVE_DIR = "/Users/mouellet/Temp/archive"
 
 # business rules
 

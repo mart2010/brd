@@ -10,13 +10,14 @@ from scrapy.exceptions import DropItem
 from scrapy import signals
 import csv
 from scrapy.exporters import CsvItemExporter
+import brd.db.service as service
 
 
 class ReviewFilterAndConverter(object):
     """
     This pipeline is responsible of
     1) filtering out Reviews not within load period
-    2) parsing/converting some fields (ex. derived_title_sform, derived_review_date)
+    2) adding derived fields (ex. derived_title_sform, derived_review_date)
     """
 
     def __init__(self):
@@ -44,7 +45,7 @@ class ReviewFilterAndConverter(object):
 
 
 
-class CsvExporter(object):
+class DumpScrapedData(object):
     """
     Dump scraped data into flat file
     # Could be done by Feed-Exporters with no extra-code (scrapy crawl spider_name -o output.csv -t csv)
@@ -54,6 +55,8 @@ class CsvExporter(object):
 
     def __init__(self):
         self.files = {}
+        self.audit = {}
+        self.counter = 0
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -63,33 +66,38 @@ class CsvExporter(object):
         crawler.signals.connect(pipeline.spider_closed, signals.spider_closed)
         return pipeline
 
-    def get_filename(self, prefix, begin_period, end_period):
-        b = str(begin_period.day) + '-' + str(begin_period.month) + '-' + str(begin_period.year)
-        e = str(end_period.day) + '-' + str(end_period.month) + '-' + str(end_period.year)
-        return prefix + '_' + b + '_' + e + '.dat'
-
 
     def spider_opened(self, spider):
-        fn = config.SCRAPED_OUTPUT_DIR + self.get_filename(spider.name, spider.begin_period, spider.end_period)
-        f = open(fn, 'w')
-        self.files[spider] = f
+        filename = self.get_dump_filename(spider)
+        f = open(config.SCRAPED_OUTPUT_DIR + filename, 'w')
+        self.files[spider.name] = f
         self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|')
+        # audit record must have correct period (used to filter period when loading staging.reviews)
+        audit_id = self.create_audit(filename, (spider.begin_period, spider.end_period))
+        self.audit[spider.name] = audit_id
         self.exporter.start_exporting()
 
     def spider_closed(self, spider):
         self.exporter.finish_exporting()
-        f = self.files.pop(spider)
+        f = self.files.pop(spider.name)
         f.close()
+        self.update_audit(self.counter, self.audit[spider.name])
 
     def process_item(self, item, spider):
+        item['load_audit_id'] = self.audit[spider.name]
         self.exporter.export_item(item)
+        self.counter += 1
         return item
 
+    def create_audit(self, filename, period):
+        step = "Loaded file: " + filename
+        return service.load_auditing({'job': DumpScrapedData.__name__, 'step': step, 'begin': period[0], 'end': period[1]})
 
+    def update_audit(self, nb_rows, audit_id):
+        service.update_auditing({'nb': nb_rows, 'status': "Completed", 'id': audit_id})
 
-
-
-
+    def get_dump_filename(self, spider):
+        return spider.name + '_' + utils.get_period_text(spider.begin_period, spider.end_period) + '.dat'
 
 
 

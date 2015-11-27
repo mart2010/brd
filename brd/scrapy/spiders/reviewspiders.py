@@ -10,47 +10,35 @@ from datetime import datetime
 import brd.config as config
 
 
-def populate_item(item, **kitems):
-    for key in kitems.iterkeys():
-        item[key] = kitems[key]
-
 
 # ------------------------------------------------------------------------------------------------- #
 #                                        ReviewBaseSpider                                           #
 # ------------------------------------------------------------------------------------------------- #
 
 class BaseReviewSpider(scrapy.Spider):
-
     # business-rules
     min_nb_reviews = 5
-
 
     def __init__(self, logical_name, **kwargs):
         """
         Make sure all mandatory arguments are passed to all Spider subclass
-        (ex. scrapy crawl myspider -a param1=val1 -a param2=val2)
-        :param begin_period: Review's minimum date to scrape ('dd/mm/yyyy')
-        :param end_period: Review's maximum date (exclusive) to scrape ('dd/mm/yyyy')
-        :param logical_name: name defined in the review subclass scraper (static name field)
+        (ex. scrapy crawl myspider -a param1=val1 -a param2=val2).
+        :begin_period: Review's minimum date to scrape ('d-m-yyyy')
+        :end_period: Review's maximum date (exclusive) to scrape ('d-m-yyyy')
+        :logical_name: name defined in the review subclass scraper (static name field)
                 (must match site.logical_name at DB level)
         """
         super(BaseReviewSpider, self).__init__(**kwargs)
 
-        # default period for now...
-        if not kwargs.has_key('begin_period'):
-            kwargs['begin_period'] = '01/01/2000'
-            kwargs['end_period'] = '01/01/2010'
+        assert (kwargs['begin_period'] is not None)
+        assert (kwargs['end_period'] is not None)
 
-        # assert(kwargs['begin_period'] is not None)
-        # assert(kwargs['end_period'] is not None)
-
-        self.begin_period = datetime.strptime(kwargs['begin_period'], '%d/%m/%Y')
-        self.end_period = datetime.strptime(kwargs['end_period'], '%d/%m/%Y')
         self.logical_name = logical_name
+        self.begin_period = datetime.strptime(kwargs['begin_period'], '%d-%m-%Y')
+        self.end_period = datetime.strptime(kwargs['end_period'], '%d-%m-%Y')
 
         # dict to hold the nb-reviews already persisted: {"book_uid": "nb"}  (Probably not scalable and not to be used for all spider)
         # self.stored_nb_reviews = utils.fetch_nbreviews(self.logical_name)
-
 
 
 # ------------------------------------------------------------------------------------------------- #
@@ -70,8 +58,9 @@ class CritiquesLibresSpider(BaseReviewSpider):
 
     Note: critique can be modified during 7 days, so Spider MUST BE RUN after 7 days after end-of-period !!
     """
-    name = 'critiqueslibres'
-    allowed_domains = ['www.critiqueslibres.com']   # used as 'hostname' in item field
+    name = 'ReviewOfcritiqueslibres'
+    allowed_domains = ['www.critiqueslibres.com']  # used as 'hostname' in item field
+    lang = 'FR'
 
     ###########################
     # Control setting
@@ -92,16 +81,16 @@ class CritiquesLibresSpider(BaseReviewSpider):
     # Parse_review setting
     ###########################
     url_review = "http://www.critiqueslibres.com/i.php/vcrit/%d?alt=print"
-    xpath_title    = '//td[@class="texte"]/p/strong/text()'
-    xpath_rating   = './td[@class="texte"]/img[contains(@name,"etoiles")]/@name'
-    xpath_date     = './td[@class="texte"]/p[2]/text()'     # return:  " - BOURGES - 50 ans - 1 décembre 2004"
-    xpath_pseudo   = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/text()'
-    xpath_reviewer_uid  = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/@href'  # return: "/i.php/vuser/?uid=32wdqee2334"
+    xpath_title = '//td[@class="texte"]/p/strong/text()'
+    xpath_rating = './td[@class="texte"]/img[contains(@name,"etoiles")]/@name'
+    xpath_date = './td[@class="texte"]/p[2]/text()'  # return:  " - BOURGES - 50 ans - 1 décembre 2004"
+    xpath_pseudo = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/text()'
+    xpath_reviewer_uid = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/@href'  # return: "/i.php/vuser/?uid=32wdqee2334"
     ###########################
 
     def __init__(self, **kwargs):
         # don't use self.name as instance variable that could shadow the static one (to confirm?)
-        super(CritiquesLibresSpider, self).__init__(CritiquesLibresSpider.name, **kwargs)
+        super(CritiquesLibresSpider, self).__init__(self.name, **kwargs)
 
     def start_requests(self):
         for i in range(0, self.max_nb_items, self.items_per_page):
@@ -118,9 +107,12 @@ class CritiquesLibresSpider(BaseReviewSpider):
             nreviews_eclair = int(review['nbrcrit']) - 1
             bookid = review['id']
             # only scrape the ones having enough review-eclair (nbreviews) and not yet stored
-            if self.min_nb_reviews <= nreviews_eclair:  # TO_ADD:  > int(self.stored_nb_reviews.get(bookid, 0)):
-                item = ReviewBaseItem()
-                populate_item(item, hostname=self.allowed_domains[0], book_uid=bookid, book_title=review['titre'])
+            if self.min_nb_reviews <= nreviews_eclair > int(self.stored_nb_reviews.get(bookid, 0)):
+                item = ReviewBaseItem(hostname=self.allowed_domains[0],
+                                      site_logical_name=self.name,
+                                      book_uid=bookid,
+                                      book_title=review['titre'],
+                                      book_lang=self.lang)
                 # trigger the 2nd Request
                 request = scrapy.Request(self.url_review % int(bookid), callback=self.parse_review)
                 request.meta['item'] = item
@@ -138,19 +130,18 @@ class CritiquesLibresSpider(BaseReviewSpider):
         for review_sel in allreviews:
             # iterate through 3 rows for each critics : row-1: title_star, row-2: pseudo + date, row-3: horizontal line
             if rowno == 1:
-                new_item = ReviewBaseItem()
-                populate_item(new_item, hostname=passed_item['hostname'], book_uid=passed_item['book_uid'],
-                              book_title=passed_item['book_title'], review_rating=resolve_value(review_sel, self.xpath_rating) )
+                passed_item['review_rating'] = resolve_value(review_sel, self.xpath_rating)
                 rowno = 2
             elif rowno == 2:
                 ruid = resolve_value(review_sel, self.xpath_reviewer_uid)
                 rdate = resolve_value(review_sel, self.xpath_date)
-                populate_item(new_item, reviewer_pseudo=resolve_value(review_sel, self.xpath_pseudo),
-                              reviewer_uid=ruid[ruid.rfind("=") + 1:], review_date=rdate[rdate.rfind("-") + 2:])
+                passed_item['reviewer_pseudo'] = resolve_value(review_sel, self.xpath_pseudo),
+                passed_item['reviewer_uid'] = ruid[ruid.rfind("=") + 1:],
+                passed_item['review_date'] = rdate[rdate.rfind("-") + 2:]
                 rowno = 3
             else:
                 rowno = 1
-                yield new_item
+                yield passed_item
 
     @staticmethod
     def parse_review_date(review_date):
@@ -158,7 +149,6 @@ class CritiquesLibresSpider(BaseReviewSpider):
         month_no = utils.mois[month_name]
         review_date = review_date.replace(month_name, month_no)
         return datetime.strptime(review_date, '%d %m %Y')
-
 
 
 # ------------------------------------------------------------------------------------------------- #
@@ -172,28 +162,17 @@ class BabelioSpider(BaseReviewSpider):
     Or lookup review based on Book and sorted by Date!
 
     """
-    name = 'babelio'
+    name = 'Review_babelio'
     allowed_domains = ['www.babelio.com']
 
     # Book_uid is defined in this site as 'title/id' (ex. 'Green-Nos-etoiles-contraires/436732'
     # tri=dt order by date descending
     review_url_param = "http://www.babelio.com/livres/%s/critiques?pageN=2&tri=dt"
 
-
     def __init__(self, **kwargs):
         super(BabelioSpider, self).__init__(BabelioSpider.name, **kwargs)
         pass
 
-
     def start_requests(self):
         pass
         # for stored_
-
-
-
-
-
-
-
-
-

@@ -4,6 +4,7 @@ __author__ = 'mouellet'
 
 import re
 import brd.db.dbutils as dbutils
+from datetime import datetime
 
 
 # TODO: eventually refactor these various utils fcts into fct-based modules
@@ -97,3 +98,21 @@ def resolve_value(selector, xpath, expected=1):
     return val
 
 
+def get_period_text(begin_period, end_period):
+    """
+    :return: 'd-m-yyyy_d-m-yyyy' from the specified begin/end_priod date
+    """
+    b = str(begin_period.day) + '-' + str(begin_period.month) + '-' + str(begin_period.year)
+    e = str(end_period.day) + '-' + str(end_period.month) + '-' + str(end_period.year)
+    return b + '_' + e
+
+def resolve_period_text(period_text):
+    """
+    :param period_text: 'd-m-yyyy_d-m-yyyy'
+    :return: (begin_period, end_period)
+    """
+    bp = period_text[0:period_text.index('_')]
+    ep = period_text[period_text.index('_') + 1:]
+    begin = datetime.strptime(bp, '%d-%m-%Y')
+    end = datetime.strptime(ep, '%d-%m-%Y')
+    return (begin, end)
