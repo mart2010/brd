@@ -5,10 +5,10 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 from brd import config
-import brd.scrapy.utils as utils
+import brd.scrapy.scrapy_utils as scrapy_utils
+import brd.utils as utils
 from scrapy.exceptions import DropItem
 from scrapy import signals
-import csv
 from scrapy.exporters import CsvItemExporter
 import brd.db.service as service
 
@@ -39,7 +39,7 @@ class ReviewFilterAndConverter(object):
             raise DropItem("Review outside loading period")
 
         # manage title_sform
-        item['derived_title_sform'] = utils.convert_to_sform(item['book_title'])
+        item['derived_title_sform'] = scrapy_utils.convert_book_title_to_sform(item['book_title'])
         return item
 
 
@@ -47,8 +47,8 @@ class ReviewFilterAndConverter(object):
 
 class DumpScrapedData(object):
     """
-    Dump scraped data into flat file
-    # Could be done by Feed-Exporters with no extra-code (scrapy crawl spider_name -o output.csv -t csv)
+    Dump scraped data into flat file and log it into load_audit metadata.
+    # Could also be done by Feed-Exporters with no extra-code (scrapy crawl spider_name -o output.csv -t csv)
     # but is less integrated with the code base (output setting must be redefined...)
 
     """
@@ -61,7 +61,7 @@ class DumpScrapedData(object):
     @classmethod
     def from_crawler(cls, crawler):
         pipeline = cls()
-        # TODO: is this needed to do someking of registration of spider_closed/opened event?
+        # TODO: is this needed to do somekind of registration of spider_closed/opened event?
         crawler.signals.connect(pipeline.spider_opened, signals.spider_opened)
         crawler.signals.connect(pipeline.spider_closed, signals.spider_closed)
         return pipeline
@@ -72,8 +72,12 @@ class DumpScrapedData(object):
         f = open(config.SCRAPED_OUTPUT_DIR + filename, 'w')
         self.files[spider.name] = f
         self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|')
-        # audit record must have correct period (used to filter period when loading staging.reviews)
-        audit_id = self.create_audit(filename, (spider.begin_period, spider.end_period))
+        # audit record must have correct period (used for filtering when loading staging.reviews)
+        step = "Loaded file: " + filename
+        audit_id = service.insert_auditing(job=DumpScrapedData.__name__,
+                                           step=step,
+                                           begin=spider.begin_period,
+                                           end=spider.end_period)
         self.audit[spider.name] = audit_id
         self.exporter.start_exporting()
 
@@ -81,7 +85,11 @@ class DumpScrapedData(object):
         self.exporter.finish_exporting()
         f = self.files.pop(spider.name)
         f.close()
-        self.update_audit(self.counter, self.audit[spider.name])
+        service.update_auditing(commit=True,
+                                rows=self.counter,
+                                status="Completed",
+                                id=self.audit[spider.name])
+
 
     def process_item(self, item, spider):
         item['load_audit_id'] = self.audit[spider.name]
@@ -89,15 +97,12 @@ class DumpScrapedData(object):
         self.counter += 1
         return item
 
-    def create_audit(self, filename, period):
-        step = "Loaded file: " + filename
-        return service.load_auditing({'job': DumpScrapedData.__name__, 'step': step, 'begin': period[0], 'end': period[1]})
-
     def update_audit(self, nb_rows, audit_id):
-        service.update_auditing({'nb': nb_rows, 'status': "Completed", 'id': audit_id})
+        service.update_auditing(rows=nb_rows, status="Completed", id=audit_id)
 
     def get_dump_filename(self, spider):
-        return spider.name + '_' + utils.get_period_text(spider.begin_period, spider.end_period) + '.dat'
+        return "ReviewOf" + spider.name + '_' + \
+               utils.get_period_text(spider.begin_period, spider.end_period) + '.dat'
 
 
 

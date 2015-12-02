@@ -23,6 +23,7 @@ class ReviewBaseItem(Item):
     book_isbn = Field()
     book_title = Field()
     book_uid = Field()
+    book_author = Field()  # lname, fname
     derived_title_sform = Field()
     derived_review_date = Field()
     book_lang = Field()

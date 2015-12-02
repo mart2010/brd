@@ -70,9 +70,13 @@ class DbConnection(object):
         :param params:
         :return: the auto-generated id
         """
-        insert_sql = insert + " RETURNING id"
+        if insert.rfind(";") == -1:
+            insert += ' RETURNING id;'
+        else:
+            insert = insert.replace(';', ' RETURNING id;')
+
         with self.connection.cursor() as curs:
-            curs.execute(insert_sql, params)
+            curs.execute(insert, params)
             return curs.fetchone()[0]
 
 
@@ -85,7 +89,8 @@ class DbConnection(object):
         """
         with self.connection.cursor() as curs:
             curs.execute(sql, params)
-            return curs.fetchone()
+            one_row = curs.fetchone()
+        return one_row
 
 
     def fetch_all_inTransaction(self, query, params=None):

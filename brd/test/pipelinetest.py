@@ -3,13 +3,14 @@
 __author__ = 'mouellet'
 
 import unittest
+from datetime import datetime
+
 import brd.db.dbutils as dbutils
 import brd.scrapy.items as items
-import brd.scrapy.pipelines.pipelines as pipelines
+import brd.scrapy.pipelines as pipelines
 import brd.scrapy.spiders.reviewspiders as reviewspiders
 from scrapy.exceptions import DropItem
 import psycopg2
-from datetime import datetime
 import brd.config as config
 
 

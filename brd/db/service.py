@@ -1,41 +1,21 @@
 # -*- coding: utf-8 -*-
+from brd.utils import get_all_files, get_column_headers
+
 __author__ = 'mouellet'
 
 import shutil
-from datetime import datetime
+from brd.exception import EltError
 import brd.db.dbutils as dbutils
+import brd.utils as utils
 import brd.config as config
 import os
-import fnmatch
-import brd.scrapy.utils as utils
 import psycopg2
 
 
-def get_pending_files(repdir, pattern):
-    """
-    Get all files under repdir and below (recursively)
-    :return: list of files with matching pattern
-    """
-    if not os.path.lexists(repdir):
-        raise EnvironmentError("Invalid directory defined :'" + repdir + "'")
-
-    pending_files = []
-    for root, dirnames, filenames in os.walk(repdir):
-        for filename in fnmatch.filter(filenames, pattern):
-            pending_files.append(os.path.join(root, filename))
-    return pending_files
-
-
-def get_column_headers(file_with_header):
-    """
-    Read the column headers as stored in file
-    (by default scrapy exports fields in any order, i.e. dict-like)
-    :param file_with_header:
-    :return: string of column headers with correct order
-    """
-    with open(file_with_header, 'r') as f:
-        h = f.readline().split("|")
-    return ",".join(h).strip()
+class JobStatus():
+    FAILED = 'Failed'
+    COMPLETED = 'Completed'
+    RUNNING = 'currently running..'
 
 
 def treat_loaded_file(processed_file, remove, archive_dir):
@@ -45,10 +25,11 @@ def treat_loaded_file(processed_file, remove, archive_dir):
         shutil.move(processed_file, archive_dir)
 
 
-def bulkload_review_files(period=None, remove=False):
+def bulkload_review_files(period=None, remove_scraped_file=False):
     """
-    Bulk loads Reviews*.dat files under reviews_root dir into staging
-    By default, load all files otherwise only the ones corresponding to period
+    Bulk loads Reviews*.dat files into staging. By default, load all files
+    otherwise only the ones corresponding to period specified.
+    Commit is done after each file loaded
     :param period: 'd-m-yyyy_d-m-yyyy'
     :return: (nb of files treated, nb of files with error)
     """
@@ -57,218 +38,290 @@ def bulkload_review_files(period=None, remove=False):
         begin_period, end_period  = utils.resolve_period_text(period)
 
     n_treated, n_error = 0, 0
-    for datfile in get_pending_files(config.SCRAPED_OUTPUT_DIR, pattern):
+    for datfile in get_all_files(config.SCRAPED_OUTPUT_DIR, pattern):
         file_begin, file_end = utils.resolve_period_text(datfile[datfile.index('_') + 1: datfile.index('.dat')])
 
-        if file_begin >= begin_period and file_end <= end_period:
-            n_treated += 1
+        if period is None or (file_begin >= begin_period and file_end <= end_period):
             with open(datfile) as f:
-                audit_id = load_auditing({'job': 'Bulkload file', 'step': datfile, 'begin': begin_period, 'end': end_period})
+                n_treated += 1
+                audit_id = insert_auditing(job='Bulkload file', step=datfile, begin=file_begin, end=file_end)
                 try:
-                    count = bulkload_into_staging('review', get_column_headers(datfile), f)
-                    update_auditing({'nb': count, 'status': "Completed", 'id': audit_id})
-                    dbutils.get_connection().commit()
-                    treat_loaded_file(datfile, remove, config.SCRAPED_ARCHIVE_DIR)
+                    count = copy_into_staging('review', get_column_headers(datfile), f)
+                    update_auditing(commit=True, rows=count, status="Completed", id=audit_id)
+                    treat_loaded_file(datfile, remove_scraped_file, config.SCRAPED_ARCHIVE_DIR)
                 except psycopg2.DatabaseError, er:
                     dbutils.get_connection().rollback()
                     n_error += 1
-                    a_id = load_auditing({'job': 'Bulkload file', 'step': datfile, 'begin': begin_period, 'end': end_period})
-                    update_auditing({'nb': 0, 'status': er.pgerror, 'id': a_id})
-                    dbutils.get_connection().commit()
+                    insert_auditing(commit=True, job='Bulkload file', step=datfile, rows=0, status=er.pgerror, begin=file_begin, end=file_end)
                     # also add logging
                     print("Error bulk loading file: \n'%s'\nwith msg: '%s' " % (datfile, er.message))
-
     return (n_treated, n_error)
 
 
-def load_staged_reviews():
+def launch_load_of_staged_reviews():
     """
-    Prepare steps for loading staged reviews and launch process
+    Prepare steps for loading staged reviews and launch complete process
     :return:
     """
-    batch_name = load_staged_reviews.func_name
+    def step_dic(fct, no, params):
+        return {'step_function': fct, 'step_no': no, 'step_params': params}
 
-    period = start_load_review_batch()
+    batch_name = launch_load_of_staged_reviews.func_name
     steps = list()
-    # step
-    steps.append((load_review, {}))
-    # step
-    steps.append((load_book_site_review, {}))
-    # step
-    steps.append((load_reviewer, {}))
+    steps.append(step_dic(insert_into_reviewer, 1, {}))
+    steps.append(step_dic(insert_into_book, 2, {}))
+    steps.append(step_dic(insert_into_review, 3, {}))
+    steps.append(step_dic(insert_into_book_site_review, 4, {}))
+    steps.append(step_dic(truncate_stage_review, 5, {}))
 
-    process_all_steps(batch_name, period, steps)
+    last_step_no, last_status = get_last_audit_steps(batch_name)
 
-    complete_load_review_batch()
+    if last_status == JobStatus.RUNNING:
+        print ("Batch '%s' is still running, wait before launching new one" % batch_name)
+    else:
+        period_in_stage = fetch_periods_data_in_stage()
+        if last_status == JobStatus.FAILED:
+            if period_in_stage is None:
+                raise EltError("Integrity error, previous Batch '%s' has failed but stage.review is empty" % batch_name)
+            steps = steps[last_step_no - 1:]
+        elif last_status == JobStatus.COMPLETED:
+            if period_in_stage is None:
+                raise EltError("Cannot launch Batch '%s' stage.review is empty" % batch_name)
+        try:
+            process_generic_steps(batch_name, period_in_stage, steps)
+            print ("Finished processing Batch '%s!" % batch_name)
+        except EltError as elt:
+            print elt.message
 
 
-def process_all_steps(batch_name, period, steps):
+def fetch_periods_data_in_stage():
     """
-    Execute batch madeup of a number of steps function
-    :param batch_name:
-    :param period: 'd-m-yyyy_d-m-yyyy'
-    :param steps: list of tuple containing (function, params)
-    :return:
-    """
-    conn = dbutils.get_connection()
-    period_begin, period_end = utils.resolve_period_text(period)
-
-    try:
-
-        for step in steps:
-            fct = step[0]
-            params = step[1]
-
-            # see if auditing can be designed as a decorator added to all fcts involved (issues with batch_name and period params)
-            audit_id = load_auditing({'job': batch_name, 'step': fct.func_name, 'begin': period_begin, 'end': period_end})
-
-            # execute step function
-            params['audit_id'] = audit_id
-            nb_rows = fct(params)
-
-            update_auditing({'nb': nb_rows, 'status': "Completed", 'id': audit_id})
-
-        conn.commit()
-    # TODO: replace custom error
-    except ValueError, err:
-        conn.rollback()
-        msg = "Batch '%s' failed at step '%s' with error msg: %s" % (batch_name, fct.func_name, err.message)
-        load_auditing({'job': batch_name, 'status': msg, 'step': fct.func_name, 'begin': period_begin, 'end': period_end})
-        conn.commit()
-
-
-
-def start_load_review_batch():
-    """
-    Reset transaction and fetch all periods currently stored in staging.review
-    :return period as tuple (begin_date, end_date)
+    Fetch all periods found in staging.review
+    :return (min begin, max end) or None when table empty
     """
     sql = \
         """
         select min(period_begin), max(period_end)
         from staging.review r
-        join integration.load_audit a on (a.id = r.load_audit_id)
+        join staging.load_audit a on (a.id = r.load_audit_id);
         """
-    conn = dbutils.get_connection()
+    res = dbutils.get_connection().fetch_one(sql)
+    return res
 
-    # rollback pending transaction (RESET and SET SESSION AUTHORIZATION reset session to default)
-    conn.connection.reset()
-    res = conn.fetch_one(sql)
-    if res is None:
-        # TO-DO: create my own ETL-type exception with dedicated  messages...
-        raise ValueError("No data in stage.review, stop processsing")
-    elif type(res[0]) is not datetime.date:
-        raise ValueError("Period date should be of type datetime.date")
+
+def truncate_stage_review():
+    sql = \
+        """
+        truncate table staging.review;
+        """
+    dbutils.get_connection().execute(sql)
+
+
+
+def get_last_audit_steps(batch):
+    """
+    :param batch name
+    :return: (step_no, status) of last step logged or (-1, Completed) when no log is found
+    """
+    sql_last_step = \
+        """
+        select step_no, status
+        from staging.load_audit as l
+        where batch_job = %s
+        and id = (select max(id) from staging.load_audit where batch_job = l.batch_job);
+        """
+    resp = dbutils.get_connection().fetch_one(sql_last_step, (batch,))
+    if resp is None:
+        return (-1, JobStatus.COMPLETED)
+    last_step_no, last_status = resp
+
+    if last_status.startswith(JobStatus.COMPLETED):
+        last_status = JobStatus.COMPLETED
+    elif last_status.startswith(JobStatus.FAILED):
+        last_status = JobStatus.FAILED
+    elif last_status.startswith(JobStatus.RUNNING):
+        last_status = JobStatus.RUNNING
     else:
-        return res
+        raise EltError("Step no%d for batch '%s' has invalid status '%s'" % (last_step_no, batch, last_status))
+    return (last_step_no, last_status)
 
 
-def complete_load_review_batch():
+def process_generic_steps(batch_name, period, steps_list):
     """
-    Truncate the staged review
+    Execute batch which is madeup of a number of steps function
+    :param batch_name:
+    :param period: 'd-m-yyyy_d-m-yyyy'
+    :param steps_list: list of steps to be run in order and holding:
+        {step_function: the_funct, step_no: run_order, step_params: (param1, ) }
+    :return:
     """
-    sql = \
-        """
-        truncate table staging.review
-        """
     conn = dbutils.get_connection()
-    conn.execute_inTransaction(sql)
+    # reset/rollback pending trx (RESET and SET SESSION AUTHORIZATION reset session to default)
+    # conn.connection.reset()
+    period_begin, period_end = period
+
+    try:
+        for step in steps_list:
+            fct = step['step_function']
+            params = step['step_params']
+            params['audit_id'] = insert_auditing(job=batch_name,
+                                                 step=fct.func_name,
+                                                 step_no=step['step_no'],
+                                                 begin=period_begin, end=period_end)
+            # execute step function
+            nb_rows = fct(params)
+            update_auditing(commit=True, rows=nb_rows, status=JobStatus.COMPLETED, id=params['audit_id'])
+    except psycopg2.DatabaseError, dbe:
+        conn.rollback()
+        msg = JobStatus.FAILED + ": Batch failed with DB error: '%s'" % (dbe.message)
+        insert_auditing(commit=True, job=batch_name, status=msg, step=fct.func_name,
+                        step_no=step['step_no'], begin=period_begin, end=period_end)
+        raise EltError(msg, dbe)
 
 
-def load_auditing(named_params):
+
+def insert_auditing(commit=False, **named_params):
     sql = \
         """
-        insert into staging.load_audit(batch_job, step_name, status, period_begin, period_end, start_dts)
-                            values (%(job)s, %(step)s, 'currently processing...', %(begin)s, %(end)s, now())
+        insert into staging.load_audit(batch_job, step_name, step_no, status, rows_impacted, period_begin, period_end, start_dts)
+                            values (%(job)s, %(step)s, %(step_no)s, %(status)s, %(rows)s, %(begin)s, %(end)s, now());
         """
+    assert('job' in named_params)
+    assert('step' in named_params)
+    assert('begin' in named_params)
+    assert('end' in named_params)
+    named_params['status'] = named_params.get('status', JobStatus.RUNNING)
+    named_params['step_no'] = named_params.get('step_no', 1)
+    named_params['rows'] = named_params.get('rows', -1)
+    ret = dbutils.get_connection().insert_row_get_id(sql, named_params)
+    if commit:
+        dbutils.get_connection().commit()
+    return ret
 
-    return dbutils.get_connection().insert_row_get_id(sql, named_params)
 
-
-def update_auditing(named_params):
+def update_auditing(commit=False, **named_params):
     sql = \
         """
         update staging.load_audit set status = %(status)s
-                                    ,rows_impacted = %(nb)s
+                                    ,rows_impacted = %(rows)s
                                     ,finish_dts = now()
-        where id = %(id)s
+        where id = %(id)s;
         """
-    return dbutils.get_connection().execute(sql, named_params)
+    assert('status' in named_params)
+    assert('rows' in named_params)
+    assert('id' in named_params)
+    ret = dbutils.get_connection().execute(sql, named_params)
+    if commit:
+        dbutils.get_connection().commit()
+    return ret
 
 
-def bulkload_into_staging(tablename, columns, open_file):
+def copy_into_staging(tablename, columns, open_file):
     sql = \
         """
         copy staging.%s( %s )
-        from STDIN with csv HEADER DELIMITER '|' NULL ''
+        from STDIN with csv HEADER DELIMITER '|' NULL '';
         """ % (tablename, columns)
     return dbutils.get_connection().copy_expert(sql, open_file)
 
 
-def load_review(named_params):
+def insert_into_reviewer(named_params):
+    # ok since now() always return timestamp as of begining of transaction
     sql = \
         """
-        insert into integration.review(book_id, reviewer_id, review_date, rating_code, create_dts, load_audit_id)
+        insert into integration.reviewer(id, site_id, pseudo, load_audit_id, create_dts)
         select
-            b.id
-            , reviewer_id
-            , derived_review_date
-            , review_rating
-            , now()
+            cast(md5(concat(r.site_logical_name, r.reviewer_pseudo)) as uuid)
+            , s.id
+            , r.reviewer_pseudo
             , %(audit_id)s
+            , now()
         from staging.review r
-        join integration.book b on (r.derived_book_id = b.id)
+        join integration.site s on (r.site_logical_name = s.logical_name)
+        except
+        select
+            id
+            , site_id
+            , pseudo
+            , %(audit_id)s
+            , now()
+        from integration.reviewer;
         """
     return dbutils.get_connection().execute(sql, named_params)
 
 
-def load_book_site_review(named_params):
+def insert_into_book(named_params):
+    sql = \
+        """
+        insert into integration.book(id, title_sform, lang_code, create_dts, load_audit_id)
+        select * from
+        (select
+             cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid) as bookid
+             , r.derived_title_sform
+             , r.book_lang
+             , now()
+             , %(audit_id)s
+        from staging.review r
+        group by cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
+             , r.derived_title_sform
+             , r.book_lang
+        ) as new_book
+        where
+        NOT EXISTS ( select b.id
+                     from integration.book b
+                     where b.id = new_book.bookid
+                    );
+        """
+    return dbutils.get_connection().execute(sql, named_params)
+
+def insert_into_review(named_params):
+    sql = \
+        """
+        insert into integration.review(book_id, reviewer_id, review_date, rating_code, create_dts, load_audit_id)
+        select
+            cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
+            , cast(md5(concat(r.site_logical_name, r.reviewer_pseudo)) as uuid) as reviewer_id
+            , r.derived_review_date
+            , r.review_rating
+            , now()
+            , %(audit_id)s
+        from staging.review r
+        """
+    return dbutils.get_connection().execute(sql, named_params)
+
+
+def insert_into_book_site_review(named_params):
     sql = \
         """
         insert into integration.book_site_review(book_id, site_id, book_uid, title_text, create_dts, load_audit_id)
         select distinct
-            b.id
+            cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
             , s.id
             , r.book_uid
-            , r.title_text
+            , r.book_title
             , now()
             , %(audit_id)s
         from staging.review r
         join integration.site s on (r.site_logical_name = s.logical_name)
         where
-        NOT EXISTS (
-                        select bsr.book_id
+        NOT EXISTS (    select bsr.book_id
                         from integration.book_site_review bsr
                         where bsr.site_id = s.id
-                        bsr.book_id = r.derived_book_id
-                    )
+                        and bsr.book_id = cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
+                    );
         """
     return dbutils.get_connection().execute(sql, named_params)
 
 
-def load_reviewer(named_params):
-    sql = \
-        """
-        insert into integration.reviewer(id, site_id, pseudo, create_dts, load_audit_id)
-        select
-            b.id
-            , s.id
-            , rere
-            , %(audit_id)s
-        from staging.review r
-        join integration.site s on (r.site_id = s.id)
-        where
-        """
-    return dbutils.get_connection().execute(sql, named_params)
 
-def load_review_rejected(named_params):
+def insert_into_review_rejected(named_params):
     sql = \
         """
         insert into staging.review_rejected
         select *
         from staging.review r
         left join integration.book b on (r.derived_book_id = b.id)
-        where b.id IS NULL
+        where b.id IS NULL;
         """
     return dbutils.get_connection().execute(sql, named_params)
 

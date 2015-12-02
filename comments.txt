@@ -4,10 +4,12 @@
 
 - Should test the hashing MD5 fct from both python runtime and PS... should be SAME!!!
 
-- to export using the out-of-the-box Feed-Exporters:
+- to launch a crawler :
 
-scrapy crawl critiqueslibres --set FEED_URI="//Temp/%(name)s/%(time)s" --set FEED_FORMAT=csv
+scrapy crawl critiqueslibres -a period='1-1-2014_1-1-2015'
 
+# On CritiquesLibres:
+- Scraper takes less than 4 min to run the full period 2000-2014 with min_nb_reviews = 5 !
 
 
 

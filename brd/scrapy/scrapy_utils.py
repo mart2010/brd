@@ -30,25 +30,27 @@ mois = {
 
 compile_regex = re.compile(r"\s+")
 
-def convert_to_sform(title):
+def convert_book_title_to_sform(title):
     r"""
-    Convert raw title found in websites and transform into a format used after for MD5 hashing
+    Convert raw title found in websites to this form :
+        'capitalized-title-with-space-replaced-by-dash'
     For doctest to work, I need to flag this text as raw (r)
-    >>> convert_to_sform(" title blank with leading/trailing  ")
+    >>> convert_book_title_to_sform(" title blank with leading/trailing  ")
     'TITLE-BLANK-WITH-LEADING/TRAILING'
-    >>> convert_to_sform(" Here's a good \"garden\", to convert!!?")
+    >>> convert_book_title_to_sform(" Here's a good \"garden\", to convert!!?")
     'HERE\'S-A-GOOD-"GARDEN",-TO-CONVERT!!?'
     """
     ctrim = title.strip().upper()
     return compile_regex.sub("-", ctrim)
 
 
+# should be moved to service
 def fetch_nbreviews(scraper_name):
     query = """select  book_uid
                       ,count(one_review) as nb_reviews
                 from integration.reviews_persisted_lookup
                 where logical_name = %s
-                group by book_uid
+                group by book_uid;
              """
 
     res = dbutils.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
@@ -59,7 +61,7 @@ def fetch_nbreviews(scraper_name):
             nbreviews_stored[row[0]] = row[1]
     return nbreviews_stored
 
-
+# should be moved to service
 def fetch_book_titles(scraper_name):
     """
     Fetch titles scrapped by other spiders but not for 'scraper_name'.
@@ -76,10 +78,9 @@ def fetch_book_titles(scraper_name):
             join integration.site s on (s.id = c.site_id)
             where
             s.logical_name = %s  --logical name of babelio
-            and c.book_id = b.book_id)
+            and c.book_id = b.book_id);
     """
     return dbutils.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
-
 
 
 def resolve_value(selector, xpath, expected=1):
@@ -97,22 +98,3 @@ def resolve_value(selector, xpath, expected=1):
             raise ValueError("Expected %d elements, instead got: '%s' using selector '%s' with xpath '%s' " % (expected, val, selector, xpath))
     return val
 
-
-def get_period_text(begin_period, end_period):
-    """
-    :return: 'd-m-yyyy_d-m-yyyy' from the specified begin/end_priod date
-    """
-    b = str(begin_period.day) + '-' + str(begin_period.month) + '-' + str(begin_period.year)
-    e = str(end_period.day) + '-' + str(end_period.month) + '-' + str(end_period.year)
-    return b + '_' + e
-
-def resolve_period_text(period_text):
-    """
-    :param period_text: 'd-m-yyyy_d-m-yyyy'
-    :return: (begin_period, end_period)
-    """
-    bp = period_text[0:period_text.index('_')]
-    ep = period_text[period_text.index('_') + 1:]
-    begin = datetime.strptime(bp, '%d-%m-%Y')
-    end = datetime.strptime(ep, '%d-%m-%Y')
-    return (begin, end)

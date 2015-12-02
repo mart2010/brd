@@ -9,7 +9,7 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'ReviewOfcritiqueslibres'
+BOT_NAME = 'critiqueslibres'
 SPIDER_MODULES = ['brd.scrapy.spiders']
 
 # Disable cookies (some sites use cookies to spot bot)
@@ -20,7 +20,8 @@ COOKIES_ENABLED = False
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 
 ITEM_PIPELINES = {
-    'brd.scrapy.pipelines.pipelines.DumpScrapedData': 100
+    'brd.scrapy.pipelines.ReviewFilterAndConverter': 100,
+    'brd.scrapy.pipelines.DumpScrapedData': 200
 }
 
 # 'brd.scrapy.pipelines.pipelines.ReviewStageLoader': 300,

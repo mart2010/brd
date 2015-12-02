@@ -30,14 +30,14 @@ class TestService(unittest.TestCase):
 
         # pre-condition: dummy audit log so bulk load does not fail with relational integrity (mock file have audit_id=2)
         now = datetime.datetime.now()
-        a_id = service.load_auditing({'job': "MockScraped", 'step': "Mockfiles", 'begin': now, 'end': now})
+        a_id = service.insert_auditing(job="MockScraped", step="Mockfiles", begin=datetime.date(2000, 1, 1), end=datetime.date(2001, 1, 1))
         self.dbconn.execute_inTransaction("update staging.load_audit set id = %s where id = %s ", (2, a_id))
         # fixture
         config.SCRAPED_OUTPUT_DIR = '/Users/mouellet/dev/p/brd/brd/test/mockscrapedfiles'
         config.SCRAPED_ARCHIVE_DIR ='/Users/mouellet/dev/p/brd/brd/test/mockscrapedfiles/archive'
 
         period = '1-1-2000_1-5-2010'
-        n_treated, n_er = service.bulkload_review_files(period, remove=False)
+        n_treated, n_er = service.bulkload_review_files(period, remove_scraped_file=False)
 
         self.assertEqual(n_treated, 2)
         self.assertEqual(n_er, 1)

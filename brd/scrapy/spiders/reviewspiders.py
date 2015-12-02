@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 __author__ = 'mouellet'
 
-from brd.scrapy.utils import resolve_value
+from brd.scrapy.scrapy_utils import resolve_value
 import json
 import scrapy
 from brd.scrapy.items import ReviewBaseItem
-import brd.scrapy.utils as utils
+import brd.scrapy.scrapy_utils as scrapy_utils
+import brd.utils as utils
 from datetime import datetime
 import brd.config as config
 
@@ -16,29 +17,20 @@ import brd.config as config
 # ------------------------------------------------------------------------------------------------- #
 
 class BaseReviewSpider(scrapy.Spider):
-    # business-rules
-    min_nb_reviews = 5
 
     def __init__(self, logical_name, **kwargs):
         """
-        Make sure all mandatory arguments are passed to all Spider subclass
+        Make sure all arguments are passed to all Spider subclass
         (ex. scrapy crawl myspider -a param1=val1 -a param2=val2).
-        :begin_period: Review's minimum date to scrape ('d-m-yyyy')
-        :end_period: Review's maximum date (exclusive) to scrape ('d-m-yyyy')
-        :logical_name: name defined in the review subclass scraper (static name field)
+        : period: Review's minimum/max (exclusive) date to scrape ('d-m-yyyy_d-m-yyyy')
+        : logical_name: name defined in the review subclass scraper (static name field)
                 (must match site.logical_name at DB level)
         """
         super(BaseReviewSpider, self).__init__(**kwargs)
-
-        assert (kwargs['begin_period'] is not None)
-        assert (kwargs['end_period'] is not None)
-
+        assert (kwargs['period'] is not None)
         self.logical_name = logical_name
-        self.begin_period = datetime.strptime(kwargs['begin_period'], '%d-%m-%Y')
-        self.end_period = datetime.strptime(kwargs['end_period'], '%d-%m-%Y')
+        self.begin_period, self.end_period = utils.resolve_period_text(kwargs['period'])
 
-        # dict to hold the nb-reviews already persisted: {"book_uid": "nb"}  (Probably not scalable and not to be used for all spider)
-        # self.stored_nb_reviews = utils.fetch_nbreviews(self.logical_name)
 
 
 # ------------------------------------------------------------------------------------------------- #
@@ -51,6 +43,7 @@ class CritiquesLibresSpider(BaseReviewSpider):
         # http://www.critiqueslibres.com/a.php?action=book&what=list&page=1&start=0&limit=300
         (adjust: start=? and limit=?)
 
+
         Json :  {"total":"44489", "data":[ {"id":"", "titre":"", "nbrcrit":"", ...}, {"id":....}] }
         where total is the total number of books reviewed.
 
@@ -58,23 +51,23 @@ class CritiquesLibresSpider(BaseReviewSpider):
 
     Note: critique can be modified during 7 days, so Spider MUST BE RUN after 7 days after end-of-period !!
     """
-    name = 'ReviewOfcritiqueslibres'
+    name = 'critiqueslibres'
     allowed_domains = ['www.critiqueslibres.com']  # used as 'hostname' in item field
     lang = 'FR'
 
     ###########################
     # Control setting
     ###########################
-    items_per_page = 200
-    # TODO: find dynamically
-    max_nb_items = 2000
+    items_per_page = 2000
+    # TODO: determine dynamically using 'total' returned from initial json request
+    max_nb_items = 45500
     ##########################
 
     ###########################
     # Parse_nb_reviews setting
     ###########################
     url_nb_reviews = "http://www.critiqueslibres.com/a.php?action=book&what=list&page=1&start=%d&limit=%d"
-    xpath_allreviews = '//table[@width="100%" and @border="0" and @cellpadding="3"]/tr'  # for Review page (find better/stable xpath)
+    xpath_allreviews = '//table[@width="100%" and @border="0" and @cellpadding="3"]/tr'  # for Review page (is there more stable xpath?)
     ##########################
 
     ###########################
@@ -90,10 +83,14 @@ class CritiquesLibresSpider(BaseReviewSpider):
 
     def __init__(self, **kwargs):
         # don't use self.name as instance variable that could shadow the static one (to confirm?)
-        super(CritiquesLibresSpider, self).__init__(self.name, **kwargs)
+        super(CritiquesLibresSpider, self).__init__(CritiquesLibresSpider.name, **kwargs)
+
+        # dict to hold nb-reviews persisted: {"book_uid": "nb"}  (Probably not scalable)
+        self.stored_nb_reviews = scrapy_utils.fetch_nbreviews(self.logical_name)
+
 
     def start_requests(self):
-        for i in range(0, self.max_nb_items, self.items_per_page):
+        for i in xrange(0, self.max_nb_items, self.items_per_page):
             yield scrapy.Request(self.url_nb_reviews % (i, self.items_per_page), callback=self.parse_nb_reviews)
 
     def parse_nb_reviews(self, response):
@@ -105,16 +102,17 @@ class CritiquesLibresSpider(BaseReviewSpider):
         for review in pageres['data']:
             # Only reviews-eclaire considered for scraping (i.e. = #reviews - 1 )
             nreviews_eclair = int(review['nbrcrit']) - 1
-            bookid = review['id']
+            bookuid = review['id']
             # only scrape the ones having enough review-eclair (nbreviews) and not yet stored
-            if self.min_nb_reviews <= nreviews_eclair > int(self.stored_nb_reviews.get(bookid, 0)):
+            if config.MIN_NB_REVIEWS <= nreviews_eclair > int(self.stored_nb_reviews.get(bookuid, 0)):
                 item = ReviewBaseItem(hostname=self.allowed_domains[0],
                                       site_logical_name=self.name,
-                                      book_uid=bookid,
+                                      book_uid=bookuid,
                                       book_title=review['titre'],
-                                      book_lang=self.lang)
+                                      book_lang=self.lang,
+                                      book_author=review['auteurstring'])
                 # trigger the 2nd Request
-                request = scrapy.Request(self.url_review % int(bookid), callback=self.parse_review)
+                request = scrapy.Request(self.url_review % int(bookuid), callback=self.parse_review)
                 request.meta['item'] = item
                 yield request
 
@@ -146,7 +144,7 @@ class CritiquesLibresSpider(BaseReviewSpider):
     @staticmethod
     def parse_review_date(review_date):
         month_name = review_date[(review_date.find(' ') + 1): review_date.rfind(' ')]
-        month_no = utils.mois[month_name]
+        month_no = scrapy_utils.mois[month_name]
         review_date = review_date.replace(month_name, month_no)
         return datetime.strptime(review_date, '%d %m %Y')
 
@@ -162,7 +160,7 @@ class BabelioSpider(BaseReviewSpider):
     Or lookup review based on Book and sorted by Date!
 
     """
-    name = 'Review_babelio'
+    name = 'babelio'
     allowed_domains = ['www.babelio.com']
 
     # Book_uid is defined in this site as 'title/id' (ex. 'Green-Nos-etoiles-contraires/436732'

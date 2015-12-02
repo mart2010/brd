@@ -34,14 +34,16 @@ SOURCE_WEBSITES_EN = {
 
 
 
-
-
 # resource
 
 SCRAPED_OUTPUT_DIR = "/Users/mouellet/Temp/"
 SCRAPED_ARCHIVE_DIR = "/Users/mouellet/Temp/archive"
 
 # business rules
+
+# Minimum nb of reviews before loading book from website
+MIN_NB_REVIEWS = 5
+
 
 
 
