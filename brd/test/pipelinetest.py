@@ -18,33 +18,28 @@ class TestPipeline(unittest.TestCase):
 
     def setUp(self):
         self.dbconn = dbutils.get_connection()
-        self.dbconn.execute_inTransaction("truncate staging.review")
-        self.dbconn.execute_inTransaction("truncate staging.load_audit")
+        self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
 
 
     def tearDown(self):
-        self.dbconn.execute_inTransaction("truncate staging.review")
-        self.dbconn.execute_inTransaction("truncate staging.load_audit")
+        self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
 
 
     def test_dump_item_into_flatfile_ok(self):
 
         # dependencies fixture
-        spider = reviewspiders.CritiquesLibresSpider(begin_period='1-1-2001', end_period='31-12-2015')
+        spider = reviewspiders.CritiquesLibresSpider(period='1-1-2001_31-12-2015')
         config.SCRAPED_OUTPUT_DIR = '/Users/mouellet/dev/p/brd/brd/test/mockscrapedfiles/'
 
         pipeline_loader = pipelines.DumpScrapedData()
         pipeline_loader.spider_opened(spider)
 
-        item = items.ReviewBaseItem()
-        # set all mandatory fields
-        item['hostname'] = "thehost"
-        item['reviewer_pseudo'] = "thepseudo"
-        item['review_rating'] = "therating"
-        item['review_date'] = "12 dec 2013"
-        item['book_title'] = "theBook"
-        item['book_lang'] = "FR"
-
+        item = items.ReviewItem(hostname="thehost",
+                                reviewer_pseudo="thepseudo",
+                                review_rating="therating",
+                                review_date="12 dec 2013",
+                                book_title="theBook",
+                                book_lang="FR")
 
         retitem = pipeline_loader.process_item(item, spider)
         self.assertEqual(item['hostname'], retitem['hostname'])
@@ -75,7 +70,7 @@ class TestPipeline(unittest.TestCase):
 
         pipeline_loader = pipelines.ReviewStageLoader()
 
-        item = items.ReviewBaseItem()
+        item = items.ReviewItem()
         # set only one field
         item['hostname'] = "thehost"
         with self.assertRaises(psycopg2.IntegrityError):
@@ -85,13 +80,15 @@ class TestPipeline(unittest.TestCase):
 
     def test_review_filter_is_ok(self):
 
-        scraper = reviewspiders.CritiquesLibresSpider(begin_period='1-1-2010', end_period='1-2-2010')
+        scraper = reviewspiders.CritiquesLibresSpider(period='1-1-2010_1-2-2010')
+        # mock persistence for the specific book
+        scraper.stored_nb_reviews = {"100": 1}
         pipeline_loader = pipelines.ReviewFilterAndConverter()
         pipeline_loader.open_spider(scraper)
 
-        item = items.ReviewBaseItem()
-        item['book_title'] = " the, Book "
-        item['review_date'] = u"31 décembre 2009"
+        item = items.ReviewItem(book_title=" the, Book ",
+                                review_date=u"31 décembre 2009",
+                                book_uid="100")
 
         with self.assertRaises(DropItem):
             pipeline_loader.process_item(item, scraper)
@@ -104,14 +101,12 @@ class TestPipeline(unittest.TestCase):
         item['review_date'] = u"1 janvier 2010"
         ret_item = pipeline_loader.process_item(item, scraper)
         self.assertEquals(ret_item['book_title'], item['book_title'])
-        # check out derived attrs
-        self.assertEquals(ret_item['derived_review_date'], datetime.strptime('1-1-2010', '%d-%m-%Y'))
-        self.assertEquals(ret_item['derived_title_sform'], "THE,-BOOK")
+        self.assertEquals(ret_item['parsed_review_date'], datetime.strptime('1-1-2010', '%d-%m-%Y'))
 
 
         item['review_date'] = u"31 janvier 2010"
         ret_item = pipeline_loader.process_item(item, scraper)
-        self.assertEquals(ret_item['derived_review_date'], datetime.strptime('31-01-2010', '%d-%m-%Y'))
+        self.assertEquals(ret_item['parsed_review_date'], datetime.strptime('31-01-2010', '%d-%m-%Y'))
 
 
 

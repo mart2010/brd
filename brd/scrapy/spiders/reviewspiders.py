@@ -4,7 +4,7 @@ __author__ = 'mouellet'
 from brd.scrapy.scrapy_utils import resolve_value
 import json
 import scrapy
-from brd.scrapy.items import ReviewBaseItem
+from brd.scrapy.items import ReviewItem
 import brd.scrapy.scrapy_utils as scrapy_utils
 import brd.utils as utils
 from datetime import datetime
@@ -22,7 +22,7 @@ class BaseReviewSpider(scrapy.Spider):
         """
         Make sure all arguments are passed to all Spider subclass
         (ex. scrapy crawl myspider -a param1=val1 -a param2=val2).
-        : period: Review's minimum/max (exclusive) date to scrape ('d-m-yyyy_d-m-yyyy')
+        : period: Review's minimum/max (exclusive) period to scrape as 'd-m-yyyy_d-m-yyyy'
         : logical_name: name defined in the review subclass scraper (static name field)
                 (must match site.logical_name at DB level)
         """
@@ -30,6 +30,21 @@ class BaseReviewSpider(scrapy.Spider):
         assert (kwargs['period'] is not None)
         self.logical_name = logical_name
         self.begin_period, self.end_period = utils.resolve_period_text(kwargs['period'])
+
+        # dict to hold nb-reviews persisted: {"book_uid": "nb"}  (check scalability)
+        self.stored_nb_reviews = None
+
+    def parse_review_date(self, review_date_str):
+        raise NotImplementedError("method to be implementes by sub-class")
+
+    def lookup_stored_nb_reviews(self, bookuid):
+        """
+        :return nb of reviews persisted for bookid (or 0 if not found in DB)
+        """
+        if self.stored_nb_reviews is None:
+            self.stored_nb_reviews = scrapy_utils.fetch_nbreviews(self.logical_name)
+        return int(self.stored_nb_reviews.get(bookuid, 0))
+
 
 
 
@@ -42,7 +57,6 @@ class CritiquesLibresSpider(BaseReviewSpider):
     First Step: Fetch latest Reviews in Json format using request:
         # http://www.critiqueslibres.com/a.php?action=book&what=list&page=1&start=0&limit=300
         (adjust: start=? and limit=?)
-
 
         Json :  {"total":"44489", "data":[ {"id":"", "titre":"", "nbrcrit":"", ...}, {"id":....}] }
         where total is the total number of books reviewed.
@@ -59,8 +73,8 @@ class CritiquesLibresSpider(BaseReviewSpider):
     # Control setting
     ###########################
     items_per_page = 2000
-    # TODO: determine dynamically using 'total' returned from initial json request
-    max_nb_items = 45500
+    # set to -1, for proper initialization (for test purposes, set to any small values)
+    max_nb_items = 10000  # -1
     ##########################
 
     ###########################
@@ -85,11 +99,17 @@ class CritiquesLibresSpider(BaseReviewSpider):
         # don't use self.name as instance variable that could shadow the static one (to confirm?)
         super(CritiquesLibresSpider, self).__init__(CritiquesLibresSpider.name, **kwargs)
 
-        # dict to hold nb-reviews persisted: {"book_uid": "nb"}  (Probably not scalable)
-        self.stored_nb_reviews = scrapy_utils.fetch_nbreviews(self.logical_name)
+
+    def init_max_nb_items(self, response):
+        res = json.loads(response.body[1:-1])
+        self.max_nb_items = int(res['total'])
+        print "j'ai trouve le max !!!!" + str(self.max_nb_items)
 
 
     def start_requests(self):
+        if self.max_nb_items == -1:
+            yield scrapy.Request(self.url_nb_reviews % (0, 2), callback=self.init_max_nb_items)
+
         for i in xrange(0, self.max_nb_items, self.items_per_page):
             yield scrapy.Request(self.url_nb_reviews % (i, self.items_per_page), callback=self.parse_nb_reviews)
 
@@ -103,14 +123,16 @@ class CritiquesLibresSpider(BaseReviewSpider):
             # Only reviews-eclaire considered for scraping (i.e. = #reviews - 1 )
             nreviews_eclair = int(review['nbrcrit']) - 1
             bookuid = review['id']
-            # only scrape the ones having enough review-eclair (nbreviews) and not yet stored
-            if config.MIN_NB_REVIEWS <= nreviews_eclair > int(self.stored_nb_reviews.get(bookuid, 0)):
-                item = ReviewBaseItem(hostname=self.allowed_domains[0],
-                                      site_logical_name=self.name,
-                                      book_uid=bookuid,
-                                      book_title=review['titre'],
-                                      book_lang=self.lang,
-                                      book_author=review['auteurstring'])
+            # only crawls reviews having min reviews required and not yet persisted
+            if config.MIN_NB_REVIEWS <= nreviews_eclair > self.lookup_stored_nb_reviews(bookuid):
+                lname, fname = self.parse_author(review['auteurstring'])
+                item = ReviewItem(hostname=self.allowed_domains[0],
+                                  site_logical_name=self.name,
+                                  book_uid=bookuid,
+                                  book_title=review['titre'],
+                                  book_lang=self.lang,
+                                  author_fname=fname,
+                                  author_lname=lname)
                 # trigger the 2nd Request
                 request = scrapy.Request(self.url_review % int(bookuid), callback=self.parse_review)
                 request.meta['item'] = item
@@ -141,12 +163,19 @@ class CritiquesLibresSpider(BaseReviewSpider):
                 rowno = 1
                 yield passed_item
 
-    @staticmethod
-    def parse_review_date(review_date):
-        month_name = review_date[(review_date.find(' ') + 1): review_date.rfind(' ')]
+    def parse_review_date(self, review_date_str):
+        month_name = review_date_str[(review_date_str.find(' ') + 1): review_date_str.rfind(' ')]
         month_no = scrapy_utils.mois[month_name]
-        review_date = review_date.replace(month_name, month_no)
-        return datetime.strptime(review_date, '%d %m %Y')
+        review_date_str = review_date_str.replace(month_name, month_no)
+        return datetime.strptime(review_date_str, '%d %m %Y')
+
+
+    def parse_author(self, author_str):
+        i = author_str.index(', ')
+        lname = author_str[0:i]
+        fname = author_str[i + 2:]
+        return (lname, fname)
+
 
 
 # ------------------------------------------------------------------------------------------------- #

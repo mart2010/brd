@@ -25,7 +25,7 @@ def treat_loaded_file(processed_file, remove, archive_dir):
         shutil.move(processed_file, archive_dir)
 
 
-def bulkload_review_files(period=None, remove_scraped_file=False):
+def bulkload_review_files(period=None, remove_scraped_file=False, truncate_staging=False):
     """
     Bulk loads Reviews*.dat files into staging. By default, load all files
     otherwise only the ones corresponding to period specified.
@@ -36,6 +36,9 @@ def bulkload_review_files(period=None, remove_scraped_file=False):
     pattern = "ReviewOf*.dat"
     if period:
         begin_period, end_period  = utils.resolve_period_text(period)
+    if truncate_staging:
+        truncate_table({'schema': 'staging', 'table': 'review'})
+        dbutils.get_connection().commit()
 
     n_treated, n_error = 0, 0
     for datfile in get_all_files(config.SCRAPED_OUTPUT_DIR, pattern):
@@ -72,7 +75,7 @@ def launch_load_of_staged_reviews():
     steps.append(step_dic(insert_into_book, 2, {}))
     steps.append(step_dic(insert_into_review, 3, {}))
     steps.append(step_dic(insert_into_book_site_review, 4, {}))
-    steps.append(step_dic(truncate_stage_review, 5, {}))
+    steps.append(step_dic(truncate_table, 5, {'schema': 'staging', 'table': 'review'}))
 
     last_step_no, last_status = get_last_audit_steps(batch_name)
 
@@ -109,11 +112,8 @@ def fetch_periods_data_in_stage():
     return res
 
 
-def truncate_stage_review():
-    sql = \
-        """
-        truncate table staging.review;
-        """
+def truncate_table(schema_table):
+    sql = "truncate table %s.%s;" % (schema_table['schema'], schema_table['table'])
     dbutils.get_connection().execute(sql)
 
 
@@ -191,7 +191,7 @@ def insert_auditing(commit=False, **named_params):
     assert('begin' in named_params)
     assert('end' in named_params)
     named_params['status'] = named_params.get('status', JobStatus.RUNNING)
-    named_params['step_no'] = named_params.get('step_no', 1)
+    named_params['step_no'] = named_params.get('step_no', 0)
     named_params['rows'] = named_params.get('rows', -1)
     ret = dbutils.get_connection().insert_row_get_id(sql, named_params)
     if commit:
@@ -231,7 +231,7 @@ def insert_into_reviewer(named_params):
         """
         insert into integration.reviewer(id, site_id, pseudo, load_audit_id, create_dts)
         select
-            cast(md5(concat(r.site_logical_name, r.reviewer_pseudo)) as uuid)
+            integration.derive_reviewerid(r.reviewer_pseudo, r.site_logical_name) as reviewerid
             , s.id
             , r.reviewer_pseudo
             , %(audit_id)s
@@ -253,18 +253,19 @@ def insert_into_reviewer(named_params):
 def insert_into_book(named_params):
     sql = \
         """
-        insert into integration.book(id, title_sform, lang_code, create_dts, load_audit_id)
+        insert into integration.book(id, title_sform, lang_code, author_sform, create_dts, load_audit_id)
         select * from
         (select
-             cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid) as bookid
-             , r.derived_title_sform
+             integration.derive_bookid( integration.get_sform(r.book_title),
+                                        r.book_lang,
+                                        integration.standardize_authorname(r.author_fname, r.author_lname) ) as bookid
+             , integration.get_sform(r.book_title) as title_sform
              , r.book_lang
+             , integration.standardize_authorname(r.author_fname, r.author_lname) as author_sform
              , now()
              , %(audit_id)s
         from staging.review r
-        group by cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
-             , r.derived_title_sform
-             , r.book_lang
+        group by 1, 2, 3, 4
         ) as new_book
         where
         NOT EXISTS ( select b.id
@@ -279,9 +280,11 @@ def insert_into_review(named_params):
         """
         insert into integration.review(book_id, reviewer_id, review_date, rating_code, create_dts, load_audit_id)
         select
-            cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
-            , cast(md5(concat(r.site_logical_name, r.reviewer_pseudo)) as uuid) as reviewer_id
-            , r.derived_review_date
+            integration.derive_bookid( integration.get_sform(r.book_title),
+                                       r.book_lang,
+                                       integration.standardize_authorname(r.author_fname, r.author_lname) ) as bookid
+            , integration.derive_reviewerid( r.reviewer_pseudo, r.site_logical_name ) as reviewerid
+            , r.parsed_review_date
             , r.review_rating
             , now()
             , %(audit_id)s
@@ -295,7 +298,9 @@ def insert_into_book_site_review(named_params):
         """
         insert into integration.book_site_review(book_id, site_id, book_uid, title_text, create_dts, load_audit_id)
         select distinct
-            cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
+            integration.derive_bookid( integration.get_sform(r.book_title),
+                                       r.book_lang,
+                                       integration.standardize_authorname(r.author_fname, r.author_lname) ) as bookid
             , s.id
             , r.book_uid
             , r.book_title
@@ -307,7 +312,9 @@ def insert_into_book_site_review(named_params):
         NOT EXISTS (    select bsr.book_id
                         from integration.book_site_review bsr
                         where bsr.site_id = s.id
-                        and bsr.book_id = cast(md5(concat(r.derived_title_sform, r.book_lang)) as uuid)
+                        and bsr.book_id = integration.derive_bookid( integration.get_sform(r.book_title),
+                                                                     r.book_lang,
+                                                                     integration.standardize_authorname(r.author_fname, r.author_lname) )
                     );
         """
     return dbutils.get_connection().execute(sql, named_params)

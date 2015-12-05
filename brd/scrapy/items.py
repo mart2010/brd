@@ -8,9 +8,9 @@
 from scrapy import Item, Field
 
 
-class ReviewBaseItem(Item):
-    """Make sure these match with staging.review table, since
-    we rely on these name for building insert statement
+class ReviewItem(Item):
+    """Item names must match staging.review column names
+    (export stmt is constructed automatically based on that)
     """
     hostname = Field()
     site_logical_name = Field()
@@ -20,18 +20,23 @@ class ReviewBaseItem(Item):
     review_date = Field()
     review_text = Field()
 
-    book_isbn = Field()
+    book_isbn_list = Field()
     book_title = Field()
     book_uid = Field()
-    book_author = Field()  # lname, fname
-    derived_title_sform = Field()
-    derived_review_date = Field()
     book_lang = Field()
 
+    author_fname = Field()
+    author_lname = Field()
+
+    parsed_review_date = Field()
     load_audit_id = Field()
 
 
-class BookBaseItem(Item):
+
+class BookItem(Item):
+    pass
+
+class ReviewerItem(Item):
     pass
 
 

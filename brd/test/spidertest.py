@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 
-from brd.scrapy.items import ReviewBaseItem
+from brd.scrapy.items import ReviewItem
 
-__author__ = 'mouellet'
 
 import unittest
 from mockresponse import fake_response_from_file
 import brd.scrapy.spiders.reviewspiders as reviewspiders
-
+import brd.config as config
 
 
 class TestCritiqueslibres(unittest.TestCase):
 
     def setUp(self):
-        self.spider = reviewspiders.CritiquesLibresSpider(begin_period='1-1-2001', end_period='31-12-2015')
+        self.spider = reviewspiders.CritiquesLibresSpider(period='1-1-2001_31-12-2015')
         # overwrite rules for test purposes
-        self.spider.min_nb_reviews = 2
+        config.MIN_NB_REVIEWS = 2
         self.spider.stored_nb_reviews = {"200": "1", "400": "1", "500": "16"}
 
 
@@ -48,7 +47,7 @@ class TestCritiqueslibres(unittest.TestCase):
 
         bookid_expected = (200, 300, 400)
         # ---------- Trigger manually 2nd parse() with 1st response ---------- #
-        item_param = ReviewBaseItem(hostname=self.spider.allowed_domains[0])
+        item_param = ReviewItem(hostname=self.spider.allowed_domains[0])
 
         for ri in bookid_expected:
             # mock field set in parse_nb_items

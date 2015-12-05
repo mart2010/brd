@@ -28,10 +28,12 @@ mois = {
 
 
 
+
 compile_regex = re.compile(r"\s+")
 
 def convert_book_title_to_sform(title):
     r"""
+    NO LONGER USED, AS TRANSFORMATION NOT DONE DURING SCRAPING
     Convert raw title found in websites to this form :
         'capitalized-title-with-space-replaced-by-dash'
     For doctest to work, I need to flag this text as raw (r)
@@ -45,7 +47,7 @@ def convert_book_title_to_sform(title):
 
 
 # should be moved to service
-def fetch_nbreviews(scraper_name):
+def fetch_nbreviews(spider_name):
     query = """select  book_uid
                       ,count(one_review) as nb_reviews
                 from integration.reviews_persisted_lookup
@@ -53,7 +55,7 @@ def fetch_nbreviews(scraper_name):
                 group by book_uid;
              """
 
-    res = dbutils.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
+    res = dbutils.get_ro_connection().fetch_all_inTransaction(query, (spider_name, ))
 
     nbreviews_stored = {}
     if res is not None:
@@ -65,7 +67,7 @@ def fetch_nbreviews(scraper_name):
 def fetch_book_titles(scraper_name):
     """
     Fetch titles scrapped by other spiders but not for 'scraper_name'.
-    Useful for site scrapping new revews through search (ex. babelio where no global list exist)
+    Useful for site scraping new reviews through search (ex. babelio where no global list exist)
     :param scraper_name:
     :return:
     """
@@ -95,6 +97,6 @@ def resolve_value(selector, xpath, expected=1):
         if expected == len(val):
             return val[0] if expected == 1 else val
         else:
-            raise ValueError("Expected %d elements, instead got: '%s' using selector '%s' with xpath '%s' " % (expected, val, selector, xpath))
+            raise ValueError("Expected %d elements, but got: '%s' with selector '%s', xpath '%s' " % (expected, val, selector, xpath))
     return val
 

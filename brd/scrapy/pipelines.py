@@ -17,7 +17,8 @@ class ReviewFilterAndConverter(object):
     """
     This pipeline is responsible of
     1) filtering out Reviews not within load period
-    2) adding derived fields (ex. derived_title_sform, derived_review_date)
+    2) parsing fields to derive proper type (ex. review_date is parsed from string)
+    N.B. no business-rule transfo allowed (these would imply new scraping whenever rules change!)
     """
 
     def __init__(self):
@@ -32,16 +33,16 @@ class ReviewFilterAndConverter(object):
         # spider knowns how to parse its date raw string
         review_date = spider.parse_review_date(item['review_date'])
 
-        # manage review_date
-        if self.begin_period <= review_date < self.end_period:
-            item['derived_review_date'] = review_date
+        # Consider only reviews within period (except those with no reviews yet persisted)
+        if spider.lookup_stored_nb_reviews(item['book_uid']) == 0 or \
+           self.begin_period <= review_date < self.end_period:
+            item['parsed_review_date'] = review_date
         else:
             raise DropItem("Review outside loading period")
 
-        # manage title_sform
-        item['derived_title_sform'] = scrapy_utils.convert_book_title_to_sform(item['book_title'])
+        # item['derived_title_sform'] = scrapy_utils.convert_book_title_to_sform(item['book_title'])
+        # item['derived_author_sform'] = spider.format_author_name(item['book_author'])
         return item
-
 
 
 
@@ -73,7 +74,7 @@ class DumpScrapedData(object):
         self.files[spider.name] = f
         self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|')
         # audit record must have correct period (used for filtering when loading staging.reviews)
-        step = "Loaded file: " + filename
+        step = "Dump file: " + filename
         audit_id = service.insert_auditing(job=DumpScrapedData.__name__,
                                            step=step,
                                            begin=spider.begin_period,
