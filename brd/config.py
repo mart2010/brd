@@ -14,15 +14,15 @@ DATABASE = {
 
 #for now, in french:
 SOURCE_WEBSITES_FR = {
-    'critiqueslibres': 'http://www.critiqueslibres.com',  # 15K livres
+    'critiqueslibres': 'http://www.critiqueslibres.com',  # 15K livres, 50K critics
     'decitre':'http://www.decitre.fr',
     'amazon': 'http://www.amazon.fr',
     'fnac': 'http://www.fnac.com',
-    'senscritique': 'http://www.senscritique.com',
     'babelio': 'http://www.babelio.com',
-    'critique-livre': 'http://www.critique-livre.fr',
-    # these sites are quite outdated and/or just too few reviews to be considered
-    'guidelecture': 'http://www.guidelecture.com'
+    # these sites are quite outdated and/or limited in term of reviews
+    'critique-livre': 'http://www.critique-livre.fr',  # only 750 reviews on novel (roman)
+    'senscritique': 'http://www.senscritique.com',  # only a number of top-list are available
+    'guidelecture': 'http://www.guidelecture.com'  # outdated
 }
 
 

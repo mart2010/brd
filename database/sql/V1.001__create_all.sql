@@ -172,7 +172,17 @@ create table integration.author (
 );
 
 
--- to be 100% clear, we'll need to integrate ISBN for books edition ..:
+
+create table integration.isbn (
+    ean13_id bigint,
+    isbn13 char(13),
+    isbn10 char(10),
+    isbn_text text,
+    load_audit_id int,
+    primary key (ean13_id)
+)
+
+-- to be 100% precise, we'll need to integrate ISBN for books edition ..:
 
 create table integration.book_edition (
     book_id uuid not null,

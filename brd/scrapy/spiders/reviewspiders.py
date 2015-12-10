@@ -183,11 +183,9 @@ class CritiquesLibresSpider(BaseReviewSpider):
 # ------------------------------------------------------------------------------------------------- #
 class BabelioSpider(BaseReviewSpider):
     """
-    Babelio has a lot of critics but no global list to easily crawl for total #ofReviews.
-    Strategy is to use titles from review loaded from other sites and trigger a search and follow
-    link result to load the review.
-    Or lookup review based on Book and sorted by Date!
-
+    Babelio has no global list to easily crawl for total #ofReviews.  Best approach is to
+    use ISBN from persisted reviews and search reviews based on these.
+    As a consequence, only reviews from already persisted book are scraped from this site.
     """
     name = 'babelio'
     allowed_domains = ['www.babelio.com']
@@ -202,4 +200,14 @@ class BabelioSpider(BaseReviewSpider):
 
     def start_requests(self):
         pass
-        # for stored_
+        # yield scrapy.Request(self.url_nb_reviews % (0, 2), callback=self.init_max_nb_items)
+
+
+
+class DecitreSpider(BaseReviewSpider):
+    """
+    This is similar to Babelio, only a search can be easily implemented
+    """
+    pass
+
+
