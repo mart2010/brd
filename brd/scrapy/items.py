@@ -14,11 +14,11 @@ class ReviewItem(Item):
     """
     hostname = Field()
     site_logical_name = Field()
-    reviewer_pseudo = Field()
-    reviewer_uid = Field()
-    review_rating = Field()
+    username = Field()
+    user_uid = Field()
+    rating = Field()
+    review = Field()
     review_date = Field()
-    review_text = Field()
 
     book_isbn_list = Field()
     book_title = Field()
@@ -30,7 +30,6 @@ class ReviewItem(Item):
 
     parsed_review_date = Field()
     load_audit_id = Field()
-
 
 
 class BookItem(Item):

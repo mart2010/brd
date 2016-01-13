@@ -5,7 +5,7 @@ __author__ = 'mouellet'
 import unittest
 from datetime import datetime
 
-import brd.db.dbutils as dbutils
+import brd.elt as db
 import brd.scrapy.items as items
 import brd.scrapy.pipelines as pipelines
 import brd.scrapy.spiders.reviewspiders as reviewspiders
@@ -17,7 +17,7 @@ import brd.config as config
 class TestPipeline(unittest.TestCase):
 
     def setUp(self):
-        self.dbconn = dbutils.get_connection()
+        self.dbconn = elt.get_connection()
         self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
 
 

@@ -3,13 +3,11 @@
 __author__ = 'mouellet'
 
 import re
-import brd.db.dbutils as dbutils
-from datetime import datetime
 
 
 # TODO: eventually refactor these various utils fcts into fct-based modules
 
-# maybe use locale later, but I know this simple solution works for exact mois name used!
+# maybe use locale, but this simple solution works when exact 'mois' name is used!
 mois = {
     u"janvier": "01",
     u"février": "02",
@@ -33,7 +31,7 @@ compile_regex = re.compile(r"\s+")
 
 def convert_book_title_to_sform(title):
     r"""
-    NO LONGER USED, AS TRANSFORMATION NOT DONE DURING SCRAPING
+    (NO LONGER USED, AS TRANSFORMATION NOT DONE DURING SCRAPING)
     Convert raw title found in websites to this form :
         'capitalized-title-with-space-replaced-by-dash'
     For doctest to work, I need to flag this text as raw (r)
@@ -55,7 +53,7 @@ def fetch_nbreviews(spider_name):
                 group by book_uid;
              """
 
-    res = dbutils.get_ro_connection().fetch_all_inTransaction(query, (spider_name, ))
+    res = elt.get_ro_connection().fetch_all_inTransaction(query, (spider_name, ))
 
     nbreviews_stored = {}
     if res is not None:
@@ -82,7 +80,7 @@ def fetch_book_titles(scraper_name):
             s.logical_name = %s  --logical name of babelio
             and c.book_id = b.book_id);
     """
-    return dbutils.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
+    return elt.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
 
 
 def resolve_value(selector, xpath, expected=1):

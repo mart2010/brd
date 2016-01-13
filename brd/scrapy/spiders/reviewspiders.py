@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import brd
+
 __author__ = 'mouellet'
 
 from brd.scrapy.scrapy_utils import resolve_value
@@ -6,7 +8,6 @@ import json
 import scrapy
 from brd.scrapy.items import ReviewItem
 import brd.scrapy.scrapy_utils as scrapy_utils
-import brd.utils as utils
 from datetime import datetime
 import brd.config as config
 
@@ -29,7 +30,7 @@ class BaseReviewSpider(scrapy.Spider):
         super(BaseReviewSpider, self).__init__(**kwargs)
         assert (kwargs['period'] is not None)
         self.logical_name = logical_name
-        self.begin_period, self.end_period = utils.resolve_period_text(kwargs['period'])
+        self.begin_period, self.end_period = brd.resolve_period_text(kwargs['period'])
 
         # dict to hold nb-reviews persisted: {"book_uid": "nb"}  (check scalability)
         self.stored_nb_reviews = None
@@ -44,7 +45,6 @@ class BaseReviewSpider(scrapy.Spider):
         if self.stored_nb_reviews is None:
             self.stored_nb_reviews = scrapy_utils.fetch_nbreviews(self.logical_name)
         return int(self.stored_nb_reviews.get(bookuid, 0))
-
 
 
 
@@ -91,7 +91,7 @@ class CritiquesLibresSpider(BaseReviewSpider):
     xpath_title = '//td[@class="texte"]/p/strong/text()'
     xpath_rating = './td[@class="texte"]/img[contains(@name,"etoiles")]/@name'
     xpath_date = './td[@class="texte"]/p[2]/text()'  # return:  " - BOURGES - 50 ans - 1 décembre 2004"
-    xpath_pseudo = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/text()'
+    xpath_username = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/text()'
     xpath_reviewer_uid = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/@href'  # return: "/i.php/vuser/?uid=32wdqee2334"
     ###########################
 
@@ -103,7 +103,6 @@ class CritiquesLibresSpider(BaseReviewSpider):
     def init_max_nb_items(self, response):
         res = json.loads(response.body[1:-1])
         self.max_nb_items = int(res['total'])
-        print "j'ai trouve le max !!!!" + str(self.max_nb_items)
 
 
     def start_requests(self):
@@ -148,15 +147,16 @@ class CritiquesLibresSpider(BaseReviewSpider):
         allreviews = response.xpath(self.xpath_allreviews)
         rowno = 1
         for review_sel in allreviews:
-            # iterate through 3 rows for each critics : row-1: title_star, row-2: pseudo + date, row-3: horizontal line
+            # iterate through 3 rows for each critics : row-1: title_star, row-2: username + date, row-3: horizontal line
             if rowno == 1:
-                passed_item['review_rating'] = resolve_value(review_sel, self.xpath_rating)
+                passed_item['rating'] = resolve_value(review_sel, self.xpath_rating)
+                # TODO: add the review which is now the review content as text
                 rowno = 2
             elif rowno == 2:
                 ruid = resolve_value(review_sel, self.xpath_reviewer_uid)
                 rdate = resolve_value(review_sel, self.xpath_date)
-                passed_item['reviewer_pseudo'] = resolve_value(review_sel, self.xpath_pseudo),
-                passed_item['reviewer_uid'] = ruid[ruid.rfind("=") + 1:],
+                passed_item['username'] = resolve_value(review_sel, self.xpath_username),
+                passed_item['user_uid'] = ruid[ruid.rfind("=") + 1:],
                 passed_item['review_date'] = rdate[rdate.rfind("-") + 2:]
                 rowno = 3
             else:
@@ -181,6 +181,7 @@ class CritiquesLibresSpider(BaseReviewSpider):
 # ------------------------------------------------------------------------------------------------- #
 #                                            ReviewSpider                                           #
 # ------------------------------------------------------------------------------------------------- #
+
 class BabelioSpider(BaseReviewSpider):
     """
     Babelio has no global list to easily crawl for total #ofReviews.  Best approach is to

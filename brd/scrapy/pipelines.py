@@ -4,13 +4,13 @@
 #
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
+import datetime
 from brd import config
-import brd.scrapy.scrapy_utils as scrapy_utils
-import brd.utils as utils
+import brd
+import brd.elt
 from scrapy.exceptions import DropItem
 from scrapy import signals
 from scrapy.exporters import CsvItemExporter
-import brd.db.service as service
 
 
 class ReviewFilterAndConverter(object):
@@ -75,10 +75,11 @@ class DumpScrapedData(object):
         self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|')
         # audit record must have correct period (used for filtering when loading staging.reviews)
         step = "Dump file: " + filename
-        audit_id = service.insert_auditing(job=DumpScrapedData.__name__,
+        audit_id = brd.elt.insert_auditing(job=DumpScrapedData.__name__,
                                            step=step,
                                            begin=spider.begin_period,
-                                           end=spider.end_period)
+                                           end=spider.end_period,
+                                           start_dts=datetime.datetime.now())
         self.audit[spider.name] = audit_id
         self.exporter.start_exporting()
 
@@ -86,9 +87,10 @@ class DumpScrapedData(object):
         self.exporter.finish_exporting()
         f = self.files.pop(spider.name)
         f.close()
-        service.update_auditing(commit=True,
+        brd.elt.update_auditing(commit=True,
                                 rows=self.counter,
                                 status="Completed",
+                                finish_dts=datetime.datetime.now(),
                                 id=self.audit[spider.name])
 
 
@@ -99,11 +101,11 @@ class DumpScrapedData(object):
         return item
 
     def update_audit(self, nb_rows, audit_id):
-        service.update_auditing(rows=nb_rows, status="Completed", id=audit_id)
+        brd.elt.update_auditing(rows=nb_rows, status="Completed", id=audit_id)
 
     def get_dump_filename(self, spider):
         return "ReviewOf" + spider.name + '_' + \
-               utils.get_period_text(spider.begin_period, spider.end_period) + '.dat'
+               brd.get_period_text(spider.begin_period, spider.end_period) + '.dat'
 
 
 

@@ -3,14 +3,14 @@
 __author__ = 'mouellet'
 
 import unittest
-import brd.db.dbutils as dbutils
+import brd.elt as db
 import psycopg2
 
-class TestDbUtils(unittest.TestCase):
+class Testdb(unittest.TestCase):
 
 
     def setUp(self):
-        self.dbconn = dbutils.get_connection()
+        self.dbconn = elt.get_connection()
         try:
             cr = self.dbconn.execute_inTransaction("create table test(id int, val varchar(20));")
             self.assertEqual(-1, cr, "Create table stmt should have returned -1")
