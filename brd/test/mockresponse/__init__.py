@@ -6,7 +6,7 @@ from scrapy.http import Response, Request, TextResponse, HtmlResponse
 
 
 def fake_response_from_file(file_name, url=None, response_type="Response", meta=None):
-    """ Modifed version of the stackoverflow page:
+    """
     Create a Scrapy fake HTTP response from a HTML file
     @param file_name: The relative filename from the responses directory,
                       but absolute paths also accepted.

@@ -73,6 +73,7 @@ def convert_file_to_csv(xml_pathfile, audit_id, max_nb_line=-1):
     def generate_work_isbns(infile):
         for event, element in iterparse(infile):
             if event == 'end' and element.tag == 'work':
+                # TODO:  deal with the work having attribute uncertain="true"  ..maybe ignore them
                 for w in element.getchildren():
                     yield (element.get('workcode'), w.text)
 

@@ -19,6 +19,7 @@ create table staging.load_audit (
     step_name text,
     step_no int,
     status text,
+    comment text,
     start_dts timestamp,
     finish_dts timestamp,
     rows_impacted int,
@@ -30,6 +31,20 @@ comment on table staging.load_audit is 'Metadata used to manage each job that in
 comment on column staging.load_audit.step_no is 'Step process order within a batch_job (used for step in pending.. status)';
 comment on column staging.load_audit.status is 'Status of step or error msg when failure';
 comment on column staging.load_audit.period_end is 'Excluded, 12/11/15 -> 11/11/15 23:59:59';
+
+
+
+-- no primary key constraint since there are duplicates <work-id,isbn> in xml feed!
+create table staging.thingisbn (
+    work_uid bigint,
+    isbn text,
+    loading_dts timestamp,
+    load_audit_id int,
+    foreign key (load_audit_id) references staging.load_audit(id)
+);
+
+comment on table staging.thingisbn is 'Data from thingISBN.xml to load occasionally to refresh reference work/isbn data';
+
 
 
 create table staging.review (
@@ -66,18 +81,6 @@ create table staging.rejected_review as
 ;
 
 comment on table staging.rejected_review is 'Review record not loaded into integration layer (this was useful when only one spider could load new books... and the other MUST link to exsiting..)';
-
-
--- no primary key constraint since there are duplicates <work-id,isbn> in xml feed!
-create table staging.thingisbn (
-    work_uid bigint,
-    isbn text,
-    loading_dts timestamp,
-    load_audit_id int,
-    foreign key (load_audit_id) references staging.load_audit(id)
-);
-
-comment on table staging.thingisbn is 'Data from thingISBN.xml to load occasionally to refresh reference work/isbn data';
 
 
 
@@ -126,8 +129,57 @@ create table staging_work_tag (
 -------------------------------------- Integration layer -------------------------------------
 
 
+create table integration.site (
+    id int primary key,
+    logical_name text unique,
+    status text,
+    create_dts timestamp not null
+);
 
-------------- Data from curated by librarians from lt .... ---------------
+comment on table integration.site is 'Website with book reviews scraped model as hub for greater flexibility';
+comment on column integration.site.logical_name is 'Name for lookup site_id and defined independently from evolving domain/url';
+comment on column integration.site.status is 'Flag used to get status for sites';
+
+
+create table integration.site_identifier (
+    site_id int not null,
+    hostname text not null,
+    full_url text,
+    valid_from timestamp not null,
+    valid_to timestamp,
+    create_dts timestamp,
+    update_dts timestamp,
+    primary key (site_id, valid_from),
+    foreign key (site_id) references integration.site(id) on delete cascade
+);
+
+comment on table integration.site_identifier is 'Natural key, hostname, is decoupled from site_id to accommodate change in time';
+comment on column integration.site_identifier.hostname is 'Hostname such as www.amazon.fr, www.amazon.com, www.thelibrary.fr';
+
+
+create table integration.language (
+    code char(3) primary key,  --MARC code
+    code3 char(3) unique,
+    code3_term char(3) unique,
+    code2 char(2) unique,
+    english_name text,
+    english_iso_name text,
+    french_name text,
+    french_iso_name text,
+    create_dts timestamp
+);
+
+comment on table integration.language is 'Language immutable reference';
+comment on column integration.language.code is 'Primary key using MARC code (same as ISO 639-2 alpha-3 bibliographic code)';
+comment on column integration.language.code3 is 'The ISO 639-2 alpha-3 bibliographic code (originally sourced from MARC code)';
+comment on column integration.language.code3_term is 'The ISO 639-2 alpha-3 terminology code';
+comment on column integration.language.code2 is 'The ISO 639-1 alpha-2 code (subset of alpha-3)';
+
+
+
+
+
+------------- Data curated by librarians from lt .... ---------------
 
 --Batch loaded from ISBNthing source
 
@@ -245,6 +297,38 @@ create table integration.work_author (
 comment on table integration.work_author is 'Association between Work and its author(s), sourced from lt';
 
 
+
+
+
+------------- Data from Reviews, tag, list harvested .... ---------------
+
+
+-- to be inserted with new site and refreshed periodically
+-- also updated by harvest activity to reflect last_harvest_date and state
+create table integration.work_site_mapping(
+    ref_uid bigint not null,
+    site_id int not null,
+    work_id uuid not null,
+    work_ori_id text not null,
+    state smallint,
+    last_harvest_date date,
+    create_dts timestamp,
+    load_audit_id int,
+    primary key(ref_uid, site_id),
+    foreign key(ref_uid) references integration.work(uid),
+    foreign key(site_id) references integration.site(id),
+    foreign key (load_audit_id) references staging.load_audit(id)
+);
+
+comment on table integration.work_site_mapping is 'Map between work ids of lt and all other site harvested';
+comment on column integration.work_site_mapping.ref_uid is 'Reference id used by lt';
+comment on column integration.work_site_mapping.work_id is 'MD5 hashing of work_ori_id';
+comment on column integration.work_site_mapping.work_ori_id is 'Original id used by the site in text format';
+comment on column integration.work_site_mapping.state is 'Harvest state the work is in (only mapped, not-enough-reviews, harvested';
+comment on column integration.work_site_mapping.last_harvest_date is 'Last time work was harvested, useful to schedule harvest session';
+
+
+
 create table integration.tag (
     id uuid primary key,
     tag text unique,
@@ -276,49 +360,6 @@ create table integration.work_tag (
 
 comment on table integration.work_tag is 'Tag assigned to Work (for now, use lt but could add source later on)';
 comment on column integration.work_tag.frequency is 'Frequency indicating the importance of the tag for the associated work on the site';
-
-
-
-
-------------- Data from Reviews harvested .... ---------------
-
-
-create table integration.site (
-    id int primary key,
-    logical_name text unique,
-    status text,
-    create_dts timestamp not null
-);
-
-comment on table integration.site is 'Website with book reviews scraped model as hub for greater flexibility';
-comment on column integration.site.logical_name is 'Name for lookup site_id and defined independently from evolving domain/url';
-comment on column integration.site.status is 'Flag used to get status for sites';
-
-
-create table integration.site_identifier (
-    site_id int not null,
-    hostname text not null,
-    full_url text,
-    valid_from timestamp not null,
-    valid_to timestamp,
-    create_dts timestamp,
-    update_dts timestamp,
-    primary key (site_id, valid_from),
-    foreign key (site_id) references integration.site(id) on delete cascade
-);
-
-comment on table integration.site_identifier is 'Natural key, hostname, is decoupled from site_id to accommodate change in time';
-comment on column integration.site_identifier.hostname is 'Hostname such as www.amazon.fr, www.amazon.com, www.thelibrary.fr';
-
-
-create table integration.language (
-    code char(2) primary key,
-    code3 char(3) unique,
-    name text,
-    create_dts timestamp
-);
-
-comment on table integration.language is 'Language immutable reference using ISO code as PK';
 
 
 create table integration.user (
@@ -363,96 +404,98 @@ create table integration.user_info (
 
 
 
-create table integration.book (
-    id uuid primary key,
-    title_sform text not null,
-    author_sform text not null,
-    lang_code char(2) not null,
-    title text,
-    source_site_id int,
-    create_dts timestamp,
-    load_audit_id int,
-    unique (title_sform, lang_code),
-    foreign key (load_audit_id) references staging.load_audit(id)
-);
 
-comment on table integration.book is 'All distinct title-author-lang found from harvesting book data from site (reviews, list, tag..)';
-comment on column integration.book.id is 'Primary-id generated by MD5 hashing of natural key, see plsql function' ;
-comment on column integration.book.title_sform is 'Std title form in capital with redundant blanks removed, see function';
-comment on column integration.book.author_sform is 'Std author form as (Lname, Fname), see function';
-comment on column integration.book.lang_code is 'Books in diff language considered distinct';
-comment on column integration.book.source_site_id is 'Web site where the book is first harvested';
+--Some sites does not restrict users reviewing many times same book, either remove constraint or adapt insert stmt
+--no update done (ex. should only be loaded once review can no longer be edited on site)
 
-
---Some sites does not restrict users reviewing more than once same book, either remove unique(book_id, reviewer_id) or adapt insert stmt
---no update done (ex. only loaded after they can no longer be updated on site)
-/*
-create table integration.book_review(
+create table integration.review(
     id bigserial primary key,
+    work_uid bigint not null,
     user_id uuid not null,
-    book_id uuid not null,
-    rating text not null,  --this will go in external clob...
-    review text,
-    review_date date,
+    site_id int not null,
+    lang_code char(3) not null,
     source_site_id int,
+    rating text,
+    review text, --this should be defined so to go in external clob...
+    review_date date,
     create_dts timestamp,
-    update_dts timestamp,
     load_audit_id int,
-    unique (book_id, user_id),
-    foreign key (book_id) references integration.book(id),
+    unique (work_uid, user_id),
+    foreign key (work_uid) references integration.work(uid),
     foreign key (user_id) references integration.user(id),
+    foreign key (site_id) references integration.site(id),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table integration.book_review is 'Book reviewed and/or rated by user';
-
-
-create table integration.book_user (
-    id uuid primary key,
-    book_id uuid not null,
-    user_id uuid not null,
-    source_site_id int,
-    create_dts timestamp,
-    update_dts timestamp,
-    load_audit_id int,
-    unique (book_id, user_id),
-    foreign key (book_id) references integration.book(id),
-    foreign key (user_id) references integration.user(id)
-);
-
-comment on table integration.book_user is 'User relationship with Book, such like lt''s collection or gr''s bookshelf';
-comment on column integration.book_user.id is 'Identifier derived from MD5 hashing of book_id and user_id';
-
-create table integration.book_user_desc (
-    book_user_id uuid not null,
-    qualifier text not null,
-    valid_from timestamp not null,
-    valid_to timestamp,
-    create_dts timestamp,
-    update_dts timestamp,
-    load_audit_id int,
-    primary key (book_user_id, valid_from),
-    foreign key (book_user_id) references integration.book_user_link(id)
-);
-
-comment on table integration.book_user_desc is 'Temporal qualifier of the relationship of book_user';
-comment on column integration.book_user_desc.qualifier is 'Ex. for gr: read, reading, to-read, or lt: your-library, wishlist, to-read, read-but-unowned, reading, favorites (default ones, the custom one will be ignored)';
+comment on table integration.review is 'Review and/or rating done for a Work in a specific language by a user ';
 
 
 
-create table integration.book_isbn(
-    book_id uuid,
-    ean13_id numeric(13),
-    source_site_id int,
-    create_dts timestamp,
-    load_audit_id int,
-    primary key (book_id, ean13_id),
-    foreign key(book_id) references integration.book(id),
-    foreign key(ean13_id) references integration.isbn(ean13_id)
-);
 
-comment on integration.book_isbn is 'Associations between book and ISBN(s) found from harvesting reviews';
-comment on column integration.book_isbn.source_site_id is 'Original site that first loaded this association';
+-- A review must be attached to an edition (i.e. = a book = an isbn) so that we get the language info ...
+-- goodreads has reviews by a book (given a Goodreads book-id. : api../book/show) or by isbn (api../book.show_by_isbn)
+-- but the web page combine reviews for the same work (for all editions) so difficult
+-- book.isbn_to_id gets the gr's book-id give the isbn.
+--
+--create table integration.book (
+--    id uuid primary key,
+--    title_sform text not null,
+--    author_sform text not null,
+--    lang_code char(2) not null,
+--    title text,
+--    source_site_id int,
+--    create_dts timestamp,
+--    load_audit_id int,
+--    unique (title_sform, lang_code),
+--    foreign key (load_audit_id) references staging.load_audit(id)
+--);
+--
+--comment on table integration.book is 'All distinct title-author-lang found from harvesting book data from site (reviews, list, tag..)';
+--comment on column integration.book.id is 'Primary-id generated by MD5 hashing of natural key, see plsql function' ;
+--comment on column integration.book.title_sform is 'Std title form in capital with redundant blanks removed, see function';
+--comment on column integration.book.author_sform is 'Std author form as (Lname, Fname), see function';
+--comment on column integration.book.lang_code is 'Books in diff language considered distinct';
+--comment on column integration.book.source_site_id is 'Web site where the book is first harvested';
+
+
+
+
+
+
+
+
+--create table integration.work_user (
+--    id uuid primary key,
+--    book_id uuid not null,
+--    user_id uuid not null,
+--    source_site_id int,
+--    create_dts timestamp,
+--    update_dts timestamp,
+--    load_audit_id int,
+--    unique (book_id, user_id),
+--    foreign key (book_id) references integration.book(id),
+--    foreign key (user_id) references integration.user(id)
+--);
+--
+--comment on table integration.work_user is 'User relationship with Work, such like lt''s collection or gr''s bookshelf';
+--comment on column integration.work_user.id is 'Identifier derived from MD5 hashing of work_uid and user_id';
+--
+--create table integration.book_user_desc (
+--    book_user_id uuid not null,
+--    qualifier text not null,
+--    valid_from timestamp not null,
+--    valid_to timestamp,
+--    create_dts timestamp,
+--    update_dts timestamp,
+--    load_audit_id int,
+--    primary key (book_user_id, valid_from),
+--    foreign key (book_user_id) references integration.book_user_link(id)
+--);
+--
+--comment on table integration.book_user_desc is 'Temporal qualifier of the relationship of book_user';
+--comment on column integration.book_user_desc.qualifier is 'Ex. for gr: read, reading, to-read, or lt: your-library, wishlist, to-read, read-but-unowned, reading, favorites (default ones, the custom one will be ignored)';
+
+
 
 
 
@@ -493,20 +536,21 @@ comment on table integration.rating_def is 'Simple rating code with its hierarch
 
 ---------------------- View -------------------------
 
--- View that return how many reviews already persisted per website (logical name)
+-- View that return how many reviews already persisted per site (logical name)
 
 create or replace view integration.reviews_persisted_lookup  as
-    select   logical_name
-            ,book_uid
-            ,1 as one_review
-    from integration.book_site_review b
-    join integration.site s on (s.id = b.site_id)
-    join integration.review r on (r.book_id = b.book_id);
+    select   s.logical_name
+            ,r.work_uid
+            ,r.lang_code
+            ,count(*) as nb_review
+    from integration.review r
+    join integration.site s on (s.id = r.site_id)
+    group by 1,2,3
+    ;
 
-comment on view integration.reviews_persisted_lookup is 'Report the number of reviews currently persisted by website (logical_name)' ;
+comment on view integration.reviews_persisted_lookup is 'Report of #Review by work, lang and site currently persisted' ;
 
 
-*/
 
 
 

@@ -7,8 +7,7 @@ __author__ = 'mouellet'
 class WorkReference(scrapy.Spider):
 
     name = 'workreference'
-    allowed_domains = ['www.librarything.com']
-
+    # allowed_domains = ['www.librarything.com']
 
     ###########################
     # Control setting
@@ -37,7 +36,6 @@ class WorkReference(scrapy.Spider):
 
     def start_requests(self):
         yield scrapy.Request(self.url_nb_reviews % (0, 2), callback=self.parse_work)
-
 
 
     def parse_work(self, response):

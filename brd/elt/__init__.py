@@ -8,6 +8,14 @@ import psycopg2
 import brd.config as config
 
 
+class EltStepStatus():
+    FAILED = 'Failed'
+    COMPLETED = 'Completed'
+    RUNNING = 'currently running..'
+
+
+
+
 class DbConnection(object):
     """
     Class to allow for interacting with psycopg2, reusing psycopg2 heavyweight connection,
@@ -47,13 +55,12 @@ class DbConnection(object):
 
     def copy_expert(self, sql, infile, size=8192):
         """
-        Execute copy_expert as a single transaction and commit
+        Execute copy_expert
         :return rowcount impacted
         """
-        with self.connection as c:
-            with c.cursor() as curs:
-                curs.copy_expert(sql, infile, size)
-                return curs.rowcount
+        with self.connection.cursor() as curs:
+            curs.copy_expert(sql, infile, size)
+            return curs.rowcount
 
 
     def insert_row_get_id(self, insert, params=None):
@@ -232,7 +239,8 @@ class BatchProcessor(object):
             msg = EltStepStatus.FAILED + ": Batch failed at step '%s' with DB error: '%s'" % (step.name, dbe.message)
             insert_auditing(commit=True,
                             job=self.batch_name,
-                            status=msg,
+                            status=EltStepStatus.FAILED,
+                            comment=msg,
                             step=step.name,
                             step_no=step.stepno,
                             start_dts=now,
@@ -286,8 +294,10 @@ class BatchProcessor(object):
 def insert_auditing(commit=False, **named_params):
     sql = \
         """
-        insert into staging.load_audit(batch_job, step_name, step_no, status, rows_impacted, period_begin, period_end, start_dts)
-                            values (%(job)s, %(step)s, %(step_no)s, %(status)s, %(rows)s, %(begin)s, %(end)s, %(start_dts)s);
+        insert into staging.load_audit(batch_job, step_name, step_no, status, comment,
+                                       rows_impacted, period_begin, period_end, start_dts)
+                            values (%(job)s, %(step)s, %(step_no)s, %(status)s,%(comment)s,
+                                    %(rows)s, %(begin)s, %(end)s, %(start_dts)s);
         """
     assert('job' in named_params)
     assert('step' in named_params)
@@ -297,6 +307,7 @@ def insert_auditing(commit=False, **named_params):
     named_params['status'] = named_params.get('status', EltStepStatus.RUNNING)
     named_params['step_no'] = named_params.get('step_no', 0)
     named_params['rows'] = named_params.get('rows', -1)
+    named_params['comment'] = named_params.get('comment')
     ret = get_connection().insert_row_get_id(sql, named_params)
     if commit:
         get_connection().commit()
@@ -321,11 +332,11 @@ def update_auditing(commit=False, **named_params):
     return ret
 
 
-def bulkload_file(filepath, staging_table, column_headers, period):
+def bulkload_file(filepath, table, column_headers, period):
         """
         Try to bulkload file and manage associated auditing metadata
         :param filepath:
-        :param staging_table:
+        :param table:
         :param column_headers:
         :param period:
         :return: # of row loaded (or -1, in case of error)
@@ -334,23 +345,24 @@ def bulkload_file(filepath, staging_table, column_headers, period):
         audit_id = insert_auditing(job='Bulkload file', step=filepath, begin=period[0], end=period[1], start_dts=now)
         try:
             with open(filepath) as f:
-                count = copy_into_staging(staging_table, column_headers, f)
-            update_auditing(commit=True, rows=count, status="Completed", id=audit_id, finish_dts=datetime.datetime.now())
+                count = copy_into_table(table, column_headers, f)
+            update_auditing(commit=True, rows=count, status=EltStepStatus.COMPLETED, id=audit_id, finish_dts=datetime.datetime.now())
             return count
         except psycopg2.DatabaseError, er:
             get_connection().rollback()
-            insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=0, status=er.pgerror, begin=period[0], end=period[1], start_dts=now)
+            insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=0, status=EltStepStatus.FAILED,
+                            comment=er.pgerror, begin=period[0], end=period[1], start_dts=now)
             # also add logging
             print("Error bulk loading file: \n'%s'\nwith msg: '%s' " % (filepath, er.message))
             return -1
 
 
-def copy_into_staging(tablename, columns, open_file):
+def copy_into_table(tablename, columns, open_file, delim='|'):
     sql = \
         """
-        copy staging.%s( %s )
-        from STDIN with csv HEADER DELIMITER '|' NULL '';
-        """ % (tablename, columns)
+        copy %s( %s )
+        from STDIN with csv HEADER DELIMITER '%s' NULL '';
+        """ % (tablename, columns, delim)
     return get_connection().copy_expert(sql, open_file)
 
 
@@ -369,12 +381,6 @@ class EltError(Exception):
 
     def __str__(self):
         return self.message
-
-
-class EltStepStatus():
-    FAILED = 'Failed'
-    COMPLETED = 'Completed'
-    RUNNING = 'currently running..'
 
 
 class CTAStage(object):

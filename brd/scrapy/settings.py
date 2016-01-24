@@ -9,8 +9,7 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'critiqueslibres'
-SPIDER_MODULES = ['brd.scrapy.spiders']
+#SPIDER_MODULES = ['brd.scrapy.spiders']
 
 # Disable cookies (some sites use cookies to spot bot)
 COOKIES_ENABLED = False
@@ -19,26 +18,27 @@ COOKIES_ENABLED = False
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 
-ITEM_PIPELINES = {
-    'brd.scrapy.pipelines.ReviewFilterAndConverter': 100,
-    'brd.scrapy.pipelines.DumpScrapedData': 200
-}
-
-# 'brd.scrapy.pipelines.pipelines.ReviewStageLoader': 300,
-
-# NEWSPIDER_MODULE = 'brd_tuto.spiders'
-
-
-# Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = 'brd_tuto (+http://www.yourdomain.com)'
-
-# Configure maximum concurrent requests performed by Scrapy (default: 16)
-#CONCURRENT_REQUESTS=32
+# ITEM_PIPELINES = {
+#     'brd.scrapy.pipelines.ReviewFilter': 100,
+#     'brd.scrapy.pipelines.DumpToFile': 200
+# }
 
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-#DOWNLOAD_DELAY=3
+DOWNLOAD_DELAY = 2  # 0.25 = 250 ms
+USER_AGENT = 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)'
+
+
+
+# BOT_NAME = 'scrapybot'
+
+# NEWSPIDER_MODULE = 'brd_tuto.spiders'
+
+# Configure maximum concurrent requests performed by Scrapy (default: 16)
+#CONCURRENT_REQUESTS=32
+
+
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN=16
 #CONCURRENT_REQUESTS_PER_IP=16

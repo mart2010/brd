@@ -5,22 +5,53 @@ from brd.scrapy.items import ReviewItem
 
 import unittest
 from mockresponse import fake_response_from_file
-import brd.scrapy.spiders.reviewspiders as reviewspiders
+import brd.scrapy.spiders.reviews as spiderreviews
 import brd.config as config
 
 
-class TestCritiqueslibres(unittest.TestCase):
+class TestLtReview(unittest.TestCase):
+
+
+    def test_work_withManylangs(self):
+
+        spider = spiderreviews.LibraryThingWorkReview(
+            begin_period='1-1-2000',
+            end_period='1-1-2016',
+            dump_filepath='dummy',
+            reviews_order='asc',
+            works_to_harvest=[{'work-site-id': '2371329', 'last_harvest_date': None, 'nb_in_db': {}}])
+
+        #review_file = "file://mockobject/"
+        #spider.url_workreview = review_file + "Reviews_lt_%s_manyLangs.html"
+        req_gen = spider.start_requests()
+        for r in req_gen:
+            self.assertEqual(r.url, spider.url_workreview % '2371329')
+            meta = r.meta
+            self.assertEqual(meta['work-index'], 0)
+
+        formreq_gen = spider.parse_nbreview(fake_response_from_file("mockobject/Reviews_lt_2371329_manyLangs.html",
+                                                                    url=spider.url_workreview % '2371329',
+                                                                    response_type="Html",
+                                                                    meta=meta))
+        i = 0
+        for f in formreq_gen:
+            self.assertEqual(f.url, spider.url_formRequest)
+            i += 1
+
+        self.assertEqual(9, i)
+
+
+
+class TttestCritiqueslibres(unittest.TestCase):
 
     def setUp(self):
-        self.spider = reviewspiders.CritiquesLibresSpider(period='1-1-2001_31-12-2015')
+        self.spider = spiderreviews.CritiquesLibresReview(period='1-1-2001_31-12-2015')
         # overwrite rules for test purposes
         config.MIN_NB_REVIEWS = 2
         self.spider.stored_nb_reviews = {"200": "1", "400": "1", "500": "16"}
 
-
     def tearDown(self):
         pass
-
 
     def test_parse_nb_of_review_is_ok(self):
 

@@ -8,7 +8,7 @@ from datetime import datetime
 import brd.elt as db
 import brd.scrapy.items as items
 import brd.scrapy.pipelines as pipelines
-import brd.scrapy.spiders.reviewspiders as reviewspiders
+import brd.scrapy.spiders.reviews as reviewspiders
 from scrapy.exceptions import DropItem
 import psycopg2
 import brd.config as config
@@ -28,10 +28,10 @@ class TestPipeline(unittest.TestCase):
     def test_dump_item_into_flatfile_ok(self):
 
         # dependencies fixture
-        spider = reviewspiders.CritiquesLibresSpider(period='1-1-2001_31-12-2015')
+        spider = reviewspiders.CritiquesLibresReview(period='1-1-2001_31-12-2015')
         config.SCRAPED_OUTPUT_DIR = '/Users/mouellet/dev/p/brd/brd/test/mockscrapedfiles/'
 
-        pipeline_loader = pipelines.DumpScrapedData()
+        pipeline_loader = pipelines.DumpToFile()
         pipeline_loader.spider_opened(spider)
 
         item = items.ReviewItem(hostname="thehost",
@@ -80,10 +80,10 @@ class TestPipeline(unittest.TestCase):
 
     def test_review_filter_is_ok(self):
 
-        scraper = reviewspiders.CritiquesLibresSpider(period='1-1-2010_1-2-2010')
+        scraper = reviewspiders.CritiquesLibresReview(period='1-1-2010_1-2-2010')
         # mock persistence for the specific book
         scraper.stored_nb_reviews = {"100": 1}
-        pipeline_loader = pipelines.ReviewFilterAndConverter()
+        pipeline_loader = pipelines.ReviewFilter()
         pipeline_loader.open_spider(scraper)
 
         item = items.ReviewItem(book_title=" the, Book ",
