@@ -39,7 +39,7 @@ def get_end_period():
 
 def fetch_work_ids(site_logicalname, never_harvested=False, n_limit=None):
     """
-    Fetch a number of work-ids from specified site, that have already (or never) been harvested
+    Fetch work-ids from specified site, that have already (or never) been harvested
     :return list of dic {'work-site-id1': idXXX, 'last_harvest_date': dateX, 'nb_in_db': {'ENG': 12, 'FRE': 2, ..}}
     """
     param = {"logical_name": site_logicalname}
@@ -136,7 +136,8 @@ def initial_harvest_reviews(spidername, nb_work_fetch):
                                 finish_dts=datetime.datetime.now(),
                                 id=self.audit[spider.name])
 
-
+    # update stat in work_site_mapping.... eventhough only harvest files were generated
+    # this must be based on the set of woek-ids obtained (fetch..) and not based on reviews harvested (don't want to keep harvesting unpopular work with no reviews!)
 
 
 
@@ -204,7 +205,6 @@ def bulkload_review_files(period=None, remove_files=False, truncate_staging=Fals
 
 def batch_loading_workisbn(truncate_stage=False):
     """
-
     :return:
     """
     batch = BatchProcessor(batch_loading_workisbn.func_name, 'thingisbn')
@@ -212,9 +212,7 @@ def batch_loading_workisbn(truncate_stage=False):
         name="load_work",
         sql="""
         insert into integration.work(uid, load_audit_id, create_dts)
-        select distinct s.work_uid
-            , %(audit_id)s
-            , now()
+        select distinct s.work_uid, %(audit_id)s, now()
         from staging.thingisbn s
         left join integration.work w on s.work_uid = w.uid
         where w.uid is null;
@@ -224,9 +222,7 @@ def batch_loading_workisbn(truncate_stage=False):
         name="load_isbn",
         sql="""
         insert into integration.isbn(isbn10, load_audit_id, create_dts)
-        select distinct s.isbn
-            , %(audit_id)s
-            , now()
+        select distinct s.isbn, %(audit_id)s, now()
         from staging.thingisbn s
         left join integration.isbn i on s.isbn = i.isbn10
         where i.isbn10 is null;
@@ -238,29 +234,20 @@ def batch_loading_workisbn(truncate_stage=False):
         name="load_work_isbn",
         sql="""
         insert into integration.work_isbn(isbn10, work_uid, source_site_id, load_audit_id, create_dts)
-        select distinct s.isbn
-            , s.work_uid
-            , (select id from integration.site where logical_name = %(logical_name)s)
-            , %(audit_id)s
-            , now()
+        select distinct s.isbn, s.work_uid, (select id from integration.site where logical_name = 'librarything')
+                , %(audit_id)s, now()
         from staging.thingisbn s
         left join integration.work_isbn i on (s.isbn = i.isbn10 and s.work_uid = i.work_uid)
         where i.isbn10 is null;
-        """,
-        named_params={'logical_name': 'librarything'}))
+        """))
 
     # mapping is one-to-one, but still needed to manage work/review lifecycle
     batch.add_step(Step(
         name="load_work_site_mapping",
         sql="""
         insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, state, load_audit_id, create_dts)
-        select uid
-            , cast(md5(uid::text) as uuid)
-            , (select id from integration.site where logical_name = 'librarything'
-            , uid::text
-            , %(state)s
-            , %(audit_id)s
-            , now()
+        select uid, cast(md5(uid::text) as uuid), (select id from integration.site where logical_name = 'librarything')
+            , uid::text, %(state)s, %(audit_id)s, now()
         from integration.work
         """,
         named_params={'state': WorkReviewState.MAPPED}))

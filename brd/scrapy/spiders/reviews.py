@@ -39,8 +39,7 @@ class BaseReviewSpider(scrapy.Spider):
 
         4. param dump_filepath: path+filename to let pipeline know where to Dump files
 
-        5. param reviews_order: spider can request reviews page in 'asc' (for initial harvesting)
-        or 'desc' (for incremental) of review_date
+        5. param reviews_order: spider can request reviews page in 'asc' or 'desc' of review_date (optional)
 
 
         """
@@ -59,13 +58,20 @@ class BaseReviewSpider(scrapy.Spider):
 
 
 
-
 # ------------------------------------------------------------------------------------------------- #
 #                                            ReviewSpiders                                           #
 # ------------------------------------------------------------------------------------------------- #
 
 
 class LibraryThingWorkReview(BaseReviewSpider):
+    """
+    For each Work, spider only fetches #of reviews needed (by comparing #of review on Page vs DB).
+    Reviews are then requested in chronological order (latest-first) so that only the first needed ones
+    are emitted.  Hence this spider doesn't need these param:
+        1) Begin_period (unless we need to do data integrity checks)
+        2) Reviews_order
+    End_period is used so not to harvest too recent review (needed if lt allows for update -to validate?)
+    """
     name = 'librarything'
     allowed_domains = ['www.librarything.com']
     # flag indicating site have multi-language reviews
@@ -77,28 +83,21 @@ class LibraryThingWorkReview(BaseReviewSpider):
     url_workreview = 'https://www.librarything.com/work/%s/reviews'
     url_formRequest = 'https://www.librarything.com/ajax_profilereviews.php'
 
-    form_static_data = {'offset': '0', 'type': '3', 'container': 'wp_reviews', 'showCount': '10000'}
+    form_static_data = {'offset': '0', 'type': '3', 'container': 'wp_reviews'}
     # 'offset': 25 (i.e. skip first 25.. showing 26 to 50)
-    # 'showCount': 25 (i.e. show 25 reviews, show all is set to 10'000) (TODO: to define as var)
-    # form data set dynamically: 'languagePick':'fre', 'workid': '2371329', 'sort': '0'  (0=desc, 3=asc)
-    # other formData not mandatory: showCount:25 , bookid: , optionalTitle:, uniqueID: , mode: profile
+    # to set dynamically: 'showCount':25, 'languagePick':'fre', 'workid': '2371329', 'sort': '0'  (0=desc, 3=asc)
+    # 'showCount': 25 (i.e. show 25 reviews, show all is set to 10'000 in lt)
+    # other formData not mandatory:  bookid: , optionalTitle:, uniqueID: , mode: profile
     ##########################
 
     ###########################
     # Parse setting
     ###########################
     langs_root = '//div[@class="languagepick"]//text()'
-
     xpath_reviews = '//div[@class="bookReview"]'
     xpath_rtext_rating = './div[@class="commentText"]'
     xpath_user_date = './div[@class="commentFooter"]/span[@class="controlItems"]'
-
-
     ###########################
-
-    # no longer needed
-    # def __init__(self, **kwargs):
-    #     super(LibraryThingWorkReview, self).__init__(**kwargs)
 
 
     def start_requests(self):
@@ -109,60 +108,75 @@ class LibraryThingWorkReview(BaseReviewSpider):
             yield req
 
     def parse_nbreview(self, response):
-        def prepare_form(workid, langpick, sort):
+
+        nb_buffer = 5
+        def prepare_form(workid, langpick, n_in_page, n_in_db):
+            """
+            Using descending sort and showCount = nb-missing from DB
+            guarantees incremental/initial harvesting to work properly
+            """
             form_data = dict(self.form_static_data)
             form_data['workid'] = workid
             form_data['languagePick'] = langpick
-            form_data['sort'] = '3' if sort == 'asc' else '0'
+            form_data['sort'] = '0'  # descending
+            nb_missing = n_in_page - n_in_db + nb_buffer
+            form_data['showCount'] = str(nb_missing)
             return form_data
 
         wid = response.url[response.url.index('/work/') + 6: response.url.index('/reviews')]
         work_index = response.meta['work-index']
-
         db_info = self.works_to_harvest[work_index]
-        nb_in_db = db_info.get('nb_in_db', None)
+        nb_db_dic = db_info.get('nb_in_db', {})
+        nb_page_dic = self.scrape_langs_nb(response)
+        # now only need this for data integrity checks
         last_harvest_date_db = db_info.get('last_harvest_date', None)
-        nb_in_page = self.scrape_langs_nb(response)
 
-        for lang in nb_in_page:
-            if last_harvest_date_db is None or nb_in_page[lang] > nb_in_db.get(lang, 0):
+        for lang in nb_page_dic:
+            marc_code = brd.get_marc_code(lang, capital=False)
+            nb_in_db = nb_db_dic.get(marc_code, 0)
+            nb_in_page = nb_page_dic[lang]
+            if last_harvest_date_db is None or nb_in_page > nb_in_db:
                 r = scrapy.FormRequest(self.url_formRequest,
-                                       formdata=prepare_form(wid, lang, self.reviews_order),
+                                       formdata=prepare_form(wid, marc_code, nb_in_page, nb_in_db),
                                        callback=self.parse_reviews)
                 r.meta['wid'] = wid
                 yield r
 
-
     def parse_reviews(self, response):
         for review_sel in response.xpath(self.xpath_reviews):
             sel1 = review_sel.xpath(self.xpath_rtext_rating)
-            rtext = sel1.xpath('./text()').extract()
-            r = sel1.xapth('./span[@class="rating"]/img/@src')[0]  # gives list of [http://pics..../ss6.gif]
-            rating = r[r.rindex('pics/')+5:]  # gives ss10.gif
+            # TODO: issues when text review includes markup inline (text under markup is skipped)
+            rtext = sel1.xpath('./text()').extract()[0]
+            r_list = sel1.xpath('./span[@class="rating"]/img/@src').extract()  # gives list of [http://pics..../ss6.gif]
+            if r_list or len(r_list) == 1:
+                r = r_list[0]
+                rating = r[r.rindex('pics/') + 5:]  # gives ss10.gif
+            else:
+                rating = None
 
             sel2 = review_sel.xpath(self.xpath_user_date)
-            username = sel2.xpath('./a[starts-with(@href,"/profile/")]/@href').extract()  #gives /profile/yermat
+            username = sel2.xpath('./a[starts-with(@href,"/profile/")]/@href').extract()[0]  #gives /profile/yermat
             rdate = sel2.xpath('./text()').extract()[0] # gives :   |  Nov 22, 2012  |
+            rawdate = rdate[rdate.index('|') + 1:rdate.rindex('|')].strip()
             item = ReviewItem(work_uid=response.meta['wid'],
-                              username=username[username.rindex('/')+1:],
-                              user_uid='',
+                              username=username[username.rindex('/') + 1:],
                               site_logical_name=self.name,
                               rating=rating,
                               review=rtext,
-                              review_date=rdate[rdate.index('|') + 1:rdate.rindex('|')].strip())
+                              review_date=rawdate)
             yield item
 
 
     def scrape_langs_nb(self, response):
-        """Extract language and number of reviews, assuming English review only when lang bar menu found
-        (TODO: fix-this assumption later... some book only have reviews in foreign lang)
+        """Extract language/nb of reviews (assuming English only when lang bar menu not found)
+        (TODO: fix-this assumption later... some book only have reviews in one foreign lang)
         :return {'English':  34, 'French': 12, .. }
         """
         lang_codes_nb = {}
         list_l_n = response.xpath(self.langs_root).extract()
         if len(list_l_n) == 0:
             # 'Showing 4 of 4'
-            show_txt = response.xpath('//div[@id="mainreviews_reviewnav]"/text()').extract()[0]
+            show_txt = response.xpath('//div[@id="mainreviews_reviewnav"]/text()').extract()[0]
             nb = int(show_txt[show_txt.rindex('of')+2:])
             lang_codes_nb['English'] = nb
         else:
@@ -175,8 +189,13 @@ class LibraryThingWorkReview(BaseReviewSpider):
             # to log
             print("The page '%s' has language bar but only one lang" % response.ur)
 
-        lang_codes_nb.pop(u'All languages')
+        if u'All languages' in lang_codes_nb:
+            lang_codes_nb.pop(u'All languages')
         return lang_codes_nb
+
+    def parse_review_date(self, raw_date):
+        return datetime.strptime(raw_date, '%b %d, %Y')
+
 
 
 

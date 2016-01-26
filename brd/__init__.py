@@ -94,7 +94,7 @@ load_static_ref()
 # caching langugage lookup
 lang_cache = {}
 
-def get_marc_code(input):
+def get_marc_code(input, capital=False):
     """
     input can be either alpha-2, alpha-3 code, english or french name
     capitalized or not.
@@ -120,4 +120,40 @@ def get_marc_code(input):
         else:
             marc_code = None
     lang_cache[uinput] = marc_code
-    return marc_code
+    if capital:
+        return marc_code
+    else:
+        return marc_code.lower()
+
+
+def convert_to_isbn13(isbn10):
+    """
+    Convert Isbn10 to Isbn13, or when it has 13 digits return as-is
+    >>> convert_to_isbn13('1-56619-909-3')
+    '9781566199094'
+    >>> convert_to_isbn13(u'2868890067')
+    '9782868890061'
+    >>> convert_to_isbn13(2123456802)
+    '9782123456803'
+    >>> convert_to_isbn13('817450494X')
+    '9788174504944'
+    """
+    isbn10_txt = str(isbn10)
+    isbn10_txt = isbn10_txt.replace('-', '')
+
+    if len(isbn10_txt) == 13:
+        return isbn10_txt
+    elif len(isbn10_txt) != 10:
+        raise ValueError("Isbn10 '%s' has not 10 digits" % isbn10_txt)
+
+    isbn13_no_checkdigit = '978' + isbn10_txt[:-1]
+    s = 0
+    mult = [1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3]
+    for i in xrange(12):
+        s += int(isbn13_no_checkdigit[i]) * mult[i]
+    check = 10 - (s % 10)
+    if check == 10:
+        check = 0
+
+    return isbn13_no_checkdigit + str(check)
+

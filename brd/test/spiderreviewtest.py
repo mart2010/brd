@@ -11,38 +11,92 @@ import brd.config as config
 
 class TestLtReview(unittest.TestCase):
 
-
-    def test_work_withManylangs(self):
-
+    def mock_spider(self, wid):
         spider = spiderreviews.LibraryThingWorkReview(
             begin_period='1-1-2000',
             end_period='1-1-2016',
             dump_filepath='dummy',
             reviews_order='asc',
-            works_to_harvest=[{'work-site-id': '2371329', 'last_harvest_date': None, 'nb_in_db': {}}])
+            works_to_harvest=[{'work-site-id': wid, 'last_harvest_date': None, 'nb_in_db': {}}])
+        return spider
 
-        #review_file = "file://mockobject/"
-        #spider.url_workreview = review_file + "Reviews_lt_%s_manyLangs.html"
+
+    def test_start_request(self):
+        wid = '2371329'
+        spider = self.mock_spider(wid)
         req_gen = spider.start_requests()
-        for r in req_gen:
-            self.assertEqual(r.url, spider.url_workreview % '2371329')
-            meta = r.meta
-            self.assertEqual(meta['work-index'], 0)
 
-        formreq_gen = spider.parse_nbreview(fake_response_from_file("mockobject/Reviews_lt_2371329_manyLangs.html",
-                                                                    url=spider.url_workreview % '2371329',
+        r = req_gen.next()
+        meta = r.meta
+        self.assertEqual(r.url, spider.url_workreview % wid)
+        self.assertEqual(meta['work-index'], 0)
+        try:
+            req_gen.next()
+        except StopIteration:
+            pass
+
+
+    def test_parse_nbreview_withManylangs(self):
+        wid = '2371329'
+        spider = self.mock_spider(wid)
+        # validate parse_nb_review()
+        meta = {'work-index': 0}
+        formreq_gen = spider.parse_nbreview(fake_response_from_file("mockobject/Reviews_lt_%s_manyLangs.html" % wid,
+                                                                    url=spider.url_workreview % wid,
                                                                     response_type="Html",
                                                                     meta=meta))
-        i = 0
+        nreq = 0
         for f in formreq_gen:
             self.assertEqual(f.url, spider.url_formRequest)
-            i += 1
+            lib = f.body.index('languagePick=')+13
+            lie = f.body.index('&',lib)
+            lang = f.body[lib:lie]
+            self.assertTrue(lang in ['eng', 'fre', 'spa', 'dut', 'cat', 'rus', 'ger', 'ita', 'fin'])
+            print "for workid %s the formbody is %s" % (wid, f.body)
+            nreq += 1
+        self.assertEqual(9, nreq)
 
-        self.assertEqual(9, i)
+    def test_parse_reviews(self):
+        wid = '2371329'
+        spider = self.mock_spider(wid)
+        # validate parse_reviews()
+        meta = {'wid': wid}
+        review_items = spider.parse_reviews(fake_response_from_file("mockobject/RespReview_lt_%s.html" % wid,
+                                                                    response_type="Html",
+                                                                    meta=meta))
+
+        for item in review_items:
+            # self.assertTrue(item[].find())
+            self.assertEqual(item['work_uid'], wid)
+            #print "the item" + str(item)
+
+
+    def test_parse_nbreview_onlyOne(self):
+        wid = '413508'
+        spider = self.mock_spider(wid)
+        meta = {'work-index': 0}
+        req_gen = spider.parse_nbreview(fake_response_from_file("mockobject/Reviews_lt_%s_onlyEnglish.html" % wid,
+                                                                url=spider.url_workreview % wid,
+                                                                response_type="Html",
+                                                                meta=meta))
+        one_req = req_gen.next()
+        try:
+            req_gen.next()
+        except StopIteration:
+            pass
+
+        self.assertEqual(one_req.url, spider.url_formRequest)
+        lib = one_req.body.index('languagePick=')+13
+        lie = one_req.body.index('&',lib)
+        lang = one_req.body[lib:lie]
+        self.assertEqual(lang, 'eng')
 
 
 
-class TttestCritiqueslibres(unittest.TestCase):
+
+
+
+class TZZZestCritiqueslibres(unittest.TestCase):
 
     def setUp(self):
         self.spider = spiderreviews.CritiquesLibresReview(period='1-1-2001_31-12-2015')

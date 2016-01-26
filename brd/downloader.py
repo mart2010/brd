@@ -3,18 +3,19 @@ __author__ = 'mouellet'
 
 
 from xml.etree.ElementTree import iterparse
-import brd.elt
+import brd
 import brd.config as config
 import os
 import datetime
 import urllib
 import subprocess
 
+url_test = 'file:///Users/mouellet/Google Drive/brd/data_static/thingISBN_10000.xml'
 
 
-def launch_download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.xml.gz", max_nb_line=-1):
+def launch_download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.xml.gz", max_nb_line=-1, enable_auditing=False):
     """
-    Download/uncompress a copy of thingISBN.xml.gz from lt, and convert into csv while adding
+    Download/uncompress a copy of thingISBN.xml.gz from lt (or locally), and convert into csv while adding
     log-audit_id metadata.
 
     To be done sparingly with respect to licensing agreement (the file is roughly 50M compressed).
@@ -22,60 +23,76 @@ def launch_download_convert_thingISBN(url="http://www.librarything.com/feeds/thi
     Can be tested using 'http://www.librarything.com/feeds/thingISBN_small.xml'
     """
     start_date = datetime.datetime.now()
-    step = "Download file: " + url
-    audit_id = brd.elt.insert_auditing(job=launch_download_convert_thingISBN.__name__,
-                                      step=step,
-                                      begin=start_date,
-                                      end=start_date,
-                                      start_dts=start_date)
+    if enable_auditing:
+        step = "Process file: " + url
+        audit_id = brd.elt.insert_auditing(job=launch_download_convert_thingISBN.__name__,
+                                          step=step,
+                                          begin=start_date,
+                                          end=start_date,
+                                          start_dts=start_date)
+    else:
+        audit_id = -1
 
     target_file = url[url.rindex('/') + 1:]
-    uncompress_file = download_file_and_uncompress(url, config.REF_DATA_DIR, target_file)
+    if url.startswith('http'):
+        local_filepath = download_file(url, config.REF_DATA_DIR, target_file)
+    elif url.startswith('file'):
+        local_filepath = url[7:]
+    else:
+        raise Exception('Url %s not valid' % url)
 
+    local_filepath = uncompress_file(local_filepath)
+    # add current date suffix to file
     suffix = "_" + brd.get_period_text(start_date, None) + ".xml"
-    file_with_suffix = uncompress_file[0:uncompress_file.rindex('.xml')] + suffix
-    os.rename(uncompress_file, file_with_suffix)
+    file_with_suffix = local_filepath[0:local_filepath.rindex('.xml')] + suffix
+    os.rename(local_filepath, file_with_suffix)
 
     # convert to csv
-    n_line = convert_file_to_csv(file_with_suffix, audit_id, max_nb_line)
-    brd.elt.update_auditing(commit=True,
-                           rows=n_line,
-                           status="Completed",
-                           finish_dts=datetime.datetime.now(),
-                           id=audit_id)
+
+    n_line = convert_to_csv_and_filter(file_with_suffix, audit_id, max_nb_line)
+    if enable_auditing:
+        brd.elt.update_auditing(commit=True,
+                               rows=n_line,
+                               status="Completed",
+                               finish_dts=datetime.datetime.now(),
+                               id=audit_id)
 
 
+def download_file(url, target_dir, target_filename):
+    download_f = os.path.join(target_dir, target_filename)
+    urllib.urlretrieve(url, download_f)
+    return download_f
 
-def download_file_and_uncompress(url, target_dir, target_filename):
-
-    download_file = os.path.join(target_dir, target_filename)
-    urllib.urlretrieve(url, download_file)
-    gz = download_file.find('.gz')
+def uncompress_file(filepath):
+    gz = filepath.find('.gz')
     if gz != -1:
         cmd = []
         cmd.append('gzip')
         cmd.append('-d')
-        cmd.append(download_file)
+        cmd.append(filepath)
         # execute gzip (check exit code and raise CalledProcessError if code != 0)
         subprocess.check_call(cmd)
-        return download_file[0:gz]
+        return filepath[0:gz]
     else:
-        return download_file
+        return filepath
 
 
-
-def convert_file_to_csv(xml_pathfile, audit_id, max_nb_line=-1):
+def convert_to_csv_and_filter(xml_pathfile, audit_id, max_nb_line=-1):
     """
-    Tranform xml_pathfile from xml to csv (with '|' separator)
+    Read xml file, filter isbn with attribute uncertain="true" and add
+    associated isbn13.  Convert output to to csv (with '|' separator), .
+
     :param max_nbwork: max number of work_uid to convert
     :return: number of line written to file
     """
     def generate_work_isbns(infile):
         for event, element in iterparse(infile):
             if event == 'end' and element.tag == 'work':
-                # TODO:  deal with the work having attribute uncertain="true"  ..maybe ignore them
-                for w in element.getchildren():
-                    yield (element.get('workcode'), w.text)
+                for i in element.getchildren():
+                    if 'uncertain' in i.attrib:
+                        pass
+                    else:
+                        yield (element.get('workcode'), i.text, brd.convert_to_isbn13(i.text))
 
     outputfile = xml_pathfile[0:xml_pathfile.rindex('.xml')] + ".csv"
 
@@ -85,7 +102,7 @@ def convert_file_to_csv(xml_pathfile, audit_id, max_nb_line=-1):
         n += 1
         if max_nb_line != -1 and n >= max_nb_line:
             break
-        f.write("%s|%s|%s\n" % (l[0], l[1], audit_id))
+        f.write("%s|%s|%s|%s\n" % (l[0], l[1], l[2], audit_id))
     f.close()
     return n
 
