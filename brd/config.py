@@ -40,11 +40,11 @@ SOURCE_WEBSITES_EN = {
 REVIEW_PREFIX = "ReviewOf"
 REVIEW_EXT = ".csv"
 
-SCRAPED_OUTPUT_DIR = "/Users/mouellet/Temp/reviews"
+SCRAPED_OUTPUT_DIR = "/Users/mart/Temp/reviews"
 # archive NOT under SCRAPED_OUTPUT_DIR as we recursively load review files from there
-SCRAPED_ARCHIVE_DIR = "/Users/mouellet/Temp/reviews_archive"
-REF_DATA_DIR = "/Users/mouellet/Google Drive/brd/data_static"
-REF_ARCHIVE_DIR = "/Users/mouellet/Google Drive/brd/data_static/archive"
+SCRAPED_ARCHIVE_DIR = "/Users/mart/Temp/reviews_archive"
+REF_DATA_DIR = "/Users/mart/Google Drive/brd/data_static"
+REF_ARCHIVE_DIR = "/Users/mart/Google Drive/brd/data_static/archive"
 
 
 # business rules

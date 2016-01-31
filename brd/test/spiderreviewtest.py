@@ -93,9 +93,6 @@ class TestLtReview(unittest.TestCase):
 
 
 
-
-
-
 class TZZZestCritiqueslibres(unittest.TestCase):
 
     def setUp(self):

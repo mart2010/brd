@@ -28,7 +28,7 @@ values
 -- 'copy' requires root privilege and the use of plsql '\copy' is only possible in psql shell env!
 -- now done in python!
 --copy integration.language(code3,code3_term,code2,code,english_iso_name,english_name,french_iso_name,french_name)
---from '/Users/mouellet/Google Drive/brd/ref_data/Iso_639_and_Marc_code - ISO-639-2_utf-8.tsv'
+--from '/Users/mart/Google Drive/brd/ref_data/Iso_639_and_Marc_code - ISO-639-2_utf-8.tsv'
 --with delimiter '\t';
 
 

@@ -11,13 +11,13 @@ from scrapy.exporters import CsvItemExporter
 
 class ReviewFilter(object):
     """
+    NO LONGER USED (spider manages incremental load only based on number of missing review in DB (vs found in site)
     This pipeline is responsible of
     1) getting the parsed review_date field
     1) filtering out Reviews not within load period
 
-    N.B. no business-rule transfo allowed (these would imply new scraping whenever rules change!)
+    N.B. no business-rule transfo allowed (would imply relaunching harvest whenever rules change!)
     """
-
     def __init__(self):
         self.begin_period = None
         self.end_period = None
@@ -59,9 +59,8 @@ class DumpToFile(object):
         crawler.signals.connect(pipeline.spider_closed, signals.spider_closed)
         return pipeline
 
-
     def spider_opened(self, spider):
-        filename = spider.dump_filepath
+        filename = spider.get_dump_filepath()
         f = open(filename, 'w')
         self.files[spider.name] = f
         self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|')
@@ -74,10 +73,9 @@ class DumpToFile(object):
 
     def process_item(self, item, spider):
         self.exporter.export_item(item)
-        # counter is left, however it could set an att in spider during closing (but difficult to get back considering the way service triggers spider)
+        # for counter, could set att in spider at closing
         self.counter += 1
         return item
-
 
 
 

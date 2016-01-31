@@ -9,7 +9,7 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-#SPIDER_MODULES = ['brd.scrapy.spiders']
+SPIDER_MODULES = ['brd.scrapy.spiders']
 
 # Disable cookies (some sites use cookies to spot bot)
 COOKIES_ENABLED = False
@@ -18,10 +18,11 @@ COOKIES_ENABLED = False
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 
-# ITEM_PIPELINES = {
-#     'brd.scrapy.pipelines.ReviewFilter': 100,
-#     'brd.scrapy.pipelines.DumpToFile': 200
-# }
+ITEM_PIPELINES = {
+     'brd.scrapy.pipelines.DumpToFile': 100
+ }
+
+# 'brd.scrapy.pipelines.ReviewFilter': 100,
 
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay

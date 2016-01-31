@@ -2,159 +2,192 @@
 import shutil
 
 import brd
-from brd import get_all_files, get_column_headers
 import brd.elt as elt
 from brd.elt import BatchProcessor, Step
 import brd.config as config
 import os
 import datetime
-from scrapy.crawler import CrawlerProcess
-from scrapy.utils.project import get_project_settings
+from brd.scrapy import SpiderProcessor
 
 __author__ = 'mouellet'
-
-
 
 
 def treat_loaded_file(processed_file, remove, archive_dir):
     if remove:
         os.remove(processed_file)
+        return None
     else:
         shutil.move(processed_file, archive_dir)
+        return archive_dir
 
 
-# default min_date used for initial loading mode
-init_begin_date = '1-1-1900'
 # delay period before review can be harvested
 elapse_days = 5
 
 
 def get_end_period():
     """
-    Rules to avoid Harvest reviews that are too recent
+    Rules to avoid Harvesting too recent reviews
     :return:
     """
     return datetime.date.today() - datetime.timedelta(days=elapse_days)
 
 
-def fetch_work_ids(site_logicalname, never_harvested=False, n_limit=None):
-    """
-    Fetch work-ids from specified site, that have already (or never) been harvested
-    :return list of dic {'work-site-id1': idXXX, 'last_harvest_date': dateX, 'nb_in_db': {'ENG': 12, 'FRE': 2, ..}}
-    """
-    param = {"logical_name": site_logicalname}
+begin_default_date = '1-1-1900'
 
-    select = \
-        """
-        select m.work_ori_id, m.last_harvest_date %s
-        from integration.work_site_mapping m
-        join integration.site s on (s.id = m.site_id and s.name = %(sitelogical_name)s)
-        """
-    if never_harvested:
-        sql = select % "" + " where m.last_harvest_date IS NULL "
-    else:
-        select = select % ", array_agg(l.lang_code), array_agg(l.nb_review)"
-        join = \
+
+def get_default_begin_date():
+    # default begin_date used for initial loading
+    return brd.resolve_date_text(begin_default_date)
+
+
+def _fetch_work(site_logical_name, harvested, nb_work):
+    """
+    Fetch info related to nb_work work-ids either harvested or not
+    :return list of dict {'work-ori-id': idXXX, 'last_harvest_date': dateX, 'nb_in_db': {'ENG': 12, 'FRE': 2, ..}}
+    """
+    def _construct_dic(list_tuples):
+        res = []
+        if list_tuples is None or len(list_tuples) == 0:
+            return res
+
+        for row in list_tuples:
+            dic = {'work-ori-id': row[0]}
+            if len(row) > 1:
+                dic['last_harvest_date'] = row[1]
+                if row[2] and len(row[2]) > 0:
+                    sub_dic = {}
+                    for i in xrange(len(row[2])):
+                        sub_dic[row[2][i]] = row[3][i]
+                    dic['nb_in_db'] = sub_dic
+                else:
+                    dic['nb_in_db'] = None
+            res.append(dic)
+        return res
+
+    # harvested=True (incremental) implies using the least recent harvested works
+    if harvested:
+        sql = \
             """
+            select m.work_ori_id, m.last_harvest_date,
+                    array_agg(l.lang_code), array_agg(l.nb_review)
+            from integration.work_site_mapping m
+            join integration.site s on (s.id = m.site_id)
             left join integration.reviews_persisted_lookup l
-                       on (l.work_uid = m.ref_uid and l.logical_name = %(sitelogical_name)s)
-            where m.last_harvest_date IS NOT NULL
-            group by 1, 2
+                           on (l.work_uid = m.ref_uid and l.logical_name = %(name)s)
+            where
+            s.logical_name = %(name)s
+            and m.last_harvest_date IS NOT NULL
+            group by 1,2
+            order by 2 asc
+            limit %(nb)s
             """
-        sql = select + join
-
-    if n_limit:
-        sql = sql + " limit %(nb)s"
-        param['nb'] = n_limit
-
-    result = elt.get_ro_connection().fetch_all(sql, param)
-
-    # construct list
-    res = []
-    for row in result:
-        dic = {'work-site-id': row[0], 'last_harvest_date': row[1]}
-
-        if row[2] and len(row[2]) > 0:
-            sub_dic = {}
-            for i in xrange(len(row[2])):
-                sub_dic[row[2][i]] = row[3][i]
-            dic['nb_in_db'] = sub_dic
-        else:
-            dic['nb_in_db'] = None
-        res.append(dic)
-    return res
+    # harvested=False (initial) implies listing the first n work never harvested
+    else:
+        sql = \
+            """
+            select m.work_ori_id
+            from integration.work_site_mapping m
+            join integration.site s on (s.id = m.site_id)
+            where
+            s.logical_name = %(name)s
+            and m.last_harvest_date IS NULL
+            limit %(nb)s
+            """
+    list_of_wids = elt.get_ro_connection().fetch_all(sql, {'nb': nb_work, 'name': site_logical_name})
+    return _construct_dic(list_of_wids)
 
 
-def get_dump_filename(spidername, begin, end, audit_id):
-    pre = config.REVIEW_PREFIX + spidername + "(%s)" % audit_id
+def get_dump_filename(spidername, begin, end):
+    pre = config.REVIEW_PREFIX + spidername + "(audit-id)"   # special placeholder for audit-id
     post = "_" + brd.get_period_text(begin, end) + config.REVIEW_EXT
     return pre + post
 
 
-def initial_harvest_reviews(spidername, nb_work_fetch):
+def harvest_review_and_load(site_logical_name, nb_work=10):
+    """
+    Harvest nb_work reviews (initial) for works never harvested.  If all works are harvested,
+    then harvest reviews incrementally based on how many are missing in DB (and before end_period)
+    (incremental harvest nb of reviews = #inSite - #inDB).
 
-    begin_period = init_begin_date
+    As a rule we load all reviews in staging after harvesting them, so we can update
+    work's last_harvest_date in work_site_mapping.
+    :param nb_work:
+    :param site_logical_name:
+    :return:
+    """
+
+    # Try processing Work never harvested (initial) !
+    workids_to_harvest = _fetch_work(site_logical_name, harvested=False, nb_work=nb_work)
+    if len(workids_to_harvest) >= 1:
+        audit_id, dump_filename = _harvest_reviews(site_logical_name, workids_to_harvest, initial=True)
+    # Otherwise, process Work already harvested (incremental) !
+    else:
+        workids_to_harvest = _fetch_work(site_logical_name, harvested=True, nb_work=nb_work)
+        audit_id, dump_filename = _harvest_reviews(site_logical_name, workids_to_harvest, initial=False)
+
+    # stage file so we can update stat in work_site_mapping...
+    # stage_audit_id, nb_rec = _bulkload_file(dump_filename, 'staging.review', archive_file=True)
+
+    # update last_update_date based on harvest audit_id (records in staging.reviews not linked to bulk-load audit-id)
+    # _update_harvest_date(audit_id)
+
+
+def _update_harvest_date(harvest_audit_id):
+    sql = \
+        """
+        update integration.work_site_mapping map
+            set last_harvest_date = work_in_staging.end_period
+        from (select integration.derive_other_work_id(r.book_uid, r.site_logical_name) as w_id
+                , a.id as audit_id
+                , max(a.period_end) as end_period
+              from staging.review r
+              join staging.load_audit a on (r.load_audit_id = a.id)
+              where a.id = %(audit)s
+              group by 1,2
+             ) as work_in_staging
+        where map.work_id = work_in_staging.w_id;
+        """
+    ret = elt.get_connection().execute(sql, {'audit': harvest_audit_id})
+    print("Update work_site_mapping for %s works " % ret)
+    return ret
+
+
+def _harvest_reviews(site_logical_name, workids_list, initial):
+    """
+    :param site_logical_name:
+    :param workids_list:
+    :param initial:
+    :return: (audit-id, dump_filepath)
+    """
+    if initial:
+        begin_period = get_default_begin_date()
+    else:
+        begin_period = None
     end_period = get_end_period()
-    reviews_db_stats = fetch_work_ids(spidername, never_harvested=True, n_limit=nb_work_fetch)
-    reviews_order = 'asc'
+    dump_filepath = os.path.join(config.SCRAPED_OUTPUT_DIR,
+                                 get_dump_filename(site_logical_name, begin_period, end_period))
+    spider_process = SpiderProcessor(site_logical_name,
+                                     dump_filepath=dump_filepath,
+                                     begin_period=begin_period,
+                                     end_period=end_period,
+                                     reviews_order='desc',
+                                     works_to_harvest=workids_list)
 
-    # audit record has the correct period
-    step = "preparing dump of '%s'" % spidername
-    audit_id = brd.elt.insert_auditing(job=initial_harvest_reviews.__name__,
-                                       step=step,
-                                       begin=begin_period,
-                                       end=end_period,
-                                       start_dts=datetime.datetime.now())
-
-    dump_filepath = os.path.join(config.REF_DATA_DIR, \
-                                 get_dump_filename(spidername, begin_period, end_period, audit_id))
-
-    # spider instantiation delegated to a builder-by-name (based name)
-
-    # re-update step name (circular dependency between filename/audit-id)
-    step = "Dump file: " + dump_filepath
-    brd.elt.get_connection().execute("update staging.load_audit set step_name=%s where id=%s", (step, audit_id))
-
-    # use settings.py defined under scrapy package
-    process = CrawlerProcess(get_project_settings())
-
-    process.crawl(spidername,
-                  begin_period=begin_period,
-                  end_period=end_period,
-                  dump_filepath=dump_filepath,
-                  work_to_harvest=reviews_db_stats,
-                  reviews_order=reviews_order)
-    # blocks here until crawling is finished
-    process.start()
+    audit_id, dump_filepath = spider_process.start_process()
+    print("Harvest of %d works/review completed with spider %s (initial: %s, audit_id: %s, dump file: '%s')" \
+          % (len(workids_list), site_logical_name, initial, audit_id, dump_filepath))
+    return (audit_id, dump_filepath)
 
 
-
-
-    brd.elt.update_auditing(commit=True,
-                                rows=self.counter,
-                                status="Completed",
-                                finish_dts=datetime.datetime.now(),
-                                id=self.audit[spider.name])
-
-    # update stat in work_site_mapping.... eventhough only harvest files were generated
-    # this must be based on the set of woek-ids obtained (fetch..) and not based on reviews harvested (don't want to keep harvesting unpopular work with no reviews!)
-
-
-
-def incremental_harvest():
-    pass
-
-
-def bulkload_thingisbn(remove_file=False, truncate_staging=True):
+def bulkload_thingisbn(pattern="thingISBN_10*.csv", remove_file=False, truncate_staging=True):
     """
     Try to load one reference file: thingISBN*_d-m-yyyy.csv
     :param remove_file:
     :param truncate_staging:
     :return:
     """
-
-    pattern = "thingISBN_10*.csv"
-    file_to_load = get_all_files(config.REF_DATA_DIR, pattern, recursively=False)
+    file_to_load = brd.get_all_files(config.REF_DATA_DIR, pattern, recursively=False)
 
     if len(file_to_load) == 1:
         file_to_load = file_to_load[0]
@@ -163,19 +196,19 @@ def bulkload_thingisbn(remove_file=False, truncate_staging=True):
 
     file_date = file_to_load[file_to_load.rindex('_') + 1:file_to_load.rindex('.csv')]
     # thingISBN data is a one-time snapshot (i.e. period_begin = period_end)
-    period_begin  = brd.resolve_date_text(file_date)
+    period_begin = brd.resolve_date_text(file_date)
 
     if truncate_staging:
         elt.truncate_table({'schema': 'staging', 'table': 'thingisbn'}, True)
 
-    n = elt.bulkload_file(file_to_load, 'staging.thingisbn', "WORK_UID, ISBN, LOAD_AUDIT_ID", (period_begin, period_begin))
-    if n != -1:
+    n = elt.bulkload_file(file_to_load, 'staging.thingisbn', "WORK_UID, ISBN_ORI, ISBN10, ISBN13, LOAD_AUDIT_ID", (period_begin, period_begin))
+    if n[1] != -1:
         treat_loaded_file(file_to_load, remove_file, config.REF_ARCHIVE_DIR)
 
 
-
-def bulkload_review_files(period=None, remove_files=False, truncate_staging=False):
+def bulkload_review_files(filepattern, period=None, remove_files=False, first_truncate_staging=False):
     """
+    NOT USED ANYMORE (Could be useful later when batch loading file...must manage not to havest same work-id prior to that)
     Bulk loads Reviews*.dat files into staging DB. By default, load all files
     otherwise only the ones corresponding to period specified.
     Commit is done after each file loaded
@@ -183,28 +216,44 @@ def bulkload_review_files(period=None, remove_files=False, truncate_staging=Fals
     :return: (nb of files treated, nb of files with error)
     """
     if period:
-        begin_period, end_period  = brd.resolve_period_text(period)
-    if truncate_staging:
+        begin_period, end_period = brd.resolve_period_text(period)
+    if first_truncate_staging:
         elt.truncate_table({'schema': 'staging', 'table': 'review'}, True)
 
-    pattern = config.REVIEW_PREFIX + "*"
     n_treated, n_error = 0, 0
-    for datfile in get_all_files(config.SCRAPED_OUTPUT_DIR, pattern, True):
+    for datfile in get_all_files(config.SCRAPED_OUTPUT_DIR, filepattern, True):
         file_begin, file_end = brd.resolve_period_text(datfile[datfile.index('_') + 1: datfile.rindex(config.REVIEW_EXT)])
-
         if period is None or (file_begin >= begin_period and file_end <= end_period):
             n = elt.bulkload_file(datfile, 'staging.review', get_column_headers(datfile), (file_begin, file_end))
-            if n == -1:
+            if n[1] == -1:
                 n_error += 1
             else:
                 n_treated += 1
-                treat_loaded_file(datfile, remove_files, config.SCRAPED_ARCHIVE_DIR)
+                archivefile = treat_loaded_file(datfile, remove_files, config.SCRAPED_ARCHIVE_DIR)
+            print("Finished bulkloading review file '%s', file was archived to '%s'" % (datfile, archivefile))
     return (n_treated, n_error)
 
+
+def _bulkload_file(filepath, schematable, archive_file=True):
+    """
+    Bulkload filepath with headers, assuming table columns are same as headers and
+    period found in filename as '*_beginxxx_endyyy.ext' (where begin is optional)
+    move to archive dir
+    :param filepath:
+    :param archive_file: move to archive otherwise delete file
+    :return: (audit-id, #ofRec bulkloaded)
+    """
+    period_text = filepath[filepath.index('_') + 1: filepath.rindex(".")]
+    file_begin, file_end = brd.resolve_period_text(period_text)
+    audit_id, n = elt.bulkload_file(filepath, schematable, brd.get_column_headers(filepath), (file_begin, file_end))
+    treat_loaded_file(filepath, False, config.SCRAPED_ARCHIVE_DIR)
+    print("Bulkload of %s completed (audit-id: %s, #OfLines: %s" %(filepath, audit_id, n))
+    return (audit_id, n)
 
 
 def batch_loading_workisbn(truncate_stage=False):
     """
+    :param truncate_stage:
     :return:
     """
     batch = BatchProcessor(batch_loading_workisbn.func_name, 'thingisbn')
@@ -221,36 +270,40 @@ def batch_loading_workisbn(truncate_stage=False):
     batch.add_step(Step(
         name="load_isbn",
         sql="""
-        insert into integration.isbn(isbn10, load_audit_id, create_dts)
-        select distinct s.isbn, %(audit_id)s, now()
+        insert into integration.isbn(ean, isbn13, isbn10, load_audit_id, create_dts)
+        select distinct cast(s.isbn13 as bigint), s.isbn13, s.isbn10, %(audit_id)s, now()
         from staging.thingisbn s
-        left join integration.isbn i on s.isbn = i.isbn10
-        where i.isbn10 is null;
+        left join integration.isbn i on cast(s.isbn13 as bigint) = i.ean
+        where i.ean is null;
         """))
 
     # TODO: design for possible deletion of work_uid/isbn (relevant also for work and isbn table) ?
-    # not hardcoding librarything for layer reuse..
     batch.add_step(Step(
         name="load_work_isbn",
         sql="""
-        insert into integration.work_isbn(isbn10, work_uid, source_site_id, load_audit_id, create_dts)
-        select distinct s.isbn, s.work_uid, (select id from integration.site where logical_name = 'librarything')
+        insert into integration.work_isbn(ean, work_uid, source_site_id, load_audit_id, create_dts)
+        select distinct cast(s.isbn13 as bigint), s.work_uid, (select id from integration.site where logical_name = 'librarything')
                 , %(audit_id)s, now()
         from staging.thingisbn s
-        left join integration.work_isbn i on (s.isbn = i.isbn10 and s.work_uid = i.work_uid)
-        where i.isbn10 is null;
+        left join integration.work_isbn i on (cast(s.isbn13 as bigint) = i.ean and s.work_uid = i.work_uid)
+        where i.ean is null;
         """))
 
-    # mapping is one-to-one, but still needed to manage work/review lifecycle
+    # mapping is one-to-one, but still needed to manage work/review harvest planning
+    # not hardcoding librarything (bit could be reused for other site update..)
     batch.add_step(Step(
         name="load_work_site_mapping",
         sql="""
-        insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, state, load_audit_id, create_dts)
-        select uid, cast(md5(uid::text) as uuid), (select id from integration.site where logical_name = 'librarything')
-            , uid::text, %(state)s, %(audit_id)s, now()
-        from integration.work
+        insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, load_audit_id, create_dts)
+        select work.uid, integration.derive_other_work_id(work.uid::text,%(logical_name)s)
+                , work.site_id, work.uid_text, %(audit_id)s, now()
+        from
+        (select uid, uid::text as uid_text, (select id from integration.site where logical_name = %(logical_name)s) as site_id
+        from integration.work) as work
+        left join integration.work_site_mapping m on (work.uid_text = m.work_ori_id and m.site_id = work.site_id)
+        where m.work_ori_id IS NULL;
         """,
-        named_params={'state': WorkReviewState.MAPPED}))
+        named_params={'logical_name': 'librarything'}))
 
     if truncate_stage:
         batch.add_step(Step(
@@ -264,13 +317,24 @@ def batch_loading_workisbn(truncate_stage=False):
         print str(er)
 
 
-
 def batch_loading_reviews():
     """
         inserts to do: reviewer, book, review, ..truncate staging
     :return:
     """
     pass
+
+
+def get_isbn_not_yet_associated():
+    sql = \
+        """
+        select isbn13, isbn10
+        from integration.isbn i
+        left join integration.isbn_sameas s on i.isbn13 = s.isbn13_same
+        where s.isbn13 is null;
+        limit 1
+        """
+    return elt.get_ro_connection().fetch_all(sql)
 
 
 
@@ -376,15 +440,4 @@ def insert_into_review_rejected():
         where b.id is null;
         """
 
-
-def get_isbn_not_yet_associated():
-    sql = \
-        """
-        select isbn13, isbn10
-        from integration.isbn i
-        left join integration.isbn_sameas s on i.isbn13 = s.isbn13_same
-        where s.isbn13 is null;
-        limit 1
-        """
-    return elt.get_ro_connection().fetch_all(sql)
 

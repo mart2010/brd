@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import datetime
-
-__author__ = 'mouellet'
-
 import uuid
 import psycopg2
 import brd.config as config
+
+__author__ = 'mouellet'
 
 
 class EltStepStatus():
@@ -14,22 +13,20 @@ class EltStepStatus():
     RUNNING = 'currently running..'
 
 
-
-
 class DbConnection(object):
     """
     Class to allow for interacting with psycopg2, reusing psycopg2 heavyweight connection,
     managing transaction, ... etc.
     """
+
     def __init__(self, connection=config.DATABASE, readonly=False):
         self.connection = psycopg2.connect(host=connection['host'],
-                                            database=connection['name'],
-                                            port=connection['port'],
-                                            user=connection['user'],
-                                            password=connection['pwd'])
+                                           database=connection['name'],
+                                           port=connection['port'],
+                                           user=connection['user'],
+                                           password=connection['pwd'])
         if readonly:
             self.connection.set_session(readonly=readonly)
-
 
     def execute_inTransaction(self, sql, params=None):
         """
@@ -52,16 +49,20 @@ class DbConnection(object):
             curs.execute(sql, params)
             return curs.rowcount
 
-
-    def copy_expert(self, sql, infile, size=8192):
+    def copy_into_table(self, schematable, columns, open_file, delim='|'):
         """
         Execute copy_expert
         :return rowcount impacted
         """
-        with self.connection.cursor() as curs:
-            curs.copy_expert(sql, infile, size)
-            return curs.rowcount
+        sql = \
+            """
+            copy %s( %s )
+            from STDIN with csv HEADER DELIMITER '%s' NULL '';
+            """ % (schematable, columns, delim)
 
+        with self.connection.cursor() as curs:
+            curs.copy_expert(sql, open_file, size=8192)
+            return curs.rowcount
 
     def insert_row_get_id(self, insert, params=None):
         """
@@ -79,7 +80,6 @@ class DbConnection(object):
             curs.execute(insert, params)
             return curs.fetchone()[0]
 
-
     def fetch_one(self, sql, params=None):
         """
         Execute sql query and fetch one row
@@ -92,7 +92,6 @@ class DbConnection(object):
             one_row = curs.fetchone()
         return one_row
 
-
     def fetch_all_inTransaction(self, query, params=None):
         """
         Execute query, fetch all records into a list and return it as a single transaction.
@@ -103,23 +102,20 @@ class DbConnection(object):
                 result = curs.fetchall()
                 return result
 
-
     def fetch_all(self, query, params=None):
         """
-        Execute query, fetch all records into a list and return it while leaving open the transaction.
+        Execute query, return all records as a list of tuple (or None) while leaving open the transaction.
         """
         with self.connection.cursor() as curs:
             curs.execute(query, params)
             result = curs.fetchall()
             return result
 
-
     def commit(self):
         self.connection.commit()
 
     def rollback(self):
         self.connection.rollback()
-
 
     def __del__(self):
         self.connection.close()
@@ -128,8 +124,9 @@ class DbConnection(object):
         return self.connection.__str__()
 
 
-# Singleton DbConnection connecting on default database
+# Singleton Dbconnection on default database
 conn_readonly = None
+
 def get_ro_connection():
     global conn_readonly
     if conn_readonly is None:
@@ -137,6 +134,7 @@ def get_ro_connection():
     return conn_readonly
 
 conn = None
+
 def get_connection():
     global conn
     if conn is None:
@@ -163,14 +161,13 @@ class Step(object):
 
 class BatchProcessor(object):
     """
-    Used to define/execute Batch which is defined with a number of ordered steps (sql stmts) to execute
-    which are sourced from same source_table (ex. load_staged_reviews, load_thingisbn, ..).
+    Used to define/execute Batch composed of a number of ordered steps (sql stmts) to execute
+    and sourced from same source_table (ex. load_staged_reviews, load_thingisbn, ..).
 
-    Commit done after each step executed successfully, and only failed steps are executed in case of
-    previous failure.
+    Commit is done after each step executed successfully, and after failure only failed steps
+    are re-executed (starting from failed step).
 
-    Steps are defined as a list of Step object each containing the sql and params to execute
-
+    Steps are defined in list of 'Step' object, each containing sql and params to execute
     """
 
     def __init__(self, batch_name, source_table):
@@ -184,11 +181,10 @@ class BatchProcessor(object):
         step.set_stepno(len(self.steps) + 1)
         self.steps.append(step)
 
-
     def execute_batch(self):
         """
         Execute all steps of the batch (or starting from a previously failed steps)
-
+        while updating the audit-log info
         :param period:
         :return:
         """
@@ -209,7 +205,6 @@ class BatchProcessor(object):
         # execute batch
         self._process_generic_steps(period_in_stage)
         print ("Finished processing Batch '%s!" % self.batch_name)
-
 
     def _process_generic_steps(self, period):
         """
@@ -261,7 +256,6 @@ class BatchProcessor(object):
         res = get_ro_connection().fetch_one(sql)
         return res
 
-
     def _get_last_audit_steps(self):
         """
         :return: (step_no, status) of last step log-audit for Batch
@@ -287,8 +281,12 @@ class BatchProcessor(object):
         elif last_status.startswith(EltStepStatus.RUNNING):
             last_status = EltStepStatus.RUNNING
         else:
-            raise EltError("Step no%d for batch '%s' has invalid status '%s'" % (last_step_no, self.batch_name, last_status))
+            raise EltError(
+                "Step no%d for batch '%s' has invalid status '%s'" % (last_step_no, self.batch_name, last_status))
         return (last_step_no, last_status)
+
+    def __str__(self):
+        return "Batch '%s' with these steps: %s " % (self.batch_name, str(self.steps))
 
 
 def insert_auditing(commit=False, **named_params):
@@ -299,11 +297,11 @@ def insert_auditing(commit=False, **named_params):
                             values (%(job)s, %(step)s, %(step_no)s, %(status)s,%(comment)s,
                                     %(rows)s, %(begin)s, %(end)s, %(start_dts)s);
         """
-    assert('job' in named_params)
-    assert('step' in named_params)
-    assert('begin' in named_params)
-    assert('end' in named_params)
-    assert('start_dts' in named_params)
+    assert ('job' in named_params)
+    assert ('step' in named_params)
+    assert ('begin' in named_params)
+    assert ('end' in named_params)
+    assert ('start_dts' in named_params)
     named_params['status'] = named_params.get('status', EltStepStatus.RUNNING)
     named_params['step_no'] = named_params.get('step_no', 0)
     named_params['rows'] = named_params.get('rows', -1)
@@ -322,48 +320,40 @@ def update_auditing(commit=False, **named_params):
                                     ,finish_dts = %(finish_dts)s
         where id = %(id)s;
         """
-    assert('status' in named_params)
-    assert('rows' in named_params)
-    assert('id' in named_params)
-    assert('finish_dts' in named_params)
+    assert ('status' in named_params)
+    assert ('rows' in named_params)
+    assert ('id' in named_params)
+    assert ('finish_dts' in named_params)
     ret = get_connection().execute(sql, named_params)
     if commit:
         get_connection().commit()
     return ret
 
 
-def bulkload_file(filepath, table, column_headers, period):
-        """
-        Try to bulkload file and manage associated auditing metadata
-        :param filepath:
-        :param table:
-        :param column_headers:
-        :param period:
-        :return: # of row loaded (or -1, in case of error)
-        """
-        now = datetime.datetime.now()
-        audit_id = insert_auditing(job='Bulkload file', step=filepath, begin=period[0], end=period[1], start_dts=now)
-        try:
-            with open(filepath) as f:
-                count = copy_into_table(table, column_headers, f)
-            update_auditing(commit=True, rows=count, status=EltStepStatus.COMPLETED, id=audit_id, finish_dts=datetime.datetime.now())
-            return count
-        except psycopg2.DatabaseError, er:
-            get_connection().rollback()
-            insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=0, status=EltStepStatus.FAILED,
-                            comment=er.pgerror, begin=period[0], end=period[1], start_dts=now)
-            # also add logging
-            print("Error bulk loading file: \n'%s'\nwith msg: '%s' " % (filepath, er.message))
-            return -1
-
-
-def copy_into_table(tablename, columns, open_file, delim='|'):
-    sql = \
-        """
-        copy %s( %s )
-        from STDIN with csv HEADER DELIMITER '%s' NULL '';
-        """ % (tablename, columns, delim)
-    return get_connection().copy_expert(sql, open_file)
+def bulkload_file(filepath, schematable, column_headers, period):
+    """
+    Bulkload filepath into schematable and manage auditing
+    :param filepath: full path of file
+    :param schematable: format expected 'schema.table'
+    :param column_headers:
+    :param period: period associated to file for auditing
+    :return: (audit_id, #ofRow)  Note: #ofRow = -1, in case of error
+    """
+    now = datetime.datetime.now()
+    audit_id = insert_auditing(job='Bulkload file', step=filepath, begin=period[0], end=period[1], start_dts=now)
+    try:
+        with open(filepath) as f:
+            count = get_connection().copy_into_table(schematable, column_headers, f)
+        update_auditing(commit=True, rows=count, status=EltStepStatus.COMPLETED, id=audit_id,
+                        finish_dts=datetime.datetime.now())
+        return (audit_id, count)
+    except psycopg2.DatabaseError, er:
+        get_connection().rollback()
+        insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=-1, status=EltStepStatus.FAILED,
+                        comment=er.pgerror, begin=period[0], end=period[1], start_dts=now)
+        # also add logging
+        print("Error bulk loading file: \n'%s'\nwith msg: '%s' " % (filepath, er.message))
+        return (audit_id, -1)
 
 
 def truncate_table(schema_table, commit=False):
@@ -374,7 +364,6 @@ def truncate_table(schema_table, commit=False):
 
 
 class EltError(Exception):
-
     def __init__(self, message, cause=None):
         self.message = message
         self.cause = cause

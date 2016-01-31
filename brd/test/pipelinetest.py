@@ -29,7 +29,7 @@ class TestPipeline(unittest.TestCase):
 
         # dependencies fixture
         spider = reviewspiders.CritiquesLibresReview(period='1-1-2001_31-12-2015')
-        config.SCRAPED_OUTPUT_DIR = '/Users/mouellet/dev/p/brd/brd/test/mockscrapedfiles/'
+        config.SCRAPED_OUTPUT_DIR = '/Users/mart/dev/p/brd/brd/test/mockscrapedfiles/'
 
         pipeline_loader = pipelines.DumpToFile()
         pipeline_loader.spider_opened(spider)
