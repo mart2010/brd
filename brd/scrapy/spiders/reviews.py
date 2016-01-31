@@ -44,7 +44,7 @@ class BaseReviewSpider(BaseAuditSpider):
         Spiders do NOT manage any load logic (initial-harvest, incremental-harvest etc..), only concerned
         with harvesting review (delegating filtering/saving to pipelines)
 
-        1. param begin_period: Review's min Date to harvest ('d-m-yyyy')
+        1. param begin_period: Review's min Date to harvest
 
         2. param end_date: Review's max Date to harvest (exclusive)
 

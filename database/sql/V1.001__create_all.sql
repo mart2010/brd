@@ -48,7 +48,6 @@ create table staging.thingisbn (
 comment on table staging.thingisbn is 'Data from thingISBN.xml to load occasionally to refresh reference work/isbn data';
 
 
-
 create table staging.review (
     id bigserial primary key,
     site_logical_name text,

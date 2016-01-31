@@ -180,10 +180,10 @@ def _harvest_reviews(site_logical_name, workids_list, initial):
     return (audit_id, dump_filepath)
 
 
-def bulkload_thingisbn(pattern="thingISBN_10*.csv", remove_file=False, truncate_staging=True):
+def bulkload_thingisbn(pattern="thingISBN_10*.csv", archive_file=False, truncate_staging=True):
     """
     Try to load one reference file: thingISBN*_d-m-yyyy.csv
-    :param remove_file:
+    :param archive_file:
     :param truncate_staging:
     :return:
     """
@@ -203,7 +203,8 @@ def bulkload_thingisbn(pattern="thingISBN_10*.csv", remove_file=False, truncate_
 
     n = elt.bulkload_file(file_to_load, 'staging.thingisbn', "WORK_UID, ISBN_ORI, ISBN10, ISBN13, LOAD_AUDIT_ID", (period_begin, period_begin))
     if n[1] != -1:
-        treat_loaded_file(file_to_load, remove_file, config.REF_ARCHIVE_DIR)
+        if archive_file:
+            treat_loaded_file(file_to_load, remove=False, archive_dir=config.REF_ARCHIVE_DIR)
 
 
 def bulkload_review_files(filepattern, period=None, remove_files=False, first_truncate_staging=False):
@@ -240,13 +241,14 @@ def _bulkload_file(filepath, schematable, archive_file=True):
     period found in filename as '*_beginxxx_endyyy.ext' (where begin is optional)
     move to archive dir
     :param filepath:
-    :param archive_file: move to archive otherwise delete file
+    :param archive_file: move to archive otherwise leave it
     :return: (audit-id, #ofRec bulkloaded)
     """
     period_text = filepath[filepath.index('_') + 1: filepath.rindex(".")]
     file_begin, file_end = brd.resolve_period_text(period_text)
     audit_id, n = elt.bulkload_file(filepath, schematable, brd.get_column_headers(filepath), (file_begin, file_end))
-    treat_loaded_file(filepath, False, config.SCRAPED_ARCHIVE_DIR)
+    if archive_file:
+        treat_loaded_file(filepath, remove=False, archive_dir=config.SCRAPED_ARCHIVE_DIR)
     print("Bulkload of %s completed (audit-id: %s, #OfLines: %s" %(filepath, audit_id, n))
     return (audit_id, n)
 

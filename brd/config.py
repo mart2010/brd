@@ -43,8 +43,8 @@ REVIEW_EXT = ".csv"
 SCRAPED_OUTPUT_DIR = "/Users/mart/Temp/reviews"
 # archive NOT under SCRAPED_OUTPUT_DIR as we recursively load review files from there
 SCRAPED_ARCHIVE_DIR = "/Users/mart/Temp/reviews_archive"
-REF_DATA_DIR = "/Users/mart/Google Drive/brd/data_static"
-REF_ARCHIVE_DIR = "/Users/mart/Google Drive/brd/data_static/archive"
+REF_DATA_DIR = "/Users/mart/Temp/ref_data"
+REF_ARCHIVE_DIR = "/Users/mart/Temp/ref_data/archive"
 
 
 # business rules
