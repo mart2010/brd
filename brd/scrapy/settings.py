@@ -19,18 +19,20 @@ COOKIES_ENABLED = False
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 
 ITEM_PIPELINES = {
-     'brd.scrapy.pipelines.DumpToFile': 100
+    'brd.scrapy.pipelines.ReviewFilter': 100,
+    'brd.scrapy.pipelines.DumpToFile': 200
  }
 
-# 'brd.scrapy.pipelines.ReviewFilter': 100,
+
 
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 2  # 0.25 = 250 ms
+DOWNLOAD_DELAY = 0.2  # 0.25 = 250 ms
 USER_AGENT = 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)'
 
-
+# default level 'DEBUG'
+LOG_LEVEL = 'INFO'
 
 # BOT_NAME = 'scrapybot'
 

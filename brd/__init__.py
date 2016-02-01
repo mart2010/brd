@@ -18,19 +18,24 @@ def get_period_text(begin_period, end_period):
     or 'd-m-yyyy' when begin_period is None
     """
     assert(end_period is not None)
-    b = str(end_period.day) + '-' + str(end_period.month) + '-' + str(end_period.year)
+    e = str(end_period.day) + '-' + str(end_period.month) + '-' + str(end_period.year)
     if begin_period is None:
-        return b
+        return e
     else:
-        e = str(begin_period.day) + '-' + str(begin_period.month) + '-' + str(begin_period.year)
+        b = str(begin_period.day) + '-' + str(begin_period.month) + '-' + str(begin_period.year)
         return b + '_' + e
 
 
 def resolve_date_text(onedate, fmt='%d-%m-%Y'):
+    """
+    :param onedate:
+    :param fmt:
+    :return: onedate in date format (not datetime)
+    """
     if onedate is None:
         return None
     else:
-        return datetime.strptime(onedate, fmt)
+        return datetime.strptime(onedate, fmt).date()
 
 
 def resolve_period_text(period_text):

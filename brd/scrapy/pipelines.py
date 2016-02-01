@@ -11,9 +11,11 @@ from scrapy.exporters import CsvItemExporter
 
 class ReviewFilter(object):
     """
-    NO LONGER USED (spider manages incremental load only based on number of missing review in DB (vs found in site)
+    Less important since ReviewSpider could only request missing review, however we keep this
+    to implement parsing additional field and make sure the dates are ok (Spider add a buffer ..)
+
     This pipeline is responsible of
-    1) getting the parsed review_date field
+    1) getting the parsed version of some fields (review_date, parsed_rating)
     1) filtering out Reviews not within load period
 
     N.B. no business-rule transfo allowed (would imply relaunching harvest whenever rules change!)
@@ -27,12 +29,14 @@ class ReviewFilter(object):
         self.end_period = spider.end_period
 
     def process_item(self, item, spider):
-        # spider knowns how to parse its date text
+        # spider knows how to parse its date text, rating...
         review_date = spider.parse_review_date(item['review_date'])
 
         # Keep only reviews within period
         if self.begin_period <= review_date < self.end_period:
             item['parsed_review_date'] = review_date
+            review_rating = spider.parse_rating(item['rating'])
+            item['parsed_rating'] = review_rating
         else:
             raise DropItem("Review outside loading period")
         return item

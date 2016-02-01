@@ -346,6 +346,7 @@ def bulkload_file(filepath, schematable, column_headers, period):
             count = get_connection().copy_into_table(schematable, column_headers, f)
         update_auditing(commit=True, rows=count, status=EltStepStatus.COMPLETED, id=audit_id,
                         finish_dts=datetime.datetime.now())
+        print("Bulkload of %s completed (audit-id: %s, #OfLines: %s" %(filepath, audit_id, count))
         return (audit_id, count)
     except psycopg2.DatabaseError, er:
         get_connection().rollback()

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 DATABASE = {
     'host': 'localhost',
     'name': 'brd',
@@ -33,10 +32,6 @@ SOURCE_WEBSITES_EN = {
 }
 
 
-
-
-# resource
-
 REVIEW_PREFIX = "ReviewOf"
 REVIEW_EXT = ".csv"
 
@@ -51,8 +46,6 @@ REF_ARCHIVE_DIR = "/Users/mart/Temp/ref_data/archive"
 
 # Minimum nb of reviews before loading book from website
 MIN_NB_REVIEWS = 5
-
-
 
 
 

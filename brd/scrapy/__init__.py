@@ -51,7 +51,7 @@ class SpiderProcessor(object):
         return (self.audit_id, self.dump_filepath)
 
     def _get_audit(self):
-        audit_id = brd.elt.insert_auditing(job="Run spider " + self.spidername,
+        audit_id = brd.elt.insert_auditing(job="Harvest " + self.spidername,
                                            step="...",
                                            begin=self.begin_period,
                                            end=self.end_period,
@@ -61,7 +61,7 @@ class SpiderProcessor(object):
 
     @staticmethod
     def _update_step_filename(filename, audit_id):
-            stepname = "Output file: " + filename
+            stepname = filename
             brd.elt.get_connection().execute("update staging.load_audit set step_name=%s where id=%s",
                                              (stepname, audit_id))
             return stepname

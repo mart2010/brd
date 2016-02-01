@@ -12,13 +12,15 @@ from brd.scrapy import SpiderProcessor
 __author__ = 'mouellet'
 
 
-def treat_loaded_file(processed_file, remove, archive_dir):
+def treat_loaded_file(processed_filepath, remove, archive_dir):
     if remove:
-        os.remove(processed_file)
+        os.remove(processed_filepath)
         return None
     else:
-        shutil.move(processed_file, archive_dir)
-        return archive_dir
+        filename = os.path.basename(processed_filepath)
+        archivefilepath = os.path.join(archive_dir, filename)
+        shutil.move(processed_filepath, archivefilepath)
+        return archivefilepath
 
 
 # delay period before review can be harvested
@@ -28,7 +30,7 @@ elapse_days = 5
 def get_end_period():
     """
     Rules to avoid Harvesting too recent reviews
-    :return:
+    :return: today - some elapse_days as datetime.date
     """
     return datetime.date.today() - datetime.timedelta(days=elapse_days)
 
@@ -127,10 +129,10 @@ def harvest_review_and_load(site_logical_name, nb_work=10):
         audit_id, dump_filename = _harvest_reviews(site_logical_name, workids_to_harvest, initial=False)
 
     # stage file so we can update stat in work_site_mapping...
-    # stage_audit_id, nb_rec = _bulkload_file(dump_filename, 'staging.review', archive_file=True)
+    stage_audit_id, nb_rec = _bulkload_file(dump_filename, 'staging.review', archive_file=True)
 
-    # update last_update_date based on harvest audit_id (records in staging.reviews not linked to bulk-load audit-id)
-    # _update_harvest_date(audit_id)
+    if nb_rec > 0:
+        _update_harvest_date(audit_id)
 
 
 def _update_harvest_date(harvest_audit_id):
@@ -138,7 +140,7 @@ def _update_harvest_date(harvest_audit_id):
         """
         update integration.work_site_mapping map
             set last_harvest_date = work_in_staging.end_period
-        from (select integration.derive_other_work_id(r.book_uid, r.site_logical_name) as w_id
+        from (select integration.derive_other_work_id(r.work_uid, r.site_logical_name) as w_id
                 , a.id as audit_id
                 , max(a.period_end) as end_period
               from staging.review r
@@ -173,8 +175,8 @@ def _harvest_reviews(site_logical_name, workids_list, initial):
                                      end_period=end_period,
                                      reviews_order='desc',
                                      works_to_harvest=workids_list)
-
     audit_id, dump_filepath = spider_process.start_process()
+
     print("Harvest of %d works/review completed with spider %s (initial: %s, audit_id: %s, dump file: '%s')" \
           % (len(workids_list), site_logical_name, initial, audit_id, dump_filepath))
     return (audit_id, dump_filepath)
@@ -242,14 +244,23 @@ def _bulkload_file(filepath, schematable, archive_file=True):
     move to archive dir
     :param filepath:
     :param archive_file: move to archive otherwise leave it
-    :return: (audit-id, #ofRec bulkloaded)
+    :return: (audit-id, #ofRec bulkloaded) #ofOfRec = 0 when file was empty)
     """
+    def file_is_empty(filep):
+        return os.stat(filep).st_size == 0
+
     period_text = filepath[filepath.index('_') + 1: filepath.rindex(".")]
     file_begin, file_end = brd.resolve_period_text(period_text)
-    audit_id, n = elt.bulkload_file(filepath, schematable, brd.get_column_headers(filepath), (file_begin, file_end))
-    if archive_file:
+
+    if file_is_empty(filepath):
+        n = 0
+        audit_id = elt.insert_auditing(commit=True, job='Bulkload file', step=filepath, begin=file_begin, end=file_end,
+                                       status='File empty is not loaded', start_dts=datetime.datetime.now())
+    else:
+        audit_id, n = elt.bulkload_file(filepath, schematable, brd.get_column_headers(filepath), (file_begin, file_end))
+
+    if n != -1 and archive_file:
         treat_loaded_file(filepath, remove=False, archive_dir=config.SCRAPED_ARCHIVE_DIR)
-    print("Bulkload of %s completed (audit-id: %s, #OfLines: %s" %(filepath, audit_id, n))
     return (audit_id, n)
 
 

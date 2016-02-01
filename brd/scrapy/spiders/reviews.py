@@ -70,6 +70,9 @@ class BaseReviewSpider(BaseAuditSpider):
     def parse_review_date(self, review_date_str):
         raise NotImplementedError
 
+    def parse_rating(self, rating):
+        raise NotImplementedError
+
 
 class LibraryThingWorkReview(BaseReviewSpider):
     """
@@ -115,7 +118,6 @@ class LibraryThingWorkReview(BaseReviewSpider):
             yield req
 
     def parse_nbreview(self, response):
-
         nb_buffer = 5
 
         def prepare_form(workid, langpick, n_in_page, n_in_db):
@@ -183,9 +185,13 @@ class LibraryThingWorkReview(BaseReviewSpider):
         lang_codes_nb = {}
         list_l_n = response.xpath(self.langs_root).extract()
         if len(list_l_n) == 0:
-            # 'Showing 4 of 4'
-            show_txt = response.xpath('//div[@id="mainreviews_reviewnav"]/text()').extract()[0]
-            nb = int(show_txt[show_txt.rindex('of') + 2:])
+            # 'Showing 4 of 4'  (when there are reviews) or nothing
+            show_sel = response.xpath('//div[@id="mainreviews_reviewnav"]/text()')
+            if show_sel:
+                show_txt = show_sel.extract()[0]
+                nb = int(show_txt[show_txt.rindex('of') + 2:])
+            else:
+                nb = 0
             lang_codes_nb['English'] = nb
         else:
             for i in xrange(len(list_l_n)):
@@ -202,7 +208,14 @@ class LibraryThingWorkReview(BaseReviewSpider):
         return lang_codes_nb
 
     def parse_review_date(self, raw_date):
-        return datetime.strptime(raw_date, '%b %d, %Y')
+        return datetime.strptime(raw_date, '%b %d, %Y').date()
+
+    def parse_rating(self, rating):
+        parsed_rating = None
+        if rating:
+            parsed_rating = int(rating[rating.index('ss')+2:rating.index('.gif')])
+        return parsed_rating
+
 
 
 class CritiquesLibresReview(BaseReviewSpider):
@@ -303,7 +316,7 @@ class CritiquesLibresReview(BaseReviewSpider):
         allreviews = response.xpath(self.xpath_allreviews)
         rowno = 1
         for review_sel in allreviews:
-            # iterate through 3 rows for each critics : row-1: title_star, row-2: username + date, row-3: horizontal line
+            # iterate through 3 rows for each critics : row1: title_star, row2: username + date, row3: horizontal line
             if rowno == 1:
                 passed_item['rating'] = resolve_value(review_sel, self.xpath_rating)
                 # TODO: add the review which is now the review content as text
@@ -323,7 +336,7 @@ class CritiquesLibresReview(BaseReviewSpider):
         month_name = review_date_str[(review_date_str.find(' ') + 1): review_date_str.rfind(' ')]
         month_no = scrapy_utils.mois[month_name]
         review_date_str = review_date_str.replace(month_name, month_no)
-        return datetime.strptime(review_date_str, '%d %m %Y')
+        return datetime.strptime(review_date_str, '%d %m %Y').date()
 
     def parse_author(self, author_str):
         i = author_str.index(', ')

@@ -17,6 +17,7 @@ class ReviewItem(Item):
     user_uid            = Field()
     work_uid            = Field()
     rating              = Field()
+    parsed_rating       = Field()
     review              = Field()
     likes               = Field()
     review_date         = Field()
