@@ -5,7 +5,7 @@ import fnmatch
 import os
 from os.path import isfile, join
 import config
-import brd.service as service
+# import brd.service as service
 import brd.elt
 
 __author__ = 'mouellet'
@@ -160,29 +160,29 @@ def convert_to_isbn13(isbn10):
 
 
 # trigger reference data load
-def load_static_ref():
-    c = brd.elt.get_connection()
+# def load_static_ref():
+#     c = brd.elt.get_connection()
+#
+#     nb = c.fetch_one('select count(1) from integration.language')[0]
+#     if nb == 0:
+#         lang_ref_file = join(config.REF_DATA_DIR, 'Iso_639_and_Marc_code - ISO-639-2_utf-8.tsv')
+#         fields = 'code3,code3_term,code2,code,english_iso_name,english_name,french_iso_name,french_name'
+#         with open(lang_ref_file, 'r') as f:
+#             n = c.copy_into_table('integration.language', fields, f, delim='\t')
+#         c.commit()
+#         print "Loaded %d records into integration.language" % n
+#
+#     # set-up database with min set of data
+#     res = c.fetch_one("select count(1) from staging.thingisbn")
+#     print("Table %s already loaded with %d rows" % ('staging.thingisbn', res[0]))
+#     if res[0] == 0:
+#         # load-up the 1000 version into staging
+#         service.bulkload_thingisbn("thingISBN_10000*.csv", truncate_staging=False)
+#     res = c.fetch_one("select count(1) from integration.work")
+#     print("Table %s already loaded with %d rows" % ('integration.work', res[0]))
+#     if res[0] == 0:
+#         # load-up the ref in integration
+#         service.job_loading_workisbn()
+#
 
-    nb = c.fetch_one('select count(1) from integration.language')[0]
-    if nb == 0:
-        lang_ref_file = join(config.REF_DATA_DIR, 'Iso_639_and_Marc_code - ISO-639-2_utf-8.tsv')
-        fields = 'code3,code3_term,code2,code,english_iso_name,english_name,french_iso_name,french_name'
-        with open(lang_ref_file, 'r') as f:
-            n = c.copy_into_table('integration.language', fields, f, delim='\t')
-        c.commit()
-        print "Loaded %d records into integration.language" % n
-
-    # set-up database with min set of data
-    res = c.fetch_one("select count(1) from staging.thingisbn")
-    print("Table %s already loaded with %d rows" % ('staging.thingisbn', res[0]))
-    if res[0] == 0:
-        # load-up the 1000 version into staging
-        service.bulkload_thingisbn("thingISBN_10000*.csv", truncate_staging=False)
-    res = c.fetch_one("select count(1) from integration.work")
-    print("Table %s already loaded with %d rows" % ('integration.work', res[0]))
-    if res[0] == 0:
-        # load-up the ref in integration
-        service.batch_loading_workisbn()
-
-
-load_static_ref()
+# load_static_ref()

@@ -20,11 +20,11 @@ create table staging.load_audit (
     step_no int,
     status text,
     start_dts timestamp,
-    finish_dts timestamp,
+    elapse_sec int,
     rows_impacted int,
     period_begin date,
     period_end date,
-    comment text
+    output text
 );
 
 comment on table staging.load_audit is 'Metadata used to manage each job that insert/update batch of records';
@@ -70,7 +70,7 @@ create table staging.review (
 );
 
 comment on table staging.review is 'Transient Review and/or Rating taken from website as-is (i.e. with no transformation)';
-comment on column staging.review.book_uid is 'Unique identifier of the book as used by website, when applicable';
+comment on column staging.review.work_uid is 'Unique identifier of the book (a piece of work) used by website';
 comment on column staging.review.load_audit_id is 'Refers to audit of original Dump of scraped data, used to get period loaded';
 comment on column staging.review.parsed_review_date is 'Spider knows how to parse date in string format';
 comment on column staging.review.likes is 'Nb of users having appreciated the review (concetp likes, or green flag). Implies incremental-update the review';
@@ -315,7 +315,7 @@ create table integration.work_site_mapping(
     work_id uuid not null,
     site_id int not null,
     work_ori_id text not null,
-    last_harvest_date date,
+    last_harvest_dts timestamp,
     book_title text,
     book_lang text,
     main_author text,
@@ -332,7 +332,7 @@ comment on table integration.work_site_mapping is 'Map between work ids of lt an
 comment on column integration.work_site_mapping.ref_uid is 'Reference id used by lt';
 comment on column integration.work_site_mapping.work_id is 'Work-Id made unique throughout sites (MD5 of concatenation of: work_ori_id,site_logical_name)';
 comment on column integration.work_site_mapping.work_ori_id is 'Original id used by site in text format';
-comment on column integration.work_site_mapping.last_harvest_date is 'Last time work was harvested, useful to schedule harvesting';
+YXcomment on column integration.work_site_mapping.last_harvest_dts is 'Last time work was harvested, useful to schedule harvesting';
 comment on column integration.work_site_mapping.book_title is 'Book title, author, lang are for QA purposes (mapping between sites only done through isbn(s) lookup)';
 
 

@@ -3,7 +3,7 @@ import shutil
 
 import brd
 import brd.elt as elt
-from brd.elt import BatchProcessor, Step
+from brd.elt import EltStepStatus
 import brd.config as config
 import os
 import datetime
@@ -43,7 +43,7 @@ def get_default_begin_date():
     return brd.resolve_date_text(begin_default_date)
 
 
-def _fetch_work(site_logical_name, harvested, nb_work):
+def fetch_work(site_logical_name, harvested, nb_work):
     """
     Fetch info related to nb_work work-ids either harvested or not
     :return list of dict {'work-ori-id': idXXX, 'last_harvest_date': dateX, 'nb_in_db': {'ENG': 12, 'FRE': 2, ..}}
@@ -100,85 +100,209 @@ def _fetch_work(site_logical_name, harvested, nb_work):
     return _construct_dic(list_of_wids)
 
 
-def get_dump_filename(spidername, begin, end):
-    pre = config.REVIEW_PREFIX + spidername + "(audit-id)"   # special placeholder for audit-id
-    post = "_" + brd.get_period_text(begin, end) + config.REVIEW_EXT
+def get_dump_filename(spidername, period):
+    pre = config.REVIEW_PREFIX + spidername + "(audit_id)"
+    post = "_" + brd.get_period_text(period[0], period[1]) + config.REVIEW_EXT
     return pre + post
 
 
-def harvest_review_and_load(site_logical_name, nb_work=10):
-    """
-    Harvest nb_work reviews (initial) for works never harvested.  If all works are harvested,
-    then harvest reviews incrementally based on how many are missing in DB (and before end_period)
-    (incremental harvest nb of reviews = #inSite - #inDB).
 
-    As a rule we load all reviews in staging after harvesting them, so we can update
-    work's last_harvest_date in work_site_mapping.
-    :param nb_work:
-    :param site_logical_name:
-    :return:
-    """
+#
+# def harvest_review_and_load(spidername, nb_work=10):
+#     """
+#     Harvest nb_work reviews (initial) for works never harvested.  If all works are harvested,
+#     then harvest reviews incrementally based on how many are missing in DB (and before end_period)
+#     (incremental harvest nb of reviews = #inSite - #inDB).
+#
+#     We load all reviews in staging, update work's last_harvest_date in work_site_mapping,
+#     and proceed with the rest of the integration loads.
+#     :param nb_work:
+#     :param spidername:
+#     :return:
+#     """
+#
+#     def prepare_batch(batch):
+#         batch = BatchProcessor(batchname)
+#
+#         bulkload = \
+#             Step(name="Bulkload harvest Reviews",
+#                 sql_or_callable=_bulkload_file,
+#                 named_params={'filepath': dump_filepath,
+#                               'schematable'})
+#
+#         update_mapping = \
+#             Step(name="Update last-harvest-date in mapping",
+#                 sql_or_callable=_update_harvest_date,
+#                 named_params={'site_logical_name': spidername, 'end_period': "to be given",
+#                               'harvested_work_ids': "to be given"})
+#
+#         integrate_review = \
+#             Step(name="Integrate reviews",
+#                 sql_or_callable=
+#                 """
+#                 insert into integration.review(book_id, reviewer_id, review_date, rating_code, create_dts, load_audit_id)
+#                 select
+#                     integration.derive_bookid( integration.get_sform(r.book_title),
+#                                                r.book_lang,
+#                                                integration.standardize_authorname(r.author_fname, r.author_lname) ) as bookid
+#                     , integration.derive_reviewerid( r.username, r.site_logical_name ) as reviewerid
+#                     , r.parsed_review_date
+#                     , r.review_rating
+#                     , now()
+#                     , %(audit_id)s
+#                 from staging.review r
+#                 """,
+#                  named_params={'filepath': dump_filepath})
+#
+#         integrate_user = \
+#             Step(name="Integrate users",
+#                 sql_or_callable=
+#                 """
+#                 insert into integration.user(id, site_id, username, load_audit_id, create_dts)
+#                 select
+#                     integration.derive_userid(r.username, r.site_logical_name) as userid
+#                     , s.id
+#                     , r.username
+#                     , %(audit_id)s
+#                     , now()
+#                 from staging.review r
+#                 join integration.site s on (r.site_logical_name = s.logical_name)
+#                 except
+#                 select
+#                     id
+#                     , site_id
+#                     , username
+#                     , %(audit_id)s
+#                     , now()
+#                 from integration.user;
+#                 """)
+#
+#         batch.add_step(Step(
+#
+#     batch = Batch("Harvest works from %s" % spidername
+#
+#
+#
+#     # end_period is useful to avoid harvesting too recent reviews
+#     end_period = get_end_period()
+#     # still need a default begin_period for pipeline filtering to work
+#     begin_period = get_default_begin_date()
+#     period = (begin_period, end_period)
+#
+#
+#     batch = BatchProcessor(batch_name, period)
+#     last_step_run, status = batch.get_last_audit_steps()
+#
+#     # Start new Batch when last step completed or pre-requisite failed
+#     if status is EltStepStatus.COMPLETED or last_step_run == -1:
+#         # Process Work never harvested
+#         mode = 'initial'
+#         workids_to_harvest = fetch_work(spidername, harvested=False, nb_work=nb_work)
+#         # Otherwise, process Work already harvested
+#         if len(workids_to_harvest) == 0:
+#             mode = 'incremental'
+#             workids_to_harvest = fetch_work(spidername, harvested=True, nb_work=nb_work)
+#
+#         step = Step("Fetch work ")
+#
+#
+#
+#
+#
+#     prerequisite_step = Step
+#
+#     batch = BatchProcessor(batch_name, period)
+#
+#
+#     batch.add_step(Step(name=get_dump_filename(spidername, period),
+#                         sql_or_callable=_harvest_reviews,
+#                         named_params={'spidername': spidername,
+#                                       'workids_list': workids_to_harvest,
+#                                       'period': period}))
+#
+#     batch.add_step(Step(name="Bulk load " % "the file that just got dumped previouslY with the right id",
+#                         sql_or_callable=_bulkload_file,
+#                         named_params={'filepath': "tobegiven"}))
+#
+#
+#
+#     # stage file so we can update stat in work_site_mapping...
+#
+#     stage_audit_id, nb_rec = _bulkload_file(dump_filename, 'staging.review', archive_file=True)
+#
+#     if nb_rec > 0:
+#         # THIS DOES NOT WORK AS ONLY WORK HAVING REVIEWS WILL BE UDPATED WITH LAST_HARVEST_DATE
+#         _update_harvest_date(audit_id)
+#         elt.get_connection().commit()
+#
 
-    # Try processing Work never harvested (initial) !
-    workids_to_harvest = _fetch_work(site_logical_name, harvested=False, nb_work=nb_work)
-    if len(workids_to_harvest) >= 1:
-        audit_id, dump_filename = _harvest_reviews(site_logical_name, workids_to_harvest, initial=True)
-    # Otherwise, process Work already harvested (incremental) !
-    else:
-        workids_to_harvest = _fetch_work(site_logical_name, harvested=True, nb_work=nb_work)
-        audit_id, dump_filename = _harvest_reviews(site_logical_name, workids_to_harvest, initial=False)
-
-    # stage file so we can update stat in work_site_mapping...
-    stage_audit_id, nb_rec = _bulkload_file(dump_filename, 'staging.review', archive_file=True)
-
-    if nb_rec > 0:
-        _update_harvest_date(audit_id)
-
-
-def _update_harvest_date(harvest_audit_id):
+def update_harvest_date(site_logical_name, havest_dts, harvested_work_ids):
     sql = \
         """
-        update integration.work_site_mapping map
-            set last_harvest_date = work_in_staging.end_period
-        from (select integration.derive_other_work_id(r.work_uid, r.site_logical_name) as w_id
-                , a.id as audit_id
-                , max(a.period_end) as end_period
-              from staging.review r
-              join staging.load_audit a on (r.load_audit_id = a.id)
-              where a.id = %(audit)s
-              group by 1,2
-             ) as work_in_staging
-        where map.work_id = work_in_staging.w_id;
+        update integration.work_site_mapping
+        set last_harvest_dts = %(end)s
+        where
+        site_id = (select id from integration.site where logical_name = %(name)s)
+        and work_ori_id IN %(w_ids)s;
         """
-    ret = elt.get_connection().execute(sql, {'audit': harvest_audit_id})
-    print("Update work_site_mapping for %s works " % ret)
+    ret = elt.get_connection().execute(sql, {'end': havest_dts,
+                                             'name': site_logical_name,
+                                             'w_ids': harvested_work_ids})
     return ret
 
 
-def _harvest_reviews(site_logical_name, workids_list, initial):
+def _harvest_reviews(spidername, workids_list, period, audit_id):
     """
-    :param site_logical_name:
+    :param spidername:
     :param workids_list:
     :param initial:
+    :param audit_id dump_filepath depends on this (assigned in BatchProcessor)
     :return: (audit-id, dump_filepath)
     """
-    if initial:
-        begin_period = get_default_begin_date()
-    else:
-        begin_period = None
-    end_period = get_end_period()
     dump_filepath = os.path.join(config.SCRAPED_OUTPUT_DIR,
-                                 get_dump_filename(site_logical_name, begin_period, end_period))
-    spider_process = SpiderProcessor(site_logical_name,
+                                 get_dump_filename(spidername, period, audit_id))
+
+    spider_process = SpiderProcessor(spidername,
                                      dump_filepath=dump_filepath,
-                                     begin_period=begin_period,
-                                     end_period=end_period,
+                                     begin_period=period[0],
+                                     end_period=period[1],
                                      reviews_order='desc',
                                      works_to_harvest=workids_list)
-    audit_id, dump_filepath = spider_process.start_process()
+    dump_filepath = spider_process.start_process()
+
 
     print("Harvest of %d works/review completed with spider %s (initial: %s, audit_id: %s, dump file: '%s')" \
-          % (len(workids_list), site_logical_name, initial, audit_id, dump_filepath))
+          % (len(workids_list), spidername, initial, audit_id, dump_filepath))
+
+
+        # to move up
+    def _get_audit(self):
+        audit_id = brd.elt.insert_auditing(job="Harvest " + self.spidername,
+                                           step="...",
+                                           begin=self.begin_period,
+                                           end=self.end_period,
+                                           start_dts=datetime.datetime.now())
+        return audit_id
+
+    # to move up
+    @staticmethod
+    def _update_step_filename(filename, audit_id):
+            stepname = filename
+            brd.elt.get_connection().execute("update staging.load_audit set step_name=%s where id=%s",
+                                             (stepname, audit_id))
+            return stepname
+
+    # to move up
+    @staticmethod
+    def _commit_audit(audit_id):
+        # no longer know the # of records/line (pipeline knows...)
+        brd.elt.update_auditing(commit=True,
+                                rows=-1,
+                                status="Completed",
+                                elaspe_sec=(datetime.datetime.now() - self.now).seconds,
+                                id=audit_id)
+
+
     return (audit_id, dump_filepath)
 
 
@@ -264,70 +388,57 @@ def _bulkload_file(filepath, schematable, archive_file=True):
     return (audit_id, n)
 
 
-def batch_loading_workisbn(truncate_stage=False):
-    """
-    :param truncate_stage:
-    :return:
-    """
-    batch = BatchProcessor(batch_loading_workisbn.func_name, 'thingisbn')
-    batch.add_step(Step(
-        name="load_work",
-        sql="""
-        insert into integration.work(uid, load_audit_id, create_dts)
-        select distinct s.work_uid, %(audit_id)s, now()
+def load_work_ref():
+    sql = \
+        """
+        insert into integration.work(uid, create_dts)
+        select distinct s.work_uid, now()
         from staging.thingisbn s
         left join integration.work w on s.work_uid = w.uid
         where w.uid is null;
-        """))
+        """
+    return elt.get_connection().execute_inTransaction(sql)
 
-    batch.add_step(Step(
-        name="load_isbn",
-        sql="""
-        insert into integration.isbn(ean, isbn13, isbn10, load_audit_id, create_dts)
-        select distinct cast(s.isbn13 as bigint), s.isbn13, s.isbn10, %(audit_id)s, now()
+
+def load_isbn_ref():
+    sql = \
+        """
+        insert into integration.isbn(ean, isbn13, isbn10, create_dts)
+        select distinct cast(s.isbn13 as bigint), s.isbn13, s.isbn10, now()
         from staging.thingisbn s
         left join integration.isbn i on cast(s.isbn13 as bigint) = i.ean
         where i.ean is null;
-        """))
+        """
+    return elt.get_connection().execute_inTransaction(sql)
 
-    # TODO: design for possible deletion of work_uid/isbn (relevant also for work and isbn table) ?
-    batch.add_step(Step(
-        name="load_work_isbn",
-        sql="""
-        insert into integration.work_isbn(ean, work_uid, source_site_id, load_audit_id, create_dts)
+# TODO: what about possible deletion of work_uid/isbn (relevant also for work and isbn table)
+def load_work_isbn_ref():
+    sql = \
+        """
+        insert into integration.work_isbn(ean, work_uid, source_site_id, create_dts)
         select distinct cast(s.isbn13 as bigint), s.work_uid, (select id from integration.site where logical_name = 'librarything')
-                , %(audit_id)s, now()
+                , now()
         from staging.thingisbn s
         left join integration.work_isbn i on (cast(s.isbn13 as bigint) = i.ean and s.work_uid = i.work_uid)
         where i.ean is null;
-        """))
+        """
+    return elt.get_connection().execute_inTransaction(sql)
 
-    # mapping is one-to-one, but still needed to manage work/review harvest planning
-    # not hardcoding librarything (bit could be reused for other site update..)
-    batch.add_step(Step(
-        name="load_work_site_mapping",
-        sql="""
-        insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, load_audit_id, create_dts)
+
+def load_work_site_mapping(site_logical_name='librarything'):
+    sql = \
+        """
+        insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, create_dts)
         select work.uid, integration.derive_other_work_id(work.uid::text,%(logical_name)s)
-                , work.site_id, work.uid_text, %(audit_id)s, now()
+                , work.site_id, work.uid_text, now()
         from
         (select uid, uid::text as uid_text, (select id from integration.site where logical_name = %(logical_name)s) as site_id
         from integration.work) as work
         left join integration.work_site_mapping m on (work.uid_text = m.work_ori_id and m.site_id = work.site_id)
         where m.work_ori_id IS NULL;
-        """,
-        named_params={'logical_name': 'librarything'}))
+        """
+    return elt.get_connection().execute_inTransaction(sql, params={'logical_name': site_logical_name})
 
-    if truncate_stage:
-        batch.add_step(Step(
-            name="truncate_stage_thingisbn",
-            sql="truncate staging.thing.isbn",
-            named_params={'schema': 'staging', 'table': 'thingisbn'}))
-
-    try:
-        batch.execute_batch()
-    except elt.EltError, er:
-        print str(er)
 
 
 def batch_loading_reviews():
@@ -399,22 +510,6 @@ def insert_into_book():
                     );
         """
 
-
-def insert_into_review():
-    sql = \
-        """
-        insert into integration.review(book_id, reviewer_id, review_date, rating_code, create_dts, load_audit_id)
-        select
-            integration.derive_bookid( integration.get_sform(r.book_title),
-                                       r.book_lang,
-                                       integration.standardize_authorname(r.author_fname, r.author_lname) ) as bookid
-            , integration.derive_reviewerid( r.username, r.site_logical_name ) as reviewerid
-            , r.parsed_review_date
-            , r.review_rating
-            , now()
-            , %(audit_id)s
-        from staging.review r
-        """
 
 
 def insert_into_book_site_review():

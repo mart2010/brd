@@ -2,10 +2,10 @@
 
 DATABASE = {
     'host': 'localhost',
-    'name': 'brd',
+    'database': 'brd',
     'port': '5432',
     'user': 'brd',
-    'pwd' : 'brd'
+    'password' : 'brd'
 }
 
 

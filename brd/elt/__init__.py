@@ -19,12 +19,8 @@ class DbConnection(object):
     managing transaction, ... etc.
     """
 
-    def __init__(self, connection=config.DATABASE, readonly=False):
-        self.connection = psycopg2.connect(host=connection['host'],
-                                           database=connection['name'],
-                                           port=connection['port'],
-                                           user=connection['user'],
-                                           password=connection['pwd'])
+    def __init__(self, connection, readonly=False, ):
+        self.connection = psycopg2.connect(**connection)
         if readonly:
             self.connection.set_session(readonly=readonly)
 
@@ -130,7 +126,7 @@ conn_readonly = None
 def get_ro_connection():
     global conn_readonly
     if conn_readonly is None:
-        conn_readonly = DbConnection(readonly=True)
+        conn_readonly = DbConnection(connection=config.DATABASE, readonly=True)
     return conn_readonly
 
 conn = None
@@ -138,164 +134,203 @@ conn = None
 def get_connection():
     global conn
     if conn is None:
-        conn = DbConnection(readonly=False)
+        conn = DbConnection(connection=config.DATABASE)
     return conn
 
 
-class Step(object):
-    def __init__(self, name, sql, named_params=None):
-        self.name = name
-        self.sql = sql
-        if named_params is None:
-            self.named_params = {}
-        else:
-            self.named_params = named_params
-        self.stepno = -1
+# class Step(object):
+#     def __init__(self, name, sql_or_callable, step_no=None, named_params=None):
+#         self.name = name
+#         if callable(sql_or_callable):
+#             self.obj_callable = sql_or_callable
+#             self.is_callable = True
+#         else:
+#             self.sql = sql_or_callable
+#             self.is_callable = False
+#
+#         self.named_params = {}
+#         if named_params:
+#             self.named_params = named_params
+#         self.stepno = step_no
+#
+#     def set_stepno(self, stepno):
+#         self.stepno = stepno
+#
+#     def __str__(self):
+#         return self.name
+#
+#
+# class BatchProcessor(object):
+#     """
+#     Responsible in executing Steps in Batch AND manage auditing metadata!
+#
+#     Step in self.steps list are executed in order and may be some sql stmt or yet be
+#     some kind of callable object (i.e. function or class with __call__ attribute)
+#     """
+#     def __init__(self, name, period=None):
+#         """
+#
+#         :param name:
+#         :param period: (begin_period, end_period)
+#         :param dependencies: list of schema.table and filepath
+#         :return:
+#         """
+#         self.name = name
+#         if period:
+#             self.begin_period = period[0]
+#             self.end_period = period[1]
+#         self.steps = list()
+#         # use default read/write connection
+#         self.conn = get_connection()
+#
+#     def define_period(self, period):
+#         self.begin_period = period[0]
+#         self.end_period = period[1]
+#
+#     def execute_prerequisite_step(self):
+#         """
+#         Some batch requires prerequisite step(s) to be done before all other steps.
+#         A prerequisite's step has negative step_no and return its output (eg. flatfile generated)
+#         :return: output produced by this step (and stored in load_audit.output)
+#         """
+#         # assert(self.prerequisite_step)
+#         # TODO: check if there is a prerequisite step completed from a previous failed Batch
+#
+#         now = datetime.datetime.now()
+#         self.prerequisite_step.named_params['audit_id'] = \
+#                 _insert_auditing(job=self.name, step=self.prerequisite_step.name,
+#                                  step_no=self.prerequisite_step.stepno, start_dts=now,
+#                                  begin=self.begin_period, end=self.end_period)
+#         # execute step's function or sql
+#         if self.prerequisite_step.is_callable:
+#             ret = self.prerequisite_step.obj_callable(**self.prerequisite_step.named_params)
+#         else:
+#             ret = self.conn.execute(self.prerequisite_step.sql, self.prerequisite_step.named_params)
+#
+#         _update_auditing(insert_dts=now, commit=True, output=ret, status=EltStepStatus.COMPLETED,
+#                          id=self.prerequisite_step.named_params['audit_id'])
+#
+#         return ret
+#
+#
+#
+#
+#     def add_step(self, step):
+#         """
+#         This is to add regular step which can be run sequentially without
+#         needing any parameter value at runtime (except the audit_id)
+#         :param step:
+#         :return:
+#         """
+#         step.set_stepno(len(self.steps) + 1)
+#         self.steps.append(step)
+#
+#
+#     def _check_dependencies(self):
+#         """
+#         Check table/filepath exist and not empty
+#         :return
+#         """
+#         sql = \
+#             """
+#             select count(*)
+#             from %s
+#             """ % self.table
+#         res = self.conn.fetch_one(sql)
+#         pass
+#         # TODO
+#         # raise EltError("Batch '%s' depend on an empty resource: %s" % (self.batch_name, tableorfile))
+#
+#     def execute_batch(self):
+#         """
+#         Execute all steps or starting from a previously failed steps (if found in load_audit)
+#         and update the audit-log info accoringly
+#         :param period:
+#         :return:
+#         """
+#         last_step_no, last_status = self.get_last_audit_steps()
+#
+#         if last_status == EltStepStatus.RUNNING:
+#             raise EltError("Batch '%s' is still running" % self.name)
+#
+#         if last_status == EltStepStatus.FAILED:
+#             # skip already completed step
+#             self.steps = self.steps[last_step_no - 1:]
+#
+#         # execute batch
+#         self._process_generic_steps()
+#         print ("Finished processing Batch '%s!" % self.name)
+#
+#     def _process_generic_steps(self):
+#         """
+#         :param period: (d-m-yyyy, d-m-yyyy)
+#         """
+#         # reset/rollback pending trx (RESET and SET SESSION AUTHORIZATION reset session to default)
+#         # self.conn.connection.reset()
+#         try:
+#             for step in self.steps:
+#                 now = datetime.datetime.now()
+#                 step.named_params['audit_id'] = _insert_auditing(job=self.name, step=step.name,
+#                                                                  step_no=step.stepno, start_dts=now,
+#                                                                  begin=self.begin_period, end=self.end_period)
+#                 # execute step's function or sql
+#                 if step.is_callable:
+#                     ret = step.obj_callable(**step.named_params)
+#                 else:
+#                     ret = self.conn.execute(step.sql, step.named_params)
+#
+#                 if step.is_auditid_required():
+#                     step.add_auditid_toname()
+#                 _update_auditing(insert_dts=now, commit=True, rows=ret, status=EltStepStatus.COMPLETED,
+#                                  step=step.name, id=step.named_params['audit_id'])
+#         except Exception, e:
+#             conn.rollback()
+#             msg = EltStepStatus.FAILED + ": Batch failed at step '%s' with error: '%s'" % (step.name, e.message)
+#             _insert_auditing(commit=True, job=self.name, status=EltStepStatus.FAILED,
+#                              comment=msg, step=step.name, step_no=step.stepno,
+#                              start_dts=now, begin=self.begin_period, end=self.end_period)
+#             raise EltError(msg, e)
+#
+#     def get_last_audit_steps(self):
+#         """
+#         Check status of last step executed for Batch_name logged in load_audit
+#         :return: (step_no, status) of last step or (-1, Completed) when no record found
+#         """
+#         sql_last_step = \
+#             """
+#             select step_no, status
+#             from staging.load_audit as l
+#             where batch_job = %s
+#             and id = (select max(id) from staging.load_audit where batch_job = l.batch_job);
+#             """
+#         resp = self.conn.fetch_one(sql_last_step, (self.name,))
+#         if resp is None:
+#             return (-1, EltStepStatus.COMPLETED)
+#
+#         last_step_no, last_status = resp
+#         if last_status.startswith(EltStepStatus.COMPLETED):
+#             last_status = EltStepStatus.COMPLETED
+#         elif last_status.startswith(EltStepStatus.FAILED):
+#             last_status = EltStepStatus.FAILED
+#         elif last_status.startswith(EltStepStatus.RUNNING):
+#             last_status = EltStepStatus.RUNNING
+#         else:
+#             raise EltError(
+#                 "Step no%d of Batch '%s' has invalid status '%s'" % (last_step_no, self.name, last_status))
+#         return (last_step_no, last_status)
+#
+#     def __str__(self):
+#         return "Batch '%s' with steps: %s " % (self.name, str(self.steps))
+#
 
-    def set_stepno(self, stepno):
-        self.stepno = stepno
 
-    def __str__(self):
-        return self.name
-
-
-class BatchProcessor(object):
-    """
-    Used to define/execute Batch composed of a number of ordered steps (sql stmts) to execute
-    and sourced from same source_table (ex. load_staged_reviews, load_thingisbn, ..).
-
-    Commit is done after each step executed successfully, and after failure only failed steps
-    are re-executed (starting from failed step).
-
-    Steps are defined in list of 'Step' object, each containing sql and params to execute
-    """
-
-    def __init__(self, batch_name, source_table):
-        self.batch_name = batch_name
-        self.source_table = source_table
-        self.steps = list()
-        # use default read/write connection
-        self.conn = get_connection()
-
-    def add_step(self, step):
-        step.set_stepno(len(self.steps) + 1)
-        self.steps.append(step)
-
-    def execute_batch(self):
-        """
-        Execute all steps of the batch (or starting from a previously failed steps)
-        while updating the audit-log info
-        :param period:
-        :return:
-        """
-        last_step_no, last_status = self._get_last_audit_steps()
-
-        if last_status == EltStepStatus.RUNNING:
-            raise EltError("Batch '%s' is still running, wait before launching a new one" % self.batch_name)
-
-        period_in_stage = self._fetch_periods_data_in_stage()
-        if last_status == EltStepStatus.FAILED:
-            if period_in_stage is None:
-                raise EltError("Previous Batch '%s' has failed but %s is empty" % (self.batch_name, self.source_table))
-            # skip already completed step
-            self.steps = self.steps[last_step_no - 1:]
-        elif last_status == EltStepStatus.COMPLETED:
-            if period_in_stage is None:
-                raise EltError("Cannot launch new Batch '%s' stage.%s is empty" % (self.batch_name, self.source_table))
-        # execute batch
-        self._process_generic_steps(period_in_stage)
-        print ("Finished processing Batch '%s!" % self.batch_name)
-
-    def _process_generic_steps(self, period):
-        """
-        :param period: (d-m-yyyy, d-m-yyyy)
-        """
-        # reset/rollback pending trx (RESET and SET SESSION AUTHORIZATION reset session to default)
-        # self.conn.connection.reset()
-        period_begin, period_end = period
-
-        try:
-            for step in self.steps:
-                now = datetime.datetime.now()
-                step.named_params['audit_id'] = insert_auditing(job=self.batch_name,
-                                                                step=step.name,
-                                                                step_no=step.stepno,
-                                                                start_dts=now,
-                                                                begin=period_begin, end=period_end)
-                # execute step's sql
-                nb_rows = get_connection().execute(step.sql, step.named_params)
-                update_auditing(commit=True,
-                                rows=nb_rows,
-                                status=EltStepStatus.COMPLETED,
-                                finish_dts=datetime.datetime.now(),
-                                id=step.named_params['audit_id'])
-        except psycopg2.DatabaseError, dbe:
-            conn.rollback()
-            msg = EltStepStatus.FAILED + ": Batch failed at step '%s' with DB error: '%s'" % (step.name, dbe.message)
-            insert_auditing(commit=True,
-                            job=self.batch_name,
-                            status=EltStepStatus.FAILED,
-                            comment=msg,
-                            step=step.name,
-                            step_no=step.stepno,
-                            start_dts=now,
-                            begin=period_begin, end=period_end)
-            raise EltError(msg, dbe)
-
-    def _fetch_periods_data_in_stage(self):
-        """
-        Fetch all periods found in staging.tablename
-        :return (min begin, max end) or None when table empty
-        """
-        sql = \
-            """
-            select min(period_begin), max(period_end)
-            from staging.%s r
-            join staging.load_audit a on (a.id = r.load_audit_id);
-            """ % self.source_table
-        res = get_ro_connection().fetch_one(sql)
-        return res
-
-    def _get_last_audit_steps(self):
-        """
-        :return: (step_no, status) of last step log-audit for Batch
-        or else (-1, Completed) when no log-audit found
-        """
-        sql_last_step = \
-            """
-            select step_no, status
-            from staging.load_audit as l
-            where batch_job = %s
-            and id = (select max(id) from staging.load_audit where batch_job = l.batch_job);
-            """
-        resp = get_ro_connection().fetch_one(sql_last_step, (self.batch_name,))
-
-        if resp is None:
-            return (-1, EltStepStatus.COMPLETED)
-
-        last_step_no, last_status = resp
-        if last_status.startswith(EltStepStatus.COMPLETED):
-            last_status = EltStepStatus.COMPLETED
-        elif last_status.startswith(EltStepStatus.FAILED):
-            last_status = EltStepStatus.FAILED
-        elif last_status.startswith(EltStepStatus.RUNNING):
-            last_status = EltStepStatus.RUNNING
-        else:
-            raise EltError(
-                "Step no%d for batch '%s' has invalid status '%s'" % (last_step_no, self.batch_name, last_status))
-        return (last_step_no, last_status)
-
-    def __str__(self):
-        return "Batch '%s' with these steps: %s " % (self.batch_name, str(self.steps))
-
-
-def insert_auditing(commit=False, **named_params):
+def _insert_auditing(commit=False, **named_params):
     sql = \
         """
-        insert into staging.load_audit(batch_job, step_name, step_no, status, comment,
-                                       rows_impacted, period_begin, period_end, start_dts)
-                            values (%(job)s, %(step)s, %(step_no)s, %(status)s,%(comment)s,
-                                    %(rows)s, %(begin)s, %(end)s, %(start_dts)s);
+        insert into staging.load_audit(batch_job, step_name, step_no, status,
+                                       period_begin, period_end, start_dts)
+                            values (%(job)s, %(step)s, %(step_no)s, %(status)s,
+                                    %(begin)s, %(end)s, %(start_dts)s);
         """
     assert ('job' in named_params)
     assert ('step' in named_params)
@@ -303,27 +338,33 @@ def insert_auditing(commit=False, **named_params):
     assert ('end' in named_params)
     assert ('start_dts' in named_params)
     named_params['status'] = named_params.get('status', EltStepStatus.RUNNING)
-    named_params['step_no'] = named_params.get('step_no', 0)
-    named_params['rows'] = named_params.get('rows', -1)
-    named_params['comment'] = named_params.get('comment')
+    named_params['step_no'] = named_params.get('step_no', -1)
     ret = get_connection().insert_row_get_id(sql, named_params)
     if commit:
         get_connection().commit()
     return ret
 
 
-def update_auditing(commit=False, **named_params):
+def _update_auditing(insert_dts=None, commit=False, **named_params):
     sql = \
         """
         update staging.load_audit set status = %(status)s
                                     ,rows_impacted = %(rows)s
-                                    ,finish_dts = %(finish_dts)s
+                                    ,elapse_sec = %(elapse_sec)s
+                                    ,output = %(output)s
         where id = %(id)s;
         """
     assert ('status' in named_params)
-    assert ('rows' in named_params)
     assert ('id' in named_params)
-    assert ('finish_dts' in named_params)
+
+    now = datetime.datetime.now()
+    if insert_dts:
+        named_params['elapse_sec'] = (now - insert_dts).seconds
+    else:
+        named_params['elapse_sec'] = None
+    named_params['row'] = named_params.get('row')
+    named_params['output'] = named_params.get('output')
+
     ret = get_connection().execute(sql, named_params)
     if commit:
         get_connection().commit()
@@ -340,17 +381,17 @@ def bulkload_file(filepath, schematable, column_headers, period):
     :return: (audit_id, #ofRow)  Note: #ofRow = -1, in case of error
     """
     now = datetime.datetime.now()
-    audit_id = insert_auditing(job='Bulkload file', step=filepath, begin=period[0], end=period[1], start_dts=now)
+    audit_id = _insert_auditing(job='Bulkload file', step=filepath, begin=period[0], end=period[1], start_dts=now)
     try:
         with open(filepath) as f:
             count = get_connection().copy_into_table(schematable, column_headers, f)
-        update_auditing(commit=True, rows=count, status=EltStepStatus.COMPLETED, id=audit_id,
-                        finish_dts=datetime.datetime.now())
+        _update_auditing(commit=True, rows=count, status=EltStepStatus.COMPLETED, id=audit_id,
+                        elapse_sec=(datetime.datetime.now()-now).seconds)
         print("Bulkload of %s completed (audit-id: %s, #OfLines: %s" %(filepath, audit_id, count))
         return (audit_id, count)
     except psycopg2.DatabaseError, er:
         get_connection().rollback()
-        insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=-1, status=EltStepStatus.FAILED,
+        _insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=-1, status=EltStepStatus.FAILED,
                         comment=er.pgerror, begin=period[0], end=period[1], start_dts=now)
         # also add logging
         print("Error bulk loading file: \n'%s'\nwith msg: '%s' " % (filepath, er.message))

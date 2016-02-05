@@ -22,7 +22,6 @@ class ReviewItem(Item):
     likes               = Field()
     review_date         = Field()
     parsed_review_date  = Field()
-    load_audit_id       = Field()
 
 
 class WorkItem(Item):

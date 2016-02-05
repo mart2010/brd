@@ -22,14 +22,14 @@ def download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.
     :return: uncompressed filepath with date of download as suffix: "../thingISBN_1-31-2015.xml
     Can be tested using 'http://www.librarything.com/feeds/thingISBN_small.xml'
     """
-    start_date = datetime.datetime.now()
+    now = datetime.datetime.now()
     if enable_auditing:
         step = "Process file: " + url
         audit_id = brd.elt.insert_auditing(job=download_convert_thingISBN.__name__,
                                           step=step,
-                                          begin=start_date,
-                                          end=start_date,
-                                          start_dts=start_date)
+                                          begin=now,
+                                          end=now,
+                                          start_dts=now)
     else:
         audit_id = -1
 
@@ -43,7 +43,7 @@ def download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.
 
     local_filepath = uncompress_file(local_filepath)
     # add current date suffix to file
-    suffix = "_" + brd.get_period_text(start_date, None) + ".xml"
+    suffix = "_" + brd.get_period_text(now, None) + ".xml"
     file_with_suffix = local_filepath[0:local_filepath.rindex('.xml')] + suffix
     os.rename(local_filepath, file_with_suffix)
 
@@ -53,7 +53,7 @@ def download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.
         brd.elt.update_auditing(commit=True,
                                rows=n_line,
                                status="Completed",
-                               finish_dts=datetime.datetime.now(),
+                               elapse_sec=(datetime.datetime.now()-now).seconds,
                                id=audit_id)
 
 

@@ -13,29 +13,24 @@ from datetime import datetime
 
 class BaseAuditSpider(scrapy.Spider):
     """
-    All sub-class spiders must have dump_filepath to know where to save output file
-     as well as audit_id for linking harvested items with log audit in DB
+    All sub-class spiders must have dump_filepath to know where outputing file
     """
     def __int__(self, **kwargs):
         """
         Parameters :
-        1. audit_id: id of associated harvest Batch record in load_audit
-        2. dump_filepath:
+        1. dump_filepath:
         """
         super(BaseAuditSpider, self).__init__(**kwargs)
         self.dump_filepath = kwargs['dump_filepath']
-        self.audit_id = kwargs['audit_id']
-
-    def get_audit_id(self):
-        return self.audit_id
 
     def get_dump_filepath(self):
         return self.dump_filepath
 
 
 class BaseReviewSpider(BaseAuditSpider):
-    # To be tuned by subclass (ltreview may use diff value as it impacts Work-set of other spiders)
-    # min_required_review = 5
+    """
+    Superclass of all reviews spider subclass
+    """
 
     def __init__(self, **kwargs):
         """
@@ -54,7 +49,6 @@ class BaseReviewSpider(BaseAuditSpider):
 
         4. param reviews_order: spider can request reviews page in 'asc' or 'desc' of review_date (optional)
 
-
         """
         super(BaseReviewSpider, self).__init__(**kwargs)
         self.begin_period = kwargs['begin_period']
@@ -64,8 +58,7 @@ class BaseReviewSpider(BaseAuditSpider):
         self.works_to_harvest = kwargs.get('works_to_harvest', {})
 
     def build_review_item(self):
-        return ReviewItem(load_audit_id=self.get_audit_id(),
-                          site_logical_name=self.name)
+        return ReviewItem(site_logical_name=self.name)
 
     def parse_review_date(self, review_date_str):
         raise NotImplementedError
@@ -118,7 +111,6 @@ class LibraryThingWorkReview(BaseReviewSpider):
             yield req
 
     def parse_nbreview(self, response):
-        nb_buffer = 5
 
         def prepare_form(workid, langpick, n_in_page, n_in_db):
             """
@@ -129,7 +121,8 @@ class LibraryThingWorkReview(BaseReviewSpider):
             form_data['workid'] = workid
             form_data['languagePick'] = langpick
             form_data['sort'] = '0'  # descending
-            nb_missing = n_in_page - n_in_db + nb_buffer
+            # TODO: if site allows deletion of review (nb_missing too low and incre would miss some...)
+            nb_missing = n_in_page - n_in_db
             form_data['showCount'] = str(nb_missing)
             return form_data
 

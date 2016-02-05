@@ -45,9 +45,8 @@ class ReviewFilter(object):
 
 class DumpToFile(object):
     """
-    Dump harvested data into flat file, no other logic like managing audit metadata or file naming
-    is implemented here (it's "Dump" :-)
-
+    Dump harvested data into flat file, no other logic is implemented here
+    (it's "Dump" :-)
     # Similar to Feed-Exporters used with: scrapy crawl spider_name -o output.csv -t csv
     """
 
