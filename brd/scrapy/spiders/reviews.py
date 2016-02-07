@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 import brd
-
-__author__ = 'mouellet'
-
 from brd.scrapy.scrapy_utils import resolve_value
 import json
 import scrapy
@@ -10,24 +7,10 @@ from brd.scrapy.items import ReviewItem
 import brd.scrapy.scrapy_utils as scrapy_utils
 from datetime import datetime
 
-
-class BaseAuditSpider(scrapy.Spider):
-    """
-    All sub-class spiders must have dump_filepath to know where outputing file
-    """
-    def __int__(self, **kwargs):
-        """
-        Parameters :
-        1. dump_filepath:
-        """
-        super(BaseAuditSpider, self).__init__(**kwargs)
-        self.dump_filepath = kwargs['dump_filepath']
-
-    def get_dump_filepath(self):
-        return self.dump_filepath
+__author__ = 'mouellet'
 
 
-class BaseReviewSpider(BaseAuditSpider):
+class BaseReviewSpider(scrapy.Spider):
     """
     Superclass of all reviews spider subclass
     """
@@ -36,29 +19,24 @@ class BaseReviewSpider(BaseAuditSpider):
         """
         Arguments passed to all Spider subclass harvesting review
 
-        Spiders do NOT manage any load logic (initial-harvest, incremental-harvest etc..), only concerned
-        with harvesting review (delegating filtering/saving to pipelines)
-
-        1. param begin_period: Review's min Date to harvest
-
-        2. param end_date: Review's max Date to harvest (exclusive)
-
-        3. param works_to_harvest: contain work-ids to request along with additional info
-        (not all work are harvested in one session):
-                [{'work-ori-id': idXXX, 'last_harvest_date': dateX, 'nb_in_db': {'ENG': 12, 'FRE': 2, ..}}, ...]
-
-        4. param reviews_order: spider can request reviews page in 'asc' or 'desc' of review_date (optional)
+        Spiders do NOT manage any load logic, they're only concerned
+        with harvesting review (delegating parsing/outputing to pipelines)
+        1. dump_filepath:
+        2. works_to_harvest: contain work-ids (along with additional info) since mostl likely
+        not all work are harvested in one session:
+        [{'work-ori-id': x, 'last_harvest_date': y, 'nb_in_db': {'ENG': 12, 'FRE': 2, ..}}, ..]
 
         """
         super(BaseReviewSpider, self).__init__(**kwargs)
-        self.begin_period = kwargs['begin_period']
-        self.end_period = kwargs['end_period']
+        self.dump_filepath = kwargs['dump_filepath']
         # descending order is the default
-        self.reviews_order = kwargs.get('reviews_order', 'desc')
         self.works_to_harvest = kwargs.get('works_to_harvest', {})
 
     def build_review_item(self):
         return ReviewItem(site_logical_name=self.name)
+
+    def get_dump_filepath(self):
+        return self.dump_filepath
 
     def parse_review_date(self, review_date_str):
         raise NotImplementedError
@@ -69,17 +47,15 @@ class BaseReviewSpider(BaseAuditSpider):
 
 class LibraryThingWorkReview(BaseReviewSpider):
     """
-    For each Work, spider only fetches #of reviews needed (by comparing #of review on Page vs DB).
-    Reviews are then requested in chronological order (latest-first) so that only the first needed ones
-    are emitted.  Hence this spider doesn't need these param:
-        1) Begin_period (unless we need to do data integrity checks)
-        2) Reviews_order
-    End_period is used so not to harvest too recent review (needed if lt allows for update -to validate?)
+    Spider only fetches #of reviews needed (by comparing #of review on Site vs DB).
+    Reviews are then requested in desc order (latest-first) so only the first needed ones
+    are emitted.
+    TODO: to manage any delete reviews, should request more reviews (buffer) and use last_harvest_date
+     for filter out
+
     """
     name = 'librarything'
     allowed_domains = ['www.librarything.com']
-    # flag indicating site have multi-language reviews
-    lang = 'ALL'
 
     ###########################
     # Control setting
@@ -108,6 +84,7 @@ class LibraryThingWorkReview(BaseReviewSpider):
             wid = self.works_to_harvest[i]['work-ori-id']
             req = scrapy.Request(self.url_workreview % wid, callback=self.parse_nbreview)
             req.meta['work-index'] = i
+            req.meta['wid'] = wid
             yield req
 
     def parse_nbreview(self, response):
@@ -127,6 +104,10 @@ class LibraryThingWorkReview(BaseReviewSpider):
             return form_data
 
         wid = response.url[response.url.index('/work/') + 6: response.url.index('/reviews')]
+        ori_wid = int(response.meta['wid'])
+        if int(wid) != ori_wid:
+            raise Exception("Invalid work-id '%d' triggered a forward-request to a new work-id %d " % (ori_wid, int(wid)))
+
         work_index = response.meta['work-index']
         db_info = self.works_to_harvest[work_index]
         nb_db_dic = db_info.get('nb_in_db', {})
@@ -210,7 +191,6 @@ class LibraryThingWorkReview(BaseReviewSpider):
         return parsed_rating
 
 
-
 class CritiquesLibresReview(BaseReviewSpider):
     """
     First Step: Fetch # of Reviews in Json format using request:
@@ -221,10 +201,9 @@ class CritiquesLibresReview(BaseReviewSpider):
         where total is the total number of books reviewed.
 
     Second step:  Fetch new reviews ready for loading.
-
     Note:
-    1) critique can be modified during 7 days, so Spider MUST BE RUN after 7 days after end-of-period !!
-    2) takes only 4 min to harvest all reviews (period 2000-2014), so can be lauched in a single session
+    1) takes only 4 min to harvest all reviews (period 2000-2014), so can be relauched
+    in a single session without messing around with incremental harvesting
     """
     name = 'critiqueslibres'
     allowed_domains = ['www.critiqueslibres.com']  # used as 'hostname' in item field
@@ -254,9 +233,7 @@ class CritiquesLibresReview(BaseReviewSpider):
     xpath_date = './td[@class="texte"]/p[2]/text()'  # return:  " - BOURGES - 50 ans - 1 décembre 2004"
     xpath_username = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/text()'
     xpath_reviewer_uid = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/@href'  # return: "/i.php/vuser/?uid=32wdqee2334"
-
     ###########################
-
 
     def __init__(self, **kwargs):
         # don't use self.name as instance variable could shadow the static one (to confirm?)
@@ -367,66 +344,3 @@ class DecitreSpider(BaseReviewSpider):
     pass
 
 
-class WorkReference(BaseAuditSpider):
-
-    name = 'workreference'
-    allowed_domains = ['www.librarything.com']
-
-    ###########################
-    # Control setting
-    ###########################
-    url_workdetail = 'https://www.librarything.com/work/%d/workdetails'
-
-    nb_work_to_scrape = 1000
-    ##########################
-
-    ###########################
-    # Parse setting
-    ###########################
-    xpath_author_txt = '//div[@class="headsummary"]/h2/a/text()'
-    xpath_author_href = '//div[@class="headsummary"]/h2/a/@href'
-    xpath_title = '//table[@id="book_bookInformationTable"]/tbody/tr[1]/td[2]/b/text()'
-    xpath_ori_lang = '//table[@id="book_bookInformationTable"]/tbody/tr/td/a[starts-with(@href,"/language.php?")]/text()'
-
-    xpath_isbn = '//meta[@property="books:isbn"]/@content'
-    ###########################
-
-    def __init__(self, ref_workids, **kwargs):
-        super(WorkReference, self).__init__(**kwargs)
-        self.workids = ref_workids
-
-    def get_next_workid(self, n):
-        pass
-
-    def start_requests(self):
-        for wid in self.workids:
-            yield scrapy.Request(self.url_workdetail % wid, callback=self.parse_work)
-
-    def parse_work(self, response):
-
-        wid = response.url[response.url.index('/work/') + 6: response.url.index('/workdetails')]
-        title = response.xpath(self.xpath_title)
-        ori_lang = response.xpath(self.xpath_ori_lang)
-
-        sel_authors = response.xpath(self.xpath_author_txt)
-        sel_authors_href = response.xpath(self.xpath_author_href)
-        if len(sel_authors) != len(sel_authors_href):
-            raise Exception('Invalid authors name and href for wid %s ' % wid)
-
-        authors_name = []
-        authors_id = []
-        for i in range(len(sel_authors)):
-            authors_name.append(sel_authors[i].extract())  # return Mary Ann Shaffer (i.e. fname lname)
-            authors_id.append(sel_authors_href[i].extract()[8:])  # remove prefix of '/author/shaffermaryan'
-
-        #TODO : the ddc_mds and lc_subjs
-        item = Item(work_uid=wid,
-                    title=title,
-                    original_lang=ori_lang,
-                    authors_name=authors_name,
-                    authors_disamb_id=authors_id,
-                    lc_subjects=6,
-                    ddc_mds=7,
-                    load_audit_id=8)
-
-        yield item

@@ -5,7 +5,7 @@ import fnmatch
 import os
 from os.path import isfile, join
 import config
-# import brd.service as service
+import brd.task as task
 import brd.elt
 
 __author__ = 'mouellet'
@@ -121,7 +121,8 @@ def get_marc_code(input, capital=False):
         if ret:
             marc_code = ret[1]
         else:
-            marc_code = None
+            marc_code = 'PAS TROUVE'
+            print "WEEEEIRDDDDDDD  pas trouve de marc_code pour le input: " + uinput
     lang_cache[uinput] = marc_code
     if capital:
         return marc_code
@@ -159,18 +160,35 @@ def convert_to_isbn13(isbn10):
     return isbn13_no_checkdigit + str(check)
 
 
+import luigi
+
 # trigger reference data load
+def load_static_ref():
+
+    # language stuff
+    c = brd.elt.get_connection()
+    nb = c.fetch_one('select count(1) from integration.language')[0]
+    if nb == 0:
+        lang_ref_file = join(config.REF_DATA_DIR, 'Iso_639_and_Marc_code - ISO-639-2_utf-8.tsv')
+        fields = 'code3,code3_term,code2,code,english_iso_name,english_name,french_iso_name,french_name'
+        with open(lang_ref_file, 'r') as f:
+            n = c.copy_into_table('integration.language', fields, f, delim='\t')
+        c.commit()
+        print "Loaded %d records into integration.language" % n
+
+    #reference stuff
+    work_ref = task.BatchLoadWorkReference()
+    sch = luigi.scheduler.CentralPlannerScheduler()
+    w = luigi.worker.Worker(scheduler=sch)
+    w.add(work_ref)
+    w.run()
+
+load_static_ref()
+
+
 # def load_static_ref():
-#     c = brd.elt.get_connection()
 #
-#     nb = c.fetch_one('select count(1) from integration.language')[0]
-#     if nb == 0:
-#         lang_ref_file = join(config.REF_DATA_DIR, 'Iso_639_and_Marc_code - ISO-639-2_utf-8.tsv')
-#         fields = 'code3,code3_term,code2,code,english_iso_name,english_name,french_iso_name,french_name'
-#         with open(lang_ref_file, 'r') as f:
-#             n = c.copy_into_table('integration.language', fields, f, delim='\t')
-#         c.commit()
-#         print "Loaded %d records into integration.language" % n
+#
 #
 #     # set-up database with min set of data
 #     res = c.fetch_one("select count(1) from staging.thingisbn")
@@ -185,4 +203,3 @@ def convert_to_isbn13(isbn10):
 #         service.job_loading_workisbn()
 #
 
-# load_static_ref()

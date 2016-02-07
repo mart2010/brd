@@ -1,55 +1,29 @@
 # -*- coding: utf-8 -*-
 
-# Define item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 from scrapy.exceptions import DropItem
 from scrapy import signals
 from scrapy.exporters import CsvItemExporter
 
 
-class ReviewFilter(object):
+class ReviewParser(object):
     """
-    Less important since ReviewSpider could only request missing review, however we keep this
-    to implement parsing additional field and make sure the dates are ok (Spider add a buffer ..)
-
-    This pipeline is responsible of
-    1) getting the parsed version of some fields (review_date, parsed_rating)
-    1) filtering out Reviews not within load period
-
-    N.B. no business-rule transfo allowed (would imply relaunching harvest whenever rules change!)
+    This pipeline is responsible in parsing some raw fields (review_date, parsed_rating)
     """
-    def __init__(self):
-        self.begin_period = None
-        self.end_period = None
-
-    def open_spider(self, spider):
-        self.begin_period = spider.begin_period
-        self.end_period = spider.end_period
 
     def process_item(self, item, spider):
         # spider knows how to parse its date text, rating...
         review_date = spider.parse_review_date(item['review_date'])
-
-        # Keep only reviews within period
-        if self.begin_period <= review_date < self.end_period:
-            item['parsed_review_date'] = review_date
-            review_rating = spider.parse_rating(item['rating'])
-            item['parsed_rating'] = review_rating
-        else:
-            raise DropItem("Review outside loading period")
+        review_rating = spider.parse_rating(item['rating'])
+        item['parsed_review_date'] = review_date
+        item['parsed_rating'] = review_rating
         return item
-
 
 
 class DumpToFile(object):
     """
     Dump harvested data into flat file, no other logic is implemented here
     (it's "Dump" :-)
-    # Similar to Feed-Exporters used with: scrapy crawl spider_name -o output.csv -t csv
     """
-
     def __init__(self):
         self.files = {}
         self.counter = 0

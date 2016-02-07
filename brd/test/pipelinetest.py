@@ -83,7 +83,7 @@ class TestPipeline(unittest.TestCase):
         scraper = reviewspiders.CritiquesLibresReview(period='1-1-2010_1-2-2010')
         # mock persistence for the specific book
         scraper.stored_nb_reviews = {"100": 1}
-        pipeline_loader = pipelines.ReviewFilter()
+        pipeline_loader = pipelines.ReviewParser()
         pipeline_loader.open_spider(scraper)
 
         item = items.ReviewItem(book_title=" the, Book ",

@@ -19,10 +19,11 @@ class DbConnection(object):
     managing transaction, ... etc.
     """
 
-    def __init__(self, connection, readonly=False, ):
+    def __init__(self, connection, readonly=False):
         self.connection = psycopg2.connect(**connection)
         if readonly:
-            self.connection.set_session(readonly=readonly)
+            # to be sure no transaction started even with Select, added autocommit=True
+            self.connection.set_session(readonly=readonly, autocommit=True)
 
     def execute_inTransaction(self, sql, params=None):
         """
@@ -327,16 +328,12 @@ def get_connection():
 def _insert_auditing(commit=False, **named_params):
     sql = \
         """
-        insert into staging.load_audit(batch_job, step_name, step_no, status,
-                                       period_begin, period_end, start_dts)
-                            values (%(job)s, %(step)s, %(step_no)s, %(status)s,
-                                    %(begin)s, %(end)s, %(start_dts)s);
+        insert into staging.load_audit(batch_job, step_name, status, run_dts)
+                            values (%(job)s, %(step)s, %(status)s, %(run_dts)s);
         """
     assert ('job' in named_params)
     assert ('step' in named_params)
-    assert ('begin' in named_params)
-    assert ('end' in named_params)
-    assert ('start_dts' in named_params)
+    assert ('run_dts' in named_params)
     named_params['status'] = named_params.get('status', EltStepStatus.RUNNING)
     named_params['step_no'] = named_params.get('step_no', -1)
     ret = get_connection().insert_row_get_id(sql, named_params)
@@ -345,7 +342,7 @@ def _insert_auditing(commit=False, **named_params):
     return ret
 
 
-def _update_auditing(insert_dts=None, commit=False, **named_params):
+def _update_auditing(run_dts=None, commit=False, **named_params):
     sql = \
         """
         update staging.load_audit set status = %(status)s
@@ -358,8 +355,8 @@ def _update_auditing(insert_dts=None, commit=False, **named_params):
     assert ('id' in named_params)
 
     now = datetime.datetime.now()
-    if insert_dts:
-        named_params['elapse_sec'] = (now - insert_dts).seconds
+    if run_dts:
+        named_params['elapse_sec'] = (now - run_dts).seconds
     else:
         named_params['elapse_sec'] = None
     named_params['row'] = named_params.get('row')

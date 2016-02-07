@@ -71,7 +71,7 @@ def fetch_work(site_logical_name, harvested, nb_work):
     if harvested:
         sql = \
             """
-            select m.work_ori_id, m.last_harvest_date,
+            select m.work_ori_id, m.last_harvest_dts,
                     array_agg(l.lang_code), array_agg(l.nb_review)
             from integration.work_site_mapping m
             join integration.site s on (s.id = m.site_id)
@@ -79,7 +79,7 @@ def fetch_work(site_logical_name, harvested, nb_work):
                            on (l.work_uid = m.ref_uid and l.logical_name = %(name)s)
             where
             s.logical_name = %(name)s
-            and m.last_harvest_date IS NOT NULL
+            and m.last_harvest_dts IS NOT NULL
             group by 1,2
             order by 2 asc
             limit %(nb)s
@@ -93,7 +93,7 @@ def fetch_work(site_logical_name, harvested, nb_work):
             join integration.site s on (s.id = m.site_id)
             where
             s.logical_name = %(name)s
-            and m.last_harvest_date IS NULL
+            and m.last_harvest_dts IS NULL
             limit %(nb)s
             """
     list_of_wids = elt.get_ro_connection().fetch_all(sql, {'nb': nb_work, 'name': site_logical_name})
@@ -206,9 +206,6 @@ def get_dump_filename(spidername, period):
 #         step = Step("Fetch work ")
 #
 #
-#
-#
-#
 #     prerequisite_step = Step
 #
 #     batch = BatchProcessor(batch_name, period)
@@ -236,74 +233,7 @@ def get_dump_filename(spidername, period):
 #         elt.get_connection().commit()
 #
 
-def update_harvest_date(site_logical_name, havest_dts, harvested_work_ids):
-    sql = \
-        """
-        update integration.work_site_mapping
-        set last_harvest_dts = %(end)s
-        where
-        site_id = (select id from integration.site where logical_name = %(name)s)
-        and work_ori_id IN %(w_ids)s;
-        """
-    ret = elt.get_connection().execute(sql, {'end': havest_dts,
-                                             'name': site_logical_name,
-                                             'w_ids': harvested_work_ids})
-    return ret
 
-
-def _harvest_reviews(spidername, workids_list, period, audit_id):
-    """
-    :param spidername:
-    :param workids_list:
-    :param initial:
-    :param audit_id dump_filepath depends on this (assigned in BatchProcessor)
-    :return: (audit-id, dump_filepath)
-    """
-    dump_filepath = os.path.join(config.SCRAPED_OUTPUT_DIR,
-                                 get_dump_filename(spidername, period, audit_id))
-
-    spider_process = SpiderProcessor(spidername,
-                                     dump_filepath=dump_filepath,
-                                     begin_period=period[0],
-                                     end_period=period[1],
-                                     reviews_order='desc',
-                                     works_to_harvest=workids_list)
-    dump_filepath = spider_process.start_process()
-
-
-    print("Harvest of %d works/review completed with spider %s (initial: %s, audit_id: %s, dump file: '%s')" \
-          % (len(workids_list), spidername, initial, audit_id, dump_filepath))
-
-
-        # to move up
-    def _get_audit(self):
-        audit_id = brd.elt.insert_auditing(job="Harvest " + self.spidername,
-                                           step="...",
-                                           begin=self.begin_period,
-                                           end=self.end_period,
-                                           start_dts=datetime.datetime.now())
-        return audit_id
-
-    # to move up
-    @staticmethod
-    def _update_step_filename(filename, audit_id):
-            stepname = filename
-            brd.elt.get_connection().execute("update staging.load_audit set step_name=%s where id=%s",
-                                             (stepname, audit_id))
-            return stepname
-
-    # to move up
-    @staticmethod
-    def _commit_audit(audit_id):
-        # no longer know the # of records/line (pipeline knows...)
-        brd.elt.update_auditing(commit=True,
-                                rows=-1,
-                                status="Completed",
-                                elaspe_sec=(datetime.datetime.now() - self.now).seconds,
-                                id=audit_id)
-
-
-    return (audit_id, dump_filepath)
 
 
 def bulkload_thingisbn(pattern="thingISBN_10*.csv", archive_file=False, truncate_staging=True):

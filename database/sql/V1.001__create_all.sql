@@ -19,19 +19,16 @@ create table staging.load_audit (
     step_name text,
     step_no int,
     status text,
-    start_dts timestamp,
+    run_dts timestamp,
     elapse_sec int,
     rows_impacted int,
-    period_begin date,
-    period_end date,
     output text
 );
 
-comment on table staging.load_audit is 'Metadata used to manage each job that insert/update batch of records';
-comment on column staging.load_audit.step_no is 'Step process order within a batch_job (used for step in pending.. status)';
-comment on column staging.load_audit.status is 'Status of step or error msg when failure';
-comment on column staging.load_audit.period_end is 'Excluded, 12/11/15 -> 11/11/15 23:59:59';
-
+comment on table staging.load_audit is 'Metadata to report on running batch_job/steps';
+comment on column staging.load_audit.status is 'Status of step';
+comment on column staging.load_audit.run_dts is 'Timestamp when step run (useful for things like limiting harvest period)';
+comment on column staging.load_audit.output is 'Output produced by a step like error msg when failure or additional info';
 
 
 -- no primary key constraint since there are duplicates <work-id,isbn> in xml feed!
@@ -332,7 +329,7 @@ comment on table integration.work_site_mapping is 'Map between work ids of lt an
 comment on column integration.work_site_mapping.ref_uid is 'Reference id used by lt';
 comment on column integration.work_site_mapping.work_id is 'Work-Id made unique throughout sites (MD5 of concatenation of: work_ori_id,site_logical_name)';
 comment on column integration.work_site_mapping.work_ori_id is 'Original id used by site in text format';
-YXcomment on column integration.work_site_mapping.last_harvest_dts is 'Last time work was harvested, useful to schedule harvesting';
+comment on column integration.work_site_mapping.last_harvest_dts is 'Last time work was harvested, useful to schedule harvesting';
 comment on column integration.work_site_mapping.book_title is 'Book title, author, lang are for QA purposes (mapping between sites only done through isbn(s) lookup)';
 
 
