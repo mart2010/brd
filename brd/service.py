@@ -27,16 +27,6 @@ def treat_loaded_file(processed_filepath, remove, archive_dir):
 elapse_days = 5
 
 
-def get_end_period():
-    """
-    Rules to avoid Harvesting too recent reviews
-    :return: today - some elapse_days as datetime.date
-    """
-    return datetime.date.today() - datetime.timedelta(days=elapse_days)
-
-
-begin_default_date = '1-1-1900'
-
 
 def get_default_begin_date():
     # default begin_date used for initial loading
@@ -100,14 +90,6 @@ def fetch_work(site_logical_name, harvested, nb_work):
     return _construct_dic(list_of_wids)
 
 
-def get_dump_filename(spidername, period):
-    pre = config.REVIEW_PREFIX + spidername + "(audit_id)"
-    post = "_" + brd.get_period_text(period[0], period[1]) + config.REVIEW_EXT
-    return pre + post
-
-
-
-#
 # def harvest_review_and_load(spidername, nb_work=10):
 #     """
 #     Harvest nb_work reviews (initial) for works never harvested.  If all works are harvested,
@@ -236,49 +218,21 @@ def get_dump_filename(spidername, period):
 
 
 
-def bulkload_thingisbn(pattern="thingISBN_10*.csv", archive_file=False, truncate_staging=True):
+def bulkload_review_files(filepattern, remove_files=False, first_truncate_staging=False):
     """
-    Try to load one reference file: thingISBN*_d-m-yyyy.csv
-    :param archive_file:
-    :param truncate_staging:
-    :return:
-    """
-    file_to_load = brd.get_all_files(config.REF_DATA_DIR, pattern, recursively=False)
-
-    if len(file_to_load) == 1:
-        file_to_load = file_to_load[0]
-    else:
-        raise elt.EltError("Expected ONE thingISBN file to load: %s" % str(file_to_load))
-
-    file_date = file_to_load[file_to_load.rindex('_') + 1:file_to_load.rindex('.csv')]
-    # thingISBN data is a one-time snapshot (i.e. period_begin = period_end)
-    period_begin = brd.resolve_date_text(file_date)
-
-    if truncate_staging:
-        elt.truncate_table({'schema': 'staging', 'table': 'thingisbn'}, True)
-
-    n = elt.bulkload_file(file_to_load, 'staging.thingisbn', "WORK_UID, ISBN_ORI, ISBN10, ISBN13, LOAD_AUDIT_ID", (period_begin, period_begin))
-    if n[1] != -1:
-        if archive_file:
-            treat_loaded_file(file_to_load, remove=False, archive_dir=config.REF_ARCHIVE_DIR)
-
-
-def bulkload_review_files(filepattern, period=None, remove_files=False, first_truncate_staging=False):
-    """
-    NOT USED ANYMORE (Could be useful later when batch loading file...must manage not to havest same work-id prior to that)
+    NOT USED ANYMORE
+    Could be used in future to do batch load a bunch of harvested files
     Bulk loads Reviews*.dat files into staging DB. By default, load all files
     otherwise only the ones corresponding to period specified.
     Commit is done after each file loaded
     :param period: 'd-m-yyyy_d-m-yyyy'
     :return: (nb of files treated, nb of files with error)
     """
-    if period:
-        begin_period, end_period = brd.resolve_period_text(period)
     if first_truncate_staging:
         elt.truncate_table({'schema': 'staging', 'table': 'review'}, True)
 
     n_treated, n_error = 0, 0
-    for datfile in get_all_files(config.SCRAPED_OUTPUT_DIR, filepattern, True):
+    for datfile in brd.get_all_files(config.SCRAPED_OUTPUT_DIR, filepattern, True):
         file_begin, file_end = brd.resolve_period_text(datfile[datfile.index('_') + 1: datfile.rindex(config.REVIEW_EXT)])
         if period is None or (file_begin >= begin_period and file_end <= end_period):
             n = elt.bulkload_file(datfile, 'staging.review', get_column_headers(datfile), (file_begin, file_end))

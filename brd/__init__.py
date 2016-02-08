@@ -177,29 +177,12 @@ def load_static_ref():
         print "Loaded %d records into integration.language" % n
 
     #reference stuff
-    work_ref = task.BatchLoadWorkReference()
-    sch = luigi.scheduler.CentralPlannerScheduler()
-    w = luigi.worker.Worker(scheduler=sch)
-    w.add(work_ref)
-    w.run()
+    #work_ref = task.BatchLoadWorkReference()
+    #sch = luigi.scheduler.CentralPlannerScheduler()
+    #w = luigi.worker.Worker(scheduler=sch)
+    #w.add(work_ref)
+    #w.run()
 
 load_static_ref()
 
-
-# def load_static_ref():
-#
-#
-#
-#     # set-up database with min set of data
-#     res = c.fetch_one("select count(1) from staging.thingisbn")
-#     print("Table %s already loaded with %d rows" % ('staging.thingisbn', res[0]))
-#     if res[0] == 0:
-#         # load-up the 1000 version into staging
-#         service.bulkload_thingisbn("thingISBN_10000*.csv", truncate_staging=False)
-#     res = c.fetch_one("select count(1) from integration.work")
-#     print("Table %s already loaded with %d rows" % ('integration.work', res[0]))
-#     if res[0] == 0:
-#         # load-up the ref in integration
-#         service.job_loading_workisbn()
-#
 

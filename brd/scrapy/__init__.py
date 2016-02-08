@@ -27,7 +27,6 @@ class SpiderProcessor(object):
 
         # instantiate the spider
         r = process.crawl(self.spidername, dump_filepath=self.dump_filepath, works_to_harvest=self.works_to_harvest)
-        print "Le tyyyyyyyyyyyyyppppppppppeeeeeeeee retourne du crawl est : " + str(type(r)) + " et son content" + str(r)
 
         # blocks here until crawling is finished
         process.start()

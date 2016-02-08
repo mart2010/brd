@@ -104,9 +104,12 @@ class LibraryThingWorkReview(BaseReviewSpider):
             return form_data
 
         wid = response.url[response.url.index('/work/') + 6: response.url.index('/reviews')]
-        ori_wid = int(response.meta['wid'])
-        if int(wid) != ori_wid:
-            raise Exception("Invalid work-id '%d' triggered a forward-request to a new work-id %d " % (ori_wid, int(wid)))
+        ori_wid = response.meta['wid']
+        if wid != ori_wid:
+            # TODO: ok this seems to happen when same work has different work_id, so lt links back to the "main" work
+            # eg. work=17829 has a work=13001031 (which is assoc with a french edition isbn), so these 2 word are the same
+            # maybe should mark these on DB somehow!!!
+            raise Exception("Invalid work-id '%s' triggered a forward-request to a new work-id %s " % (ori_wid, wid))
 
         work_index = response.meta['work-index']
         db_info = self.works_to_harvest[work_index]

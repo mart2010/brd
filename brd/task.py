@@ -10,6 +10,9 @@ import os
 import brd.scrapy
 import luigi.parameter
 
+# global batch_name by Batch entry point Task (shared among all task)
+batch_name = None   # ok, as concurrent batch jobs are launched in separate process
+
 
 class DateSecondParameter(luigi.parameter.DateHourParameter):
     """
@@ -39,10 +42,11 @@ def postgres_target(target_table, update_id):
 
 class MyBasePostgresTask(luigi.Task):
     """
-    Provide to subclass the needed operations to read/write from the DB
-    and make them valid as luigi's task
-    Subclass must provide the target table (self.table) and implement sql load logic
-    in exec_sql().
+    Provides to subclass Task function to write to DB target
+    as valid luigi's task.  Also manages the audit-metadata.
+
+    Subclass must provide target table (self.table) and
+    implements sql logic in exec_sql().
     """
 
     def output(self):
@@ -51,10 +55,20 @@ class MyBasePostgresTask(luigi.Task):
     def run(self):
         connection = self.output().connect()
 
-        # I could even add my audit-log stuff before and after here (to get elapse time and auditing infor)
-        # here I would pass all param receive by the task...
-        # check with get_param_values()
-        ret = self.exec_sql(connection)
+        # decorate with audit-log stuff
+        audit_id, run_dts = brd.elt.insert_auditing(connection, batch_name, self.task_id)
+        try:
+            rows = self.exec_sql(connection)
+            status = brd.elt.EltStepStatus.COMPLETED
+            output = None
+        except Exception, e:
+            status = brd.elt.EltStepStatus.FAILED
+            output = "error message: '%s'" % e.message
+            rows = None
+            raise e
+        finally:
+            brd.elt.update_auditing(connection, audit_id, status,
+                                    run_dts=run_dts, rows=rows, output=output)
 
         # mark as complete in same transaction (checkpoint)
         self.output().touch(connection)
@@ -67,6 +81,42 @@ class MyBasePostgresTask(luigi.Task):
         raise NotImplementedError
 
 
+class MyBaseBulkLoadTask(luigi.postgres.CopyToTable):
+    """
+    Provides to subclass Task function to bulkload file to DB target
+    as valid luigi's task.  Also manages the audit-metadata.
+
+    Subclass must provide target table, columns, column_separator and
+    implements requires() logic.
+    """
+    # (cannot use postgre_target() as attributes set as abstractproperty in rdbms.CopyToTable)
+    host = brd.config.DATABASE['host']
+    database = brd.config.DATABASE['database']
+    user = brd.config.DATABASE['user']
+    password = brd.config.DATABASE['password']
+
+    def requires(self):
+        raise NotImplementedError
+
+    def run(self):
+        connection = self.output().connect()
+        # decorate with audit-log stuff
+        audit_id, run_dts = brd.elt.insert_auditing(connection, batch_name, self.task_id)
+        try:
+            super(MyBaseBulkLoadTask, self).run()
+            status = brd.elt.EltStepStatus.COMPLETED
+            output = None
+        except Exception, e:
+            status = brd.elt.EltStepStatus.FAILED
+            output = "error message: '%s'" % e.message
+            raise e
+        finally:
+            # Here I will need to commit, as the run() on superclass has already commited!!!!!
+            brd.elt.update_auditing(connection, audit_id, status,
+                                    run_dts=run_dts, output=output)
+
+
+# ------------------- real Task implementation section ...------------------------ #
 
 class DownLoadThingISBN(luigi.Task):
     filepath = luigi.Parameter()
@@ -75,20 +125,13 @@ class DownLoadThingISBN(luigi.Task):
         return luigi.LocalTarget(self.filepath)
 
 
-class BulkLoadThingISBN(luigi.postgres.CopyToTable):
+class BulkLoadThingISBN(MyBaseBulkLoadTask):
     """
     This task bulkload thingisbn file into staging
     TODO: truncate staging table first not to accumulate older reference
     """
     thingisbn_filename = luigi.Parameter()
-
-    # TODO: annoying ... can't instantiate without (cannot use my postgre_target()  as these attributes set as abstractproperty in rdbms.CopyToTable)
-    host = brd.config.DATABASE['host']
-    database = brd.config.DATABASE['database']
-    user = brd.config.DATABASE['user']
-    password = brd.config.DATABASE['password']
     table = 'staging.thingisbn'
-
     columns = ["WORK_UID", "ISBN_ORI", "ISBN10", "ISBN13", "LOAD_AUDIT_ID"]
     column_separator = "|"
 
@@ -113,7 +156,7 @@ class LoadWorkRef(MyBasePostgresTask):
             left join integration.work w on s.work_uid = w.uid
             where w.uid is null;
             """
-        return connection.cursor().execute(sql)
+        return brd.elt.execute_and_get_rowcount(connection, sql)
 
 
 class LoadIsbnRef(MyBasePostgresTask):
@@ -132,7 +175,7 @@ class LoadIsbnRef(MyBasePostgresTask):
             left join integration.isbn i on cast(s.isbn13 as bigint) = i.ean
             where i.ean is null;
             """
-        return connection.cursor().execute(sql)
+        return brd.elt.execute_and_get_rowcount(connection, sql)
 
 
 class LoadWorkIsbnRef(MyBasePostgresTask):
@@ -152,7 +195,7 @@ class LoadWorkIsbnRef(MyBasePostgresTask):
             left join integration.work_isbn i on (cast(s.isbn13 as bigint) = i.ean and s.work_uid = i.work_uid)
             where i.ean is null;
             """
-        return connection.cursor().execute(sql)
+        return brd.elt.execute_and_get_rowcount(connection, sql)
 
 
 class LoadWorkSiteMappingRef(MyBasePostgresTask):
@@ -176,10 +219,8 @@ class LoadWorkSiteMappingRef(MyBasePostgresTask):
             left join integration.work_site_mapping m on (work.uid_text = m.work_ori_id and m.site_id = work.site_id)
             where m.work_ori_id IS NULL;
             """
-        return connection.cursor().execute(sql, {'logical_name': self.site_logical_name})
+        return brd.elt.execute_and_get_rowcount(connection, sql, {'logical_name': self.site_logical_name})
 
-
-batch_name = None   # ok, as long as concurrent batch job launched in separate process
 
 class BatchLoadWorkReference(luigi.Task):
     """
@@ -265,9 +306,8 @@ class UpdateLastHarvestDate(MyBasePostgresTask):
             site_id = (select id from integration.site where logical_name = %(name)s)
             and work_ori_id IN %(w_ids)s;
             """
-        r = connection.cursor().execute(sql, {'end': self.harvest_dts,
-                                              'name': self.spidername,
-                                              'w_ids': wids})
+        return brd.elt.execute_and_get_rowcount(connection,
+                                                sql, {'end': self.harvest_dts, 'name': self.spidername, 'w_ids': wids})
 
 # python -m luigi --module brd.task BatchLoadReviews --spidername librarything --n-work 2 --harvest-dts 2016-01-31T190723 --local-scheduler
 class BatchLoadReviews(luigi.Task):

@@ -19,11 +19,10 @@ class DbConnection(object):
     managing transaction, ... etc.
     """
 
-    def __init__(self, connection, readonly=False):
+    def __init__(self, connection, readonly=False, autocommit=False):
         self.connection = psycopg2.connect(**connection)
-        if readonly:
-            # to be sure no transaction started even with Select, added autocommit=True
-            self.connection.set_session(readonly=readonly, autocommit=True)
+        self.connection.set_session(readonly=readonly, autocommit=autocommit)
+
 
     def execute_inTransaction(self, sql, params=None):
         """
@@ -60,22 +59,6 @@ class DbConnection(object):
         with self.connection.cursor() as curs:
             curs.copy_expert(sql, open_file, size=8192)
             return curs.rowcount
-
-    def insert_row_get_id(self, insert, params=None):
-        """
-        Insert a single row while leaving open the transaction.
-        :param sql:
-        :param params:
-        :return: the auto-generated id
-        """
-        if insert.rfind(";") == -1:
-            insert += ' RETURNING id;'
-        else:
-            insert = insert.replace(';', ' RETURNING id;')
-
-        with self.connection.cursor() as curs:
-            curs.execute(insert, params)
-            return curs.fetchone()[0]
 
     def fetch_one(self, sql, params=None):
         """
@@ -121,13 +104,41 @@ class DbConnection(object):
         return self.connection.__str__()
 
 
+# convenient fcts taken from my DbConnection
+def insert_row_get_id(connection, insert, params=None):
+        """
+        Insert a single row while leaving open the transaction.
+        :return: the auto-generated id
+        """
+        if insert.rfind(";") == -1:
+            insert += ' RETURNING id;'
+        else:
+            insert = insert.replace(';', ' RETURNING id;')
+
+        with connection.cursor() as curs:
+            curs.execute(insert, params)
+            return curs.fetchone()[0]
+
+
+def execute_and_get_rowcount(connection, sql, params=None):
+    """
+    Execute sql statement while leaving open the transaction.
+    :return rowcount impacted
+    """
+    with connection.cursor() as curs:
+        curs.execute(sql, params)
+        return curs.rowcount
+
+
+
 # Singleton Dbconnection on default database
 conn_readonly = None
 
 def get_ro_connection():
     global conn_readonly
     if conn_readonly is None:
-        conn_readonly = DbConnection(connection=config.DATABASE, readonly=True)
+        # autocommit=True to be sure no transaction started (even for select)
+        conn_readonly = DbConnection(connection=config.DATABASE, readonly=True, autocommit=True)
     return conn_readonly
 
 conn = None
@@ -139,28 +150,6 @@ def get_connection():
     return conn
 
 
-# class Step(object):
-#     def __init__(self, name, sql_or_callable, step_no=None, named_params=None):
-#         self.name = name
-#         if callable(sql_or_callable):
-#             self.obj_callable = sql_or_callable
-#             self.is_callable = True
-#         else:
-#             self.sql = sql_or_callable
-#             self.is_callable = False
-#
-#         self.named_params = {}
-#         if named_params:
-#             self.named_params = named_params
-#         self.stepno = step_no
-#
-#     def set_stepno(self, stepno):
-#         self.stepno = stepno
-#
-#     def __str__(self):
-#         return self.name
-#
-#
 # class BatchProcessor(object):
 #     """
 #     Responsible in executing Steps in Batch AND manage auditing metadata!
@@ -325,24 +314,22 @@ def get_connection():
 #
 
 
-def _insert_auditing(commit=False, **named_params):
+def insert_auditing(connection, batch_job, step, **named_params):
     sql = \
         """
         insert into staging.load_audit(batch_job, step_name, status, run_dts)
                             values (%(job)s, %(step)s, %(status)s, %(run_dts)s);
         """
-    assert ('job' in named_params)
-    assert ('step' in named_params)
-    assert ('run_dts' in named_params)
+    named_params['job'] = batch_job
+    named_params['step'] = step
+    now = datetime.datetime.now()
+    named_params['run_dts'] = now
     named_params['status'] = named_params.get('status', EltStepStatus.RUNNING)
-    named_params['step_no'] = named_params.get('step_no', -1)
-    ret = get_connection().insert_row_get_id(sql, named_params)
-    if commit:
-        get_connection().commit()
-    return ret
+    audit_id = insert_row_get_id(connection, sql, named_params)
+    return (audit_id, now)
 
 
-def _update_auditing(run_dts=None, commit=False, **named_params):
+def update_auditing(connection, audit_id, status, run_dts=None, **named_params):
     sql = \
         """
         update staging.load_audit set status = %(status)s
@@ -351,21 +338,16 @@ def _update_auditing(run_dts=None, commit=False, **named_params):
                                     ,output = %(output)s
         where id = %(id)s;
         """
-    assert ('status' in named_params)
-    assert ('id' in named_params)
-
+    named_params['id'] = audit_id
+    named_params['status'] = status
+    named_params['rows'] = named_params.get('rows')
+    named_params['output'] = named_params.get('output')
     now = datetime.datetime.now()
     if run_dts:
         named_params['elapse_sec'] = (now - run_dts).seconds
     else:
         named_params['elapse_sec'] = None
-    named_params['row'] = named_params.get('row')
-    named_params['output'] = named_params.get('output')
-
-    ret = get_connection().execute(sql, named_params)
-    if commit:
-        get_connection().commit()
-    return ret
+    connection.cursor().execute(sql, named_params)
 
 
 def bulkload_file(filepath, schematable, column_headers, period):
@@ -378,7 +360,7 @@ def bulkload_file(filepath, schematable, column_headers, period):
     :return: (audit_id, #ofRow)  Note: #ofRow = -1, in case of error
     """
     now = datetime.datetime.now()
-    audit_id = _insert_auditing(job='Bulkload file', step=filepath, begin=period[0], end=period[1], start_dts=now)
+    audit_id = insert_auditing(job='Bulkload file', step=filepath, begin=period[0], end=period[1], start_dts=now)
     try:
         with open(filepath) as f:
             count = get_connection().copy_into_table(schematable, column_headers, f)
@@ -388,7 +370,7 @@ def bulkload_file(filepath, schematable, column_headers, period):
         return (audit_id, count)
     except psycopg2.DatabaseError, er:
         get_connection().rollback()
-        _insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=-1, status=EltStepStatus.FAILED,
+        insert_auditing(commit=True, job='Bulkload file', step=filepath, rows=-1, status=EltStepStatus.FAILED,
                         comment=er.pgerror, begin=period[0], end=period[1], start_dts=now)
         # also add logging
         print("Error bulk loading file: \n'%s'\nwith msg: '%s' " % (filepath, er.message))
