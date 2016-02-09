@@ -53,16 +53,17 @@ create table staging.review (
     rating text,
     review text,
     review_date text not null,
-    likes int,
+    likes text,
     work_uid text not null,
+    dup_uid text,
     book_title text,
     book_lang text,
     author_fname text,
     author_lname text,
     parsed_review_date date,
-    parsed_rating smallint,
+    parsed_rating text,
     loading_dts timestamp,
-    load_audit_id int not null,
+    load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
@@ -71,6 +72,8 @@ comment on column staging.review.work_uid is 'Unique identifier of the book (a p
 comment on column staging.review.load_audit_id is 'Refers to audit of original Dump of scraped data, used to get period loaded';
 comment on column staging.review.parsed_review_date is 'Spider knows how to parse date in string format';
 comment on column staging.review.likes is 'Nb of users having appreciated the review (concetp likes, or green flag). Implies incremental-update the review';
+comment on column staging.review.dup_uid is 'Any duplicate id associated to the "master" work_uid (used to spot duplicates existing in lt)'
+
 
 create table staging.rejected_review as
             select * from staging.review
@@ -197,14 +200,29 @@ create table integration.work_info (
     work_uid bigint primary key,
     title text,
     original_lang char(3),
-    create_dts timestamp,
     update_dts timestamp,
+    create_dts timestamp,
     load_audit_id int,
     foreign key (work_uid) references integration.work(uid),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
 comment on table integration.work_info is 'Attribute data related to a Work (unhistorized Satellite-type, could add history if need be)';
+
+
+create table integration.work_sameas (
+    work_uid bigint,
+    master_uid bigint,
+    create_dts timestamp,
+    primary key (work_uid, master_work_uid),
+    foreign key work_uid references integration.work(uid),
+    foreign key master_work_uid references integration.work(uid)
+);
+
+
+comment on table integration.work_sameas is 'Different work-uid may exist in lt for same "master" Work (spotted when harvest process gets forwarded to a different id)';
+comment on column integration.work_sameas.master_uid is 'The "master" work that work_uid refers to';
+
 
 
 create table integration.isbn (
@@ -306,7 +324,7 @@ comment on table integration.work_author is 'Association between Work and its au
 
 
 -- to be inserted with new site and refreshed periodically
--- also updated by harvest activity to reflect last_harvest_date and state
+-- also updated by harvesting process to reflect last_harvest_date
 create table integration.work_site_mapping(
     ref_uid bigint not null,
     work_id uuid not null,
@@ -325,7 +343,7 @@ create table integration.work_site_mapping(
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table integration.work_site_mapping is 'Map between work ids of lt and the one from other site harvested';
+comment on table integration.work_site_mapping is 'Map between work ids of lt the one from other site harvested';
 comment on column integration.work_site_mapping.ref_uid is 'Reference id used by lt';
 comment on column integration.work_site_mapping.work_id is 'Work-Id made unique throughout sites (MD5 of concatenation of: work_ori_id,site_logical_name)';
 comment on column integration.work_site_mapping.work_ori_id is 'Original id used by site in text format';
@@ -419,7 +437,6 @@ create table integration.review(
     user_id uuid not null,
     site_id int not null,
     lang_code char(3) not null,
-    source_site_id int,
     rating text,
     review text, --this should be defined so to go in external clob...
     review_date date,
@@ -433,7 +450,7 @@ create table integration.review(
 );
 
 comment on table integration.review is 'Review and/or rating done for a Work in a specific language by a user ';
-
+comment on column integration.review.user_id is 'User identifier derived from MD5 hashing of username, site (ref. integration.derive_userid)';
 
 
 

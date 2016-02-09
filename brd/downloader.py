@@ -13,7 +13,9 @@ import subprocess
 url_test = 'file:///Users/mart/Google Drive/brd/data_static/thingISBN_10000.xml'
 
 
-def download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.xml.gz", max_nb_line=-1, enable_auditing=False):
+def download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.xml.gz",
+                               max_nb_line=-1,
+                               enable_auditing=False):
     """
     Download/uncompress a copy of thingISBN.xml.gz from lt (or locally), and convert into csv while adding
     log-audit_id metadata.

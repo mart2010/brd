@@ -104,12 +104,11 @@ class LibraryThingWorkReview(BaseReviewSpider):
             return form_data
 
         wid = response.url[response.url.index('/work/') + 6: response.url.index('/reviews')]
-        ori_wid = response.meta['wid']
-        if wid != ori_wid:
-            # TODO: ok this seems to happen when same work has different work_id, so lt links back to the "main" work
-            # eg. work=17829 has a work=13001031 (which is assoc with a french edition isbn), so these 2 word are the same
-            # maybe should mark these on DB somehow!!!
-            raise Exception("Invalid work-id '%s' triggered a forward-request to a new work-id %s " % (ori_wid, wid))
+        requested_wid = response.meta['wid']
+        dup_id = None
+        # when work has duplicate id, must be able to link it to "master" (eg. work=17829 and work=13001031)
+        if wid != requested_wid:
+            dup_id = requested_wid
 
         work_index = response.meta['work-index']
         db_info = self.works_to_harvest[work_index]
@@ -127,6 +126,7 @@ class LibraryThingWorkReview(BaseReviewSpider):
                                        formdata=prepare_form(wid, marc_code, nb_in_site, nb_in_db),
                                        callback=self.parse_reviews)
                 r.meta['wid'] = wid
+                r.meta['duplicate_wid'] = dup_id
                 yield r
 
     def parse_reviews(self, response):
@@ -148,6 +148,7 @@ class LibraryThingWorkReview(BaseReviewSpider):
 
             item = self.build_review_item()
             item['work_uid'] = response.meta['wid']
+            item['dup_uid'] = response.meta['duplicate_wid']
             item['username'] = username[username.rindex('/') + 1:]
             item['rating'] = rating
             item['review'] = rtext

@@ -80,16 +80,18 @@ def get_all_files(repdir, pattern, recursively):
     return files
 
 
-def get_column_headers(file_with_header):
+def get_column_headers(file_with_header, separator):
     """
-    Read the column headers from specified text file
+    Read the column headers from specified file
     (by default scrapy exports fields in any order, i.e. dict-like)
     :param file_with_header:
-    :return: string of column headers with correct order
+    :return: list of column header in same order as in file
     """
-    with open(file_with_header, 'r') as f:
-        h = f.readline().split("|")
-    return ",".join(h).strip()
+
+    f = file_with_header.open('r')
+    h = f.readline().split(separator)
+    f.close()
+    return h
 
 
 

@@ -28,11 +28,6 @@ elapse_days = 5
 
 
 
-def get_default_begin_date():
-    # default begin_date used for initial loading
-    return brd.resolve_date_text(begin_default_date)
-
-
 def fetch_work(site_logical_name, harvested, nb_work):
     """
     Fetch info related to nb_work work-ids either harvested or not
@@ -164,85 +159,9 @@ def fetch_work(site_logical_name, harvested, nb_work):
 #     batch = Batch("Harvest works from %s" % spidername
 #
 #
-#
-#     # end_period is useful to avoid harvesting too recent reviews
-#     end_period = get_end_period()
-#     # still need a default begin_period for pipeline filtering to work
-#     begin_period = get_default_begin_date()
-#     period = (begin_period, end_period)
-#
-#
-#     batch = BatchProcessor(batch_name, period)
-#     last_step_run, status = batch.get_last_audit_steps()
-#
-#     # Start new Batch when last step completed or pre-requisite failed
-#     if status is EltStepStatus.COMPLETED or last_step_run == -1:
-#         # Process Work never harvested
-#         mode = 'initial'
-#         workids_to_harvest = fetch_work(spidername, harvested=False, nb_work=nb_work)
-#         # Otherwise, process Work already harvested
-#         if len(workids_to_harvest) == 0:
-#             mode = 'incremental'
-#             workids_to_harvest = fetch_work(spidername, harvested=True, nb_work=nb_work)
-#
-#         step = Step("Fetch work ")
-#
-#
-#     prerequisite_step = Step
-#
-#     batch = BatchProcessor(batch_name, period)
-#
-#
-#     batch.add_step(Step(name=get_dump_filename(spidername, period),
-#                         sql_or_callable=_harvest_reviews,
-#                         named_params={'spidername': spidername,
-#                                       'workids_list': workids_to_harvest,
-#                                       'period': period}))
-#
-#     batch.add_step(Step(name="Bulk load " % "the file that just got dumped previouslY with the right id",
-#                         sql_or_callable=_bulkload_file,
-#                         named_params={'filepath': "tobegiven"}))
-#
-#
-#
-#     # stage file so we can update stat in work_site_mapping...
-#
-#     stage_audit_id, nb_rec = _bulkload_file(dump_filename, 'staging.review', archive_file=True)
-#
-#     if nb_rec > 0:
-#         # THIS DOES NOT WORK AS ONLY WORK HAVING REVIEWS WILL BE UDPATED WITH LAST_HARVEST_DATE
-#         _update_harvest_date(audit_id)
-#         elt.get_connection().commit()
-#
 
 
 
-
-def bulkload_review_files(filepattern, remove_files=False, first_truncate_staging=False):
-    """
-    NOT USED ANYMORE
-    Could be used in future to do batch load a bunch of harvested files
-    Bulk loads Reviews*.dat files into staging DB. By default, load all files
-    otherwise only the ones corresponding to period specified.
-    Commit is done after each file loaded
-    :param period: 'd-m-yyyy_d-m-yyyy'
-    :return: (nb of files treated, nb of files with error)
-    """
-    if first_truncate_staging:
-        elt.truncate_table({'schema': 'staging', 'table': 'review'}, True)
-
-    n_treated, n_error = 0, 0
-    for datfile in brd.get_all_files(config.SCRAPED_OUTPUT_DIR, filepattern, True):
-        file_begin, file_end = brd.resolve_period_text(datfile[datfile.index('_') + 1: datfile.rindex(config.REVIEW_EXT)])
-        if period is None or (file_begin >= begin_period and file_end <= end_period):
-            n = elt.bulkload_file(datfile, 'staging.review', get_column_headers(datfile), (file_begin, file_end))
-            if n[1] == -1:
-                n_error += 1
-            else:
-                n_treated += 1
-                archivefile = treat_loaded_file(datfile, remove_files, config.SCRAPED_ARCHIVE_DIR)
-            print("Finished bulkloading review file '%s', file was archived to '%s'" % (datfile, archivefile))
-    return (n_treated, n_error)
 
 
 def _bulkload_file(filepath, schematable, archive_file=True):
@@ -396,40 +315,5 @@ def insert_into_book():
 
 
 
-def insert_into_book_site_review():
-    sql = \
-        """
-        insert into integration.book_site_review(book_id, site_id, book_uid, title_text, create_dts, load_audit_id)
-        select distinct
-            integration.derive_bookid( integration.get_sform(r.book_title),
-                                       r.book_lang,
-                                       integration.standardize_authorname(r.author_fname, r.author_lname) ) as bookid
-            , s.id
-            , r.book_uid
-            , r.book_title
-            , now()
-            , %(audit_id)s
-        from staging.review r
-        join integration.site s on (r.site_logical_name = s.logical_name)
-        where
-        NOT EXISTS (    select bsr.book_id
-                        from integration.book_site_review bsr
-                        where bsr.site_id = s.id
-                        and bsr.book_id = integration.derive_bookid( integration.get_sform(r.book_title),
-                                                                     r.book_lang,
-                                                                     integration.standardize_authorname(r.author_fname, r.author_lname) )
-                    );
-        """
-
-
-def insert_into_review_rejected():
-    sql = \
-        """
-        insert into staging.review_rejected
-        select *
-        from staging.review r
-        left join integration.book b on (r.derived_book_id = b.id)
-        where b.id is null;
-        """
 
 

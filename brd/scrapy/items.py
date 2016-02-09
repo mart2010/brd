@@ -9,13 +9,13 @@ from scrapy import Item, Field
 
 
 class ReviewItem(Item):
-    """Item names must match staging.review column names
-    (export stmt is constructed automatically based on that)
+    """Item names must match staging.review column names (not anymore)
     """
     site_logical_name   = Field()
     username            = Field()
     user_uid            = Field()
     work_uid            = Field()
+    dup_uid             = Field()
     rating              = Field()
     parsed_rating       = Field()
     review              = Field()
