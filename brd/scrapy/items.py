@@ -14,14 +14,18 @@ class ReviewItem(Item):
     site_logical_name   = Field()
     username            = Field()
     user_uid            = Field()
+    rating              = Field()
+    review              = Field()
+    review_date         = Field()
+    review_lang         = Field()
+    likes               = Field()
     work_uid            = Field()
     dup_uid             = Field()
-    rating              = Field()
     parsed_rating       = Field()
-    review              = Field()
-    likes               = Field()
-    review_date         = Field()
+    book_title          = Field()
+    book_author         = Field()
     parsed_review_date  = Field()
+    parsed_rating       = Field()
 
 
 class WorkItem(Item):

@@ -55,10 +55,12 @@ class MyBasePostgresTask(luigi.Task):
 
     def run(self):
         connection = self.output().connect()
+        cursor = connection.cursor()
 
         # decorate with audit-log stuff
         self.audit_id, self.run_dts = brd.elt.insert_auditing(batch_name, self.task_id)
-        self.rowscount = self.exec_sql(connection, self.audit_id)
+        self.rowscount = self.exec_sql(cursor, self.audit_id)
+        cursor.close()
 
         # mark as complete in same transaction (checkpoint)
         self.output().touch(connection)
@@ -74,10 +76,8 @@ class MyBasePostgresTask(luigi.Task):
         brd.elt.update_auditing(self.audit_id, brd.elt.EltStepStatus.FAILED,
                                 run_dts=self.run_dts, output=str(exception))
 
-    def exec_sql(self, connection, audit_id):
+    def exec_sql(self, cursor, audit_id):
         raise NotImplementedError
-
-
 
 
 class MyBaseBulkLoadTask(luigi.postgres.CopyToTable):
@@ -97,16 +97,33 @@ class MyBaseBulkLoadTask(luigi.postgres.CopyToTable):
     # default separator
     column_separator = '|'
 
+    # container of values inserted as NULL values (MO added empty string)
+    null_values = (None, "")
+
     # added to manage col headers
     input_has_headers = False
 
     def requires(self):
         raise NotImplementedError
 
+    def __init__(self, *args, **kwargs):
+        super(MyBaseBulkLoadTask, self).__init__(*args, **kwargs)
+        self.run_dts = None
+        self.audit_id = None
+        self.rowscount = None
+
     def run(self):
-        if self.input_has_headers:
-            with self.input().open('r') as fobj:
+
+        # if file not empty, read 1st line (header)
+        header = None
+        with self.input().open('r') as fobj:
+            try:
                 header = fobj.next()
+            # avoid executing downstream Task for empty file
+            except StopIteration, e:
+                raise ImportError("File empty, task %s is stopped" % self.task_id)
+
+        if self.input_has_headers and header:
             self.columns = header.strip('\n').split(self.column_separator)
 
         # decorate with audit-log stuff
@@ -135,11 +152,12 @@ class MyBaseBulkLoadTask(luigi.postgres.CopyToTable):
         Execute copy_expert
         :return rowcount impacted
         """
+        #  NULL '%s' : I now leave default NULL (empty and \N as luigi generated tmp file does not produce the \\N correctly)
         sql = \
             """
             copy %s( %s )
-            from STDIN with csv HEADER DELIMITER '%s' NULL '\\N';
-            """ % (self.table, ",".join(self.columns), self.column_separator)
+            from STDIN with csv HEADER DELIMITER '%s'; """ \
+            % (self.table, ",".join(self.columns), self.column_separator)
 
         cursor.copy_expert(sql, infile, size=8192)
         return cursor.rowcount
@@ -185,7 +203,7 @@ class LoadWorkRef(MyBasePostgresTask):
     def requires(self):
         return BulkLoadThingISBN(self.thingisbn_filename)
 
-    def exec_sql(self, connection, audit_id):
+    def exec_sql(self, cursor, audit_id):
         sql = \
             """
             insert into integration.work(uid, create_dts, load_audit_id)
@@ -194,7 +212,8 @@ class LoadWorkRef(MyBasePostgresTask):
             left join integration.work w on s.work_uid = w.uid
             where w.uid is null;
             """
-        return brd.elt.execute_and_get_rowcount(connection, sql, {'audit_id': audit_id})
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
 
 
 class LoadIsbnRef(MyBasePostgresTask):
@@ -204,7 +223,7 @@ class LoadIsbnRef(MyBasePostgresTask):
     def requires(self):
         return BulkLoadThingISBN(self.thingisbn_filename)
 
-    def exec_sql(self, connection, audit_id):
+    def exec_sql(self, cursor, audit_id):
         sql = \
             """
             insert into integration.isbn(ean, isbn13, isbn10, create_dts, load_audit_id)
@@ -213,7 +232,8 @@ class LoadIsbnRef(MyBasePostgresTask):
             left join integration.isbn i on cast(s.isbn13 as bigint) = i.ean
             where i.ean is null;
             """
-        return brd.elt.execute_and_get_rowcount(connection, sql, {'audit_id': audit_id})
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
 
 
 class LoadWorkIsbnRef(MyBasePostgresTask):
@@ -223,7 +243,7 @@ class LoadWorkIsbnRef(MyBasePostgresTask):
     def requires(self):
         return [LoadWorkRef(self.thingisbn_filename), LoadIsbnRef(self.thingisbn_filename)]
 
-    def exec_sql(self, connection, audit_id):
+    def exec_sql(self, cursor, audit_id):
         sql = \
             """
             insert into integration.work_isbn(ean, work_uid, source_site_id, create_dts, load_audit_id)
@@ -233,7 +253,8 @@ class LoadWorkIsbnRef(MyBasePostgresTask):
             left join integration.work_isbn i on (cast(s.isbn13 as bigint) = i.ean and s.work_uid = i.work_uid)
             where i.ean is null;
             """
-        return brd.elt.execute_and_get_rowcount(connection, sql, {'audit_id': audit_id})
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
 
 
 class LoadWorkSiteMappingRef(MyBasePostgresTask):
@@ -245,7 +266,7 @@ class LoadWorkSiteMappingRef(MyBasePostgresTask):
     def requires(self):
         return [LoadWorkRef(self.thingisbn_filename)]
 
-    def exec_sql(self, connection, audit_id):
+    def exec_sql(self, cursor, audit_id):
         sql = \
             """
             insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, create_dts, load_audit_id)
@@ -257,8 +278,8 @@ class LoadWorkSiteMappingRef(MyBasePostgresTask):
             left join integration.work_site_mapping m on (work.uid_text = m.work_ori_id and m.site_id = work.site_id)
             where m.work_ori_id IS NULL;
             """
-        return brd.elt.execute_and_get_rowcount(connection, sql, {'logical_name': self.site_logical_name,
-                                                                  'audit_id': audit_id})
+        cursor.execute(sql, {'audit_id': audit_id, 'logical_name': self.site_logical_name})
+        return cursor.rowcount
 
 
 class BatchLoadWorkReference(luigi.Task):
@@ -334,7 +355,7 @@ class UpdateLastHarvestDate(MyBasePostgresTask):
         return {'wids': FetchWorkids(self.spidername, self.n_work, self.harvest_dts),
                 'harvest': HarvestReviews(self.spidername, self.n_work, self.harvest_dts)}
 
-    def exec_sql(self, connection, audit_id):
+    def exec_sql(self, cursor, audit_id):
         with self.input()['wids'].open('r') as f:
             wids = tuple(parse_wids_file(f, True))
 
@@ -346,10 +367,8 @@ class UpdateLastHarvestDate(MyBasePostgresTask):
             site_id = (select id from integration.site where logical_name = %(name)s)
             and work_ori_id IN %(w_ids)s;
             """
-        return brd.elt.execute_and_get_rowcount(connection,
-                                                sql, {'end': self.harvest_dts,
-                                                      'name': self.spidername,
-                                                      'w_ids': wids})
+        cursor.execute(sql, {'end': self.harvest_dts, 'name': self.spidername, 'w_ids': wids})
+        return cursor.rowcount
 
 
 class BulkLoadReviews(MyBaseBulkLoadTask):
@@ -359,11 +378,50 @@ class BulkLoadReviews(MyBaseBulkLoadTask):
 
     input_has_headers = True
     table = 'staging.REVIEW'
-    # use my hack instead to guarantee the right column order
-    # columns = ["username","rating","user_uid","parsed_review_date","review_date","work_uid","review","parsed_rating","site_logical_name","likes"]
 
     def requires(self):
         return HarvestReviews(self.spidername, self.n_work, self.harvest_dts)
+
+
+class LoadUsers(MyBasePostgresTask):
+    spidername = luigi.Parameter()
+    n_work = luigi.IntParameter()
+    harvest_dts = DateSecondParameter()
+
+    table = 'integration.USER'
+
+    def requires(self):
+        return BulkLoadReviews(self.spidername, self.n_work, self.harvest_dts)
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            with new_rows as (
+                select distinct integration.derive_userid(user_uid, %(spidername)s) as id
+                    , user_uid
+                    , (select id from integration.site where logical_name = %(spidername)s) as site_id
+                    , username
+                    , now() as last_seen_date
+                    , now() as create_dts
+                    , %(audit_id)s as audit_id
+                from staging.review
+                where site_logical_name = %(spidername)s
+            ),
+            match_user as (
+                update integration.user u set last_seen_date = new_rows.last_seen_date
+                from new_rows
+                where u.id = new_rows.id
+                returning u.*
+            )
+            insert into integration.user(id, user_uid, site_id, username, last_seen_date, create_dts, load_audit_id)
+            select id, user_uid, site_id, username, last_seen_date, create_dts, audit_id
+            from new_rows
+            where not exists (select 1 from match_user where match_user.id = new_rows.id);
+            """
+        cursor.execute(sql, {'audit_id': audit_id, 'spidername': self.spidername})
+        r = cursor.rowcount
+        print "check this should return two counts .. update and insert: " + str(r)
+        return r
 
 
 class LoadReviews(MyBasePostgresTask):
@@ -373,40 +431,54 @@ class LoadReviews(MyBasePostgresTask):
     table = 'integration.REVIEW'
 
     def requires(self):
-        return BulkLoadReviews(self.spidername, self.n_work, self.harvest_dts)
+        return LoadUsers(self.spidername, self.n_work, self.harvest_dts)
 
-    def exec_sql(self, connection, audit_id):
+    def exec_sql(self, cursor, audit_id):
         sql = \
             """
             insert into integration.review
-             (work_uid, user_id, site_id, lang_code, rating, review, review_date, create_dts, load_audit_id)
-                select
-                    integration.derive_bookid( integration.get_sform(r.book_title),
-                        r.book_lang,
-                        integration.standardize_authorname(r.author_fname, r.author_lname) ) as bookid
-                        , integration.derive_reviewerid( r.username, r.site_logical_name ) as reviewerid
-                        , r.parsed_review_date
-                        , r.review_rating
-                        , now()
-                        , %(audit_id)s
+                (work_uid, user_id, site_id, rating, review, review_date, review_lang, create_dts, load_audit_id)
+                select  m.ref_uid
+                    , integration.derive_userid(r.user_uid, %(spidername)s) as user_id
+                    , s.id as site_id
+                    , r.rating
+                    , r.review
+                    , r.parsed_review_date
+                    , r.review_lang
+                    , now()
+                    , %(audit_id)s
                 from staging.review r
+                join integration.site s on (r.site_logical_name = s.logical_name and s.logical_name = %(spidername)s)
+                join integration.work_site_mapping m on (r.work_uid = m.work_ori_id and m.site_id = s.id)
             """
-        return brd.elt.execute_and_get_rowcount(connection, sql,
-                                                {'logical_name': self.site_logical_name,
-                                                 'audit_id': audit_id})
-
+        cursor.execute(sql, {'audit_id': audit_id, 'spidername': self.spidername})
+        return cursor.rowcount
 
 
 class LoadWorkSameAs(MyBasePostgresTask):
+    """
+    Used only when loading reviews from lt, to flag same work
+    """
     spidername = luigi.Parameter()
     n_work = luigi.IntParameter()
     harvest_dts = DateSecondParameter()
     table = 'integration.WORK_SAMEAS'
 
+    def requires(self):
+        return BulkLoadReviews(self.spidername, self.n_work, self.harvest_dts)
 
-
-
-
+    def exec_sql(self, cursor, audit_id):
+        #TODO: fix the null issue and remove condition on empty string...
+        sql = \
+            """
+            insert into integration.work_sameas(work_uid, master_uid, create_dts, load_audit_id)
+            select distinct cast(dup_uid as bigint), cast(work_uid as bigint), now(), %(audit_id)s
+            from staging.review r
+            where site_logical_name = 'librarything'
+            and dup_uid is not null and dup_uid != '';
+            """
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
 
 
 
@@ -421,8 +493,11 @@ class BatchLoadReviews(luigi.Task):
     batch_name = "Batch: integrate reviews"  # for auditing
 
     def requires(self):
-        return [HarvestReviews(self.spidername, self.n_work, self.harvest_dts),
-                UpdateLastHarvestDate(self.spidername, self.n_work, self.harvest_dts)]
+        requirements = [LoadReviews(self.spidername, self.n_work, self.harvest_dts),
+                        UpdateLastHarvestDate(self.spidername, self.n_work, self.harvest_dts)]
+        if self.spidername == 'librarything':
+            requirements.append(LoadWorkSameAs(self.spidername, self.n_work, self.harvest_dts))
+        return requirements
 
 
 def parse_wids_file(wf, only_ids=False):

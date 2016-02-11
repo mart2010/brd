@@ -121,15 +121,6 @@ def insert_row_get_id(connection, insert, params=None):
             return curs.fetchone()[0]
 
 
-def execute_and_get_rowcount(connection, sql, params=None):
-    """
-    Execute sql statement while leaving open the transaction.
-    :return rowcount impacted
-    """
-    with connection.cursor() as curs:
-        curs.execute(sql, params)
-        return curs.rowcount
-
 
 
 # Singleton Dbconnection on default database

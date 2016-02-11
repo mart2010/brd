@@ -32,8 +32,9 @@ class BaseReviewSpider(scrapy.Spider):
         # descending order is the default
         self.works_to_harvest = kwargs.get('works_to_harvest', {})
 
-    def build_review_item(self):
-        return ReviewItem(site_logical_name=self.name)
+    def build_review_item(self, **kwargs):
+        item = ReviewItem(site_logical_name=self.name, **kwargs)
+        return item
 
     def get_dump_filepath(self):
         return self.dump_filepath
@@ -125,8 +126,9 @@ class LibraryThingWorkReview(BaseReviewSpider):
                 r = scrapy.FormRequest(self.url_formRequest,
                                        formdata=prepare_form(wid, marc_code, nb_in_site, nb_in_db),
                                        callback=self.parse_reviews)
-                r.meta['wid'] = wid
-                r.meta['duplicate_wid'] = dup_id
+
+                item = self.build_review_item(work_uid=wid, dup_uid=dup_id, review_lang=marc_code)
+                r.meta['passed_item'] = item
                 yield r
 
     def parse_reviews(self, response):
@@ -146,10 +148,10 @@ class LibraryThingWorkReview(BaseReviewSpider):
             rdate = sel2.xpath('./text()').extract()[0]  # gives :   |  Nov 22, 2012  |
             rawdate = rdate[rdate.index('|') + 1:rdate.rindex('|')].strip()
 
-            item = self.build_review_item()
-            item['work_uid'] = response.meta['wid']
-            item['dup_uid'] = response.meta['duplicate_wid']
+            item = response.meta['passed_item']
             item['username'] = username[username.rindex('/') + 1:]
+            # for lt, both username and userid are the same
+            item['user_uid'] = item['username']
             item['rating'] = rating
             item['review'] = rtext
             item['review_date'] = rawdate
