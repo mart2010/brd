@@ -2,7 +2,9 @@
 import datetime
 import uuid
 import psycopg2
+import psycopg2.extras
 import brd.config as config
+
 
 __author__ = 'mouellet'
 
@@ -72,24 +74,35 @@ class DbConnection(object):
             one_row = curs.fetchone()
         return one_row
 
-    def fetch_all_inTransaction(self, query, params=None):
+    def fetch_all_inTransaction(self, query, params=None, as_dict=False):
         """
-        Execute query, fetch all records into a list and return it as a single transaction.
+        Execute query, fetch all records into a list and return as list of tuples
+        or as dictionary when as_dict=True (in a single transaction)
+
         """
         with self.connection as c:
-            with c.cursor() as curs:
-                curs.execute(query, params)
-                result = curs.fetchall()
-                return result
-
-    def fetch_all(self, query, params=None):
-        """
-        Execute query, return all records as a list of tuple (or None) while leaving open the transaction.
-        """
-        with self.connection.cursor() as curs:
-            curs.execute(query, params)
-            result = curs.fetchall()
+            if as_dict:
+                cur = c.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            else:
+                cur = c.cursor()
+            cur.execute(query, params)
+            result = cur.fetchall()
+            cur.close()
             return result
+
+    def fetch_all(self, query, params=None, as_dict=False):
+        """
+        Execute query, return all records as a list of tuple (or as dictionary)
+        while leaving open the transaction.
+        """
+        if as_dict:
+            cur = self.connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        else:
+            cur = self.connection.cursor()
+        cur.execute(query, params)
+        result = cur.fetchall()
+        cur.close()
+        return result
 
     def commit(self):
         self.connection.commit()

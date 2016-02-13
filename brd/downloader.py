@@ -79,10 +79,11 @@ def uncompress_file(filepath):
         return filepath
 
 
-def convert_to_csv_and_filter(xml_pathfile, audit_id, max_nb_line=-1):
-    """, ,
+def convert_to_csv_and_filter(xml_pathfile, max_nb_line=-1):
+    """
     Read xml file, filter isbn with attribute uncertain="true" and add
-    associated work-id, isbn13, isbn10 fields.  Convert output to csv with '|' separator.
+    associated work-id, isbn13 and isbn10 fields.
+    Convert output to csv with '|' separator.
 
     :param max_nbwork: max number of work_uid to convert
     :return: number of line written to file
@@ -112,7 +113,7 @@ def convert_to_csv_and_filter(xml_pathfile, audit_id, max_nb_line=-1):
         n += 1
         if max_nb_line != -1 and n >= max_nb_line:
             break
-        f.write("%s|%s|%s|%s|%s\n" % (l[0], l[1], l[2], l[3], str(audit_id)))
+        f.write("%s|%s|%s|%s\n" % (l[0], l[1], l[2], l[3]))
     f.close()
     return n
 

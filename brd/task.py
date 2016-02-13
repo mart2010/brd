@@ -152,7 +152,7 @@ class MyBaseBulkLoadTask(luigi.postgres.CopyToTable):
         Execute copy_expert
         :return rowcount impacted
         """
-        #  NULL '%s' : I now leave default NULL (empty and \N as luigi generated tmp file does not produce the \\N correctly)
+        # NULL '%s':now leave default NULL (empty and \N as luigi generated tmp file does not produce the \\N correctly)
         sql = \
             """
             copy %s( %s )
@@ -189,11 +189,15 @@ class BulkLoadThingISBN(MyBaseBulkLoadTask):
     """
     thingisbn_filename = luigi.Parameter()
     table = 'staging.THINGISBN'
-    columns = ["WORK_UID", "ISBN_ORI", "ISBN10", "ISBN13", "LOAD_AUDIT_ID"]
+    columns = ["WORK_UID", "ISBN_ORI", "ISBN10", "ISBN13"]
 
     def requires(self):
         fullpath_name = os.path.join(brd.config.REF_DATA_DIR, self.thingisbn_filename)
         return DownLoadThingISBN(fullpath_name)
+
+    def init_copy(self, connection):
+        # clear staging thingisbn before!
+        connection.cursor().execute('truncate table %s;' % self.table)
 
 
 class LoadWorkRef(MyBasePostgresTask):
@@ -235,7 +239,7 @@ class LoadIsbnRef(MyBasePostgresTask):
         cursor.execute(sql, {'audit_id': audit_id})
         return cursor.rowcount
 
-
+# TODO: what about possible deletion of work_uid/isbn (relevant also for work and isbn table)
 class LoadWorkIsbnRef(MyBasePostgresTask):
     thingisbn_filename = luigi.Parameter()
     table = 'integration.work_isbn'
@@ -257,57 +261,30 @@ class LoadWorkIsbnRef(MyBasePostgresTask):
         return cursor.rowcount
 
 
-class LoadWorkSiteMappingRef(MyBasePostgresTask):
-    thingisbn_filename = luigi.Parameter()
-    site_logical_name = luigi.Parameter(default='librarything')
-
-    table = 'integration.work_site_mapping'
-
-    def requires(self):
-        return [LoadWorkRef(self.thingisbn_filename)]
-
-    def exec_sql(self, cursor, audit_id):
-        sql = \
-            """
-            insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, create_dts, load_audit_id)
-            select work.uid, integration.derive_other_work_id(work.uid::text,%(logical_name)s)
-                    , work.site_id, work.uid_text, now(), %(audit_id)s
-            from
-            (select uid, uid::text as uid_text, (select id from integration.site where logical_name = %(logical_name)s) as site_id
-            from integration.work) as work
-            left join integration.work_site_mapping m on (work.uid_text = m.work_ori_id and m.site_id = work.site_id)
-            where m.work_ori_id IS NULL;
-            """
-        cursor.execute(sql, {'audit_id': audit_id, 'logical_name': self.site_logical_name})
-        return cursor.rowcount
-
-
-class BatchLoadWorkReference(luigi.Task):
+class BatchLoadWorkRef(luigi.Task):
     """
-    Entry point to launch all loads related to 'thingisbn.csv' filen
+    Entry point to launch loads related to 'thingisbn.csv' reference file
     """
-    thingisbn_filename = luigi.Parameter(default='thingISBN_10000_26-1-2016.csv')
+    thingisbn_filename = luigi.Parameter(default='thingISBN.csv')
 
     global batch_name
-    batch_name = "Batch: reference thingisbn"  # for auditing
+    batch_name = "Ref thingisbn"  # for auditing
 
     def requires(self):
-        return [LoadWorkIsbnRef(self.thingisbn_filename), LoadWorkSiteMappingRef(self.thingisbn_filename)]
+        return [LoadWorkIsbnRef(self.thingisbn_filename)]
 
 
-class FetchWorkids(luigi.Task):
-    spidername = luigi.Parameter()
+class FetchLtWorkids(luigi.Task):
     n_work = luigi.IntParameter()
     harvest_dts = DateSecondParameter()
 
     def output(self):
-        wids_filepath = '/tmp/wids_%s_%s.txt' % (self.spidername,
-                                                 self.harvest_dts.strftime(DateSecondParameter.date_format))
+        wids_filepath = '/tmp/ltwids_%s.txt' % (self.harvest_dts.strftime(DateSecondParameter.date_format))
         return luigi.LocalTarget(wids_filepath)
 
     def run(self):
         f = self.output().open('w')
-        for wid in brd.service.fetch_work(self.spidername, harvested=False, nb_work=self.n_work):
+        for wid in brd.service.fetch_work_list(self.spidername, harvested=False, nb_work=self.n_work):
             json.dump(wid, f)
             f.write('\n')
         f.close()
@@ -326,7 +303,7 @@ class HarvestReviews(luigi.Task):
         self.dump_filepath = os.path.join(brd.config.SCRAPED_OUTPUT_DIR, filename)
 
     def requires(self):
-        return FetchWorkids(self.spidername, self.n_work, self.harvest_dts)
+        return FetchLtWorkids(self.spidername, self.n_work, self.harvest_dts)
 
     def output(self):
         from luigi import format
@@ -343,32 +320,6 @@ class HarvestReviews(luigi.Task):
 
         print("Harvest of %d works/review completed with spider %s (dump file: '%s')"
               % (len(workids_list), self.spidername, self.dump_filepath))
-
-
-class UpdateLastHarvestDate(MyBasePostgresTask):
-    spidername = luigi.Parameter()
-    n_work = luigi.IntParameter()
-    harvest_dts = DateSecondParameter()
-    table = 'integration.WORK_SITE_MAPPING'
-
-    def requires(self):
-        return {'wids': FetchWorkids(self.spidername, self.n_work, self.harvest_dts),
-                'harvest': HarvestReviews(self.spidername, self.n_work, self.harvest_dts)}
-
-    def exec_sql(self, cursor, audit_id):
-        with self.input()['wids'].open('r') as f:
-            wids = tuple(parse_wids_file(f, True))
-
-        sql = \
-            """
-            update integration.work_site_mapping
-            set last_harvest_dts = %(end)s
-            where
-            site_id = (select id from integration.site where logical_name = %(name)s)
-            and work_ori_id IN %(w_ids)s;
-            """
-        cursor.execute(sql, {'end': self.harvest_dts, 'name': self.spidername, 'w_ids': wids})
-        return cursor.rowcount
 
 
 class BulkLoadReviews(MyBaseBulkLoadTask):
@@ -457,7 +408,7 @@ class LoadReviews(MyBasePostgresTask):
 
 class LoadWorkSameAs(MyBasePostgresTask):
     """
-    Used only when loading reviews from lt, to flag same work
+    Used only when loading reviews from lt, to link same work together
     """
     spidername = luigi.Parameter()
     n_work = luigi.IntParameter()
@@ -468,18 +419,53 @@ class LoadWorkSameAs(MyBasePostgresTask):
         return BulkLoadReviews(self.spidername, self.n_work, self.harvest_dts)
 
     def exec_sql(self, cursor, audit_id):
-        #TODO: fix the null issue and remove condition on empty string...
         sql = \
             """
             insert into integration.work_sameas(work_uid, master_uid, create_dts, load_audit_id)
             select distinct cast(dup_uid as bigint), cast(work_uid as bigint), now(), %(audit_id)s
             from staging.review r
             where site_logical_name = 'librarything'
-            and dup_uid is not null and dup_uid != '';
+            and dup_uid is not null;
             """
         cursor.execute(sql, {'audit_id': audit_id})
         return cursor.rowcount
 
+
+class UpdateLtLastHarvest(MyBasePostgresTask):
+    """
+    Updates both work_uid and associated master work_uid (if any), so need to
+    make sure update work_sameas was processed!
+    """
+    n_work = luigi.IntParameter()
+    harvest_dts = DateSecondParameter()
+    table = 'integration.WORK'
+
+    def requires(self):
+        return {FetchLtWorkids('librarything', self.n_work, self.harvest_dts),
+                LoadWorkSameAs('librarything', self.n_work, self.harvest_dts)}
+
+    def exec_sql(self, cursor, audit_id):
+        with self.input().open('r') as f:
+            wids = tuple(parse_wids_file(f, True))
+        sql = \
+            """
+            with all_uid as (
+                select uid
+                from integration.work
+                where uid IN %(w_ids)s
+                union
+                select master_uid
+                from integration.work_sameas
+                where work_uid IN %(w_ids)s
+                and master_uid IS NOT NULL
+            )
+            update integration.work w
+            set last_harvest_dts = %(end)s
+            from integration.work w
+            join all_uid on all_uid.uid = w.uid;
+            """
+        cursor.execute(sql, {'end': self.harvest_dts, 'w_ids': wids})
+        return cursor.rowcount
 
 
 # python -m luigi --module brd.task BatchLoadReviews --spidername librarything --n-work 2 --harvest-dts 2016-01-31T190723 --local-scheduler
@@ -490,13 +476,14 @@ class BatchLoadReviews(luigi.Task):
     harvest_dts = DateSecondParameter(default=datetime.datetime.now())
 
     global batch_name
-    batch_name = "Batch: integrate reviews"  # for auditing
+    batch_name = "Reviews"  # for auditing
 
     def requires(self):
         requirements = [LoadReviews(self.spidername, self.n_work, self.harvest_dts),
-                        UpdateLastHarvestDate(self.spidername, self.n_work, self.harvest_dts)]
+                        UpdateOtherLastHarvestDate(self.spidername, self.n_work, self.harvest_dts)]
         if self.spidername == 'librarything':
-            requirements.append(LoadWorkSameAs(self.spidername, self.n_work, self.harvest_dts))
+            requirements.append(LoadReviews(self.spidername, self.n_work, self.harvest_dts),
+                                UpdateLtLastHarvest(self.n_work, self.harvest_dts))
         return requirements
 
 
@@ -505,8 +492,60 @@ def parse_wids_file(wf, only_ids=False):
     for line in wf:
         jw = json.loads(line)
         if only_ids:
-            list_wids.append(jw['work-ori-id'])
+            list_wids.append(jw['work_uid'])
         else:
             list_wids.append(jw)
     return list_wids
+
+
+
+
+# now Done during reviews...
+class LoadWorkSiteMapping(MyBasePostgresTask):
+    thingisbn_filename = luigi.Parameter()
+    site_logical_name = luigi.Parameter(default='librarything')
+
+    table = 'integration.work_site_mapping'
+
+    def requires(self):
+        return [LoadWorkRef(self.thingisbn_filename)]
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            insert into integration.work_site_mapping(ref_uid, work_id, site_id, work_ori_id, create_dts, load_audit_id)
+            select work.uid, integration.derive_other_work_id(work.uid::text,%(logical_name)s)
+                    , work.site_id, work.uid_text, now(), %(audit_id)s
+            from
+            (select uid, uid::text as uid_text, (select id from integration.site where logical_name = %(logical_name)s) as site_id
+            from integration.work) as work
+            left join integration.work_site_mapping m on (work.uid_text = m.work_ori_id and m.site_id = work.site_id)
+            where m.work_ori_id IS NULL;
+            """
+        cursor.execute(sql, {'audit_id': audit_id, 'logical_name': self.site_logical_name})
+        return cursor.rowcount
+
+
+class UpdateOtherLastHarvestDate(MyBasePostgresTask):
+    spidername = luigi.Parameter()
+    n_work = luigi.IntParameter()
+    harvest_dts = DateSecondParameter()
+    table = 'integration.WORK_SITE_MAPPING'
+
+    def requires(self):
+        return {FetchLtWorkids(self.spidername, self.n_work, self.harvest_dts)}
+
+    def exec_sql(self, cursor, audit_id):
+        with self.input().open('r') as f:
+            wids = tuple(parse_wids_file(f, True))
+        sql = \
+            """
+            update integration.work_site_mapping
+            set last_harvest_dts = %(end)s
+            where
+            site_id = (select id from integration.site where logical_name = %(name)s)
+            and work_ori_id IN %(w_ids)s;
+            """
+        cursor.execute(sql, {'end': self.harvest_dts, 'name': self.spidername, 'w_ids': wids})
+        return cursor.rowcount
 

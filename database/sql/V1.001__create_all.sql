@@ -41,9 +41,7 @@ create table staging.thingisbn (
     isbn_ori text,
     isbn13 char(13),
     isbn10 char(10),
-    loading_dts timestamp,
-    load_audit_id int
-    --foreign key (load_audit_id) references staging.load_audit(id)
+    loading_dts timestamp
 );
 
 comment on table staging.thingisbn is 'Data from thingISBN.xml to load occasionally to refresh reference work/isbn data';
@@ -113,7 +111,7 @@ create table staging.work_ref (
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table staging.work_ref is 'Stage reference <static> features harvested from work';
+comment on table staging.work_ref is 'Staging for reference <static> features harvested from work';
 
 
 create table staging.work_update (
@@ -126,7 +124,7 @@ create table staging.work_update (
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table staging.work_update is 'Stage evolving features harvested from work';
+comment on table staging.work_update is 'Staging for evolving features harvested from work';
 
 
 -------------------------------------- Integration layer -------------------------------------
@@ -194,6 +192,7 @@ comment on column integration.language.code2 is 'The ISO 639-1 alpha-2 code (sub
 
 create table integration.work (
     uid bigint primary key,
+    last_harvest_dts timestamp,
     create_dts timestamp,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
@@ -229,7 +228,7 @@ create table integration.work_sameas (
 );
 
 
-comment on table integration.work_sameas is 'Different work-uid may exist in lt for same "master" Work (spotted when harvest process gets forwarded to a different id)';
+comment on table integration.work_sameas is 'Different work_uid may exist in lt for same "master" Work (harvest request is forwarded to diff work-id)';
 comment on column integration.work_sameas.master_uid is 'The "master" work that work_uid refers to';
 
 
@@ -332,14 +331,13 @@ comment on table integration.work_author is 'Association between Work and its au
 ------------- Data from Reviews, tag, list harvested .... ---------------
 
 
--- to be inserted with new site and refreshed periodically
--- also updated by harvesting process to reflect last_harvest_date
+-- to be inserted ONLY by other site following harvesting activity
 create table integration.work_site_mapping(
     ref_uid bigint not null,
     work_id uuid not null,
     site_id int not null,
     work_ori_id text not null,
-    last_harvest_dts timestamp,
+    last_harvest_dts timestamp not null,
     book_title text,
     book_lang text,
     main_author text,
@@ -352,11 +350,11 @@ create table integration.work_site_mapping(
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table integration.work_site_mapping is 'Map between work ids of lt the one from other site harvested';
-comment on column integration.work_site_mapping.ref_uid is 'Reference id used by lt';
+comment on table integration.work_site_mapping is 'Map between work ids in lt and in other site';
+comment on column integration.work_site_mapping.ref_uid is 'Reference work uid used in lt';
 comment on column integration.work_site_mapping.work_id is 'Work-Id made unique throughout sites (MD5 of concatenation of: work_ori_id,site_logical_name)';
-comment on column integration.work_site_mapping.work_ori_id is 'Original id used by site in text format';
-comment on column integration.work_site_mapping.last_harvest_dts is 'Last time work was harvested, useful to schedule harvesting';
+comment on column integration.work_site_mapping.work_ori_id is 'Original id used in other site in text format';
+comment on column integration.work_site_mapping.last_harvest_dts is 'This is mandatory as we load mapping during harvesting for other site';
 comment on column integration.work_site_mapping.book_title is 'Book title, author, lang are for QA purposes (mapping between sites only done through isbn(s) lookup)';
 
 

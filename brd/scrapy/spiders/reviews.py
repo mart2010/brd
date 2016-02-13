@@ -22,10 +22,12 @@ class BaseReviewSpider(scrapy.Spider):
         Spiders do NOT manage any load logic, they're only concerned
         with harvesting review (delegating parsing/outputing to pipelines)
         1. dump_filepath:
-        2. works_to_harvest: contain work-ids (along with additional info) since mostl likely
-        not all work are harvested in one session:
-        [{'work-ori-id': x, 'last_harvest_date': y, 'nb_in_db': {'ENG': 12, 'FRE': 2, ..}}, ..]
-
+        2. works_to_harvest: contain work-ids (along with additional info):
+        [{'work_uid': x,
+        'last_harvest_dts': y,
+        'nb_in_db': {'ENG': 12, 'FRE': 2, ..},
+        'isbns': [x,y,..]}, {..}...]
+        n.b. certain keywords are spider specific (ex. isbns...)
         """
         super(BaseReviewSpider, self).__init__(**kwargs)
         self.dump_filepath = kwargs['dump_filepath']
@@ -82,7 +84,7 @@ class LibraryThingWorkReview(BaseReviewSpider):
 
     def start_requests(self):
         for i in xrange(len(self.works_to_harvest)):
-            wid = self.works_to_harvest[i]['work-ori-id']
+            wid = self.works_to_harvest[i]['work_uid']
             req = scrapy.Request(self.url_workreview % wid, callback=self.parse_nbreview)
             req.meta['work-index'] = i
             req.meta['wid'] = wid
@@ -116,7 +118,7 @@ class LibraryThingWorkReview(BaseReviewSpider):
         nb_db_dic = db_info.get('nb_in_db', {})
         nb_page_site = self.scrape_langs_nb(response)
         # now only need this for data integrity checks
-        last_harvest_date_db = db_info.get('last_harvest_date', None)
+        last_harvest_date_db = db_info.get('last_harvest_dts', None)
 
         for lang in nb_page_site:
             marc_code = brd.get_marc_code(lang, capital=False)
@@ -195,6 +197,36 @@ class LibraryThingWorkReview(BaseReviewSpider):
         if rating:
             parsed_rating = int(rating[rating.index('ss')+2:rating.index('.gif')])
         return parsed_rating
+
+
+
+class GoodreadsReview(BaseReviewSpider):
+    name = 'goodreads'
+    allowed_domains = ['www.goodreads.com']
+    ###########################
+    # Control setting
+    ###########################
+    url = 'https://www.goodreads.com/???%d'
+
+
+
+
+    def start_requests(self):
+
+        # works to harvest must include isbns
+        for wid in self.work_to_harvest:
+            isbns = wid['isbns']
+
+        wids_with_isbn = self.nb_work_to_scrape
+
+        yield scrapy.Request(self.url % self.ref_isbns, self.parse_response())
+
+
+    def parse_response(self, response):
+        resp_in_json = response.body
+        # to continue assuming we get a json response
+
+
 
 
 class CritiquesLibresReview(BaseReviewSpider):

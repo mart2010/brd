@@ -17,7 +17,7 @@ class TestLtReview(unittest.TestCase):
             end_period='1-1-2016',
             dump_filepath='dummy',
             reviews_order='asc',
-            works_to_harvest=[{'work-site-id': wid, 'last_harvest_date': None, 'nb_in_db': {}}])
+            works_to_harvest=[{'work-site-id': wid, 'last_harvest_dts': None, 'nb_in_db': {}}])
         return spider
 
 

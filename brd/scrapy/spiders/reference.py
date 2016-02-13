@@ -6,18 +6,13 @@ __author__ = 'mouellet'
 
 
 class WorkReference(scrapy.Spider):
-
     name = 'workreference'
     allowed_domains = ['www.librarything.com']
-
     ###########################
     # Control setting
     ###########################
     url_workdetail = 'https://www.librarything.com/work/%d/workdetails'
-
     nb_work_to_scrape = 1000
-    ##########################
-
     ###########################
     # Parse setting
     ###########################
@@ -68,8 +63,6 @@ class WorkReference(scrapy.Spider):
                     load_audit_id=8)
 
         yield item
-
-
 
 
 
