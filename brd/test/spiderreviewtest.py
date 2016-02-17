@@ -24,7 +24,7 @@ class TestLtReview(unittest.TestCase):
     def test_start_request(self):
         wid = '2371329'
         spider = self.mock_spider(wid)
-        req_gen = spider.start_requests()
+        req_gen = spider.start_requests
 
         r = req_gen.next()
         meta = r.meta

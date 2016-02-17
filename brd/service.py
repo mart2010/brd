@@ -43,9 +43,12 @@ def fetch_workwithisbn_not_harvested(site_logical_name, nb_work):
         )
         select ref.wid as work_uid, ref.isbn_list as isbns
         from ref
-        left join integration.work_site_mapping m on (m.ref_uid = ref.wid)
-        join integration.site s on (s.id = m.site_id and s.logical_name = %(name)s)
-        where m.last_harvest_dts IS NULL
+        left join
+            (select ref_uid, last_harvest_dts
+             from integration.work_site_mapping m
+             join integration.site s on (m.site_id = s.id and s.logical_name = %(name)s)
+            ) as mapped on (mapped.ref_uid = ref.wid)
+        where mapped.last_harvest_dts IS NULL
         limit %(nb)s
         """
     return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work, 'name': site_logical_name}, as_dict=True)

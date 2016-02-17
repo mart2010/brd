@@ -5,19 +5,6 @@ from scrapy import signals
 from scrapy.exporters import CsvItemExporter
 
 
-class ReviewParser(object):
-    """
-    This pipeline is responsible in parsing some raw fields (review_date, parsed_rating)
-    """
-
-    def process_item(self, item, spider):
-        # spider knows how to parse its date text, rating...
-        review_date = spider.parse_review_date(item['review_date'])
-        review_rating = spider.parse_rating(item['rating'])
-        item['parsed_review_date'] = review_date
-        item['parsed_rating'] = review_rating
-        return item
-
 
 class DumpToFile(object):
     """

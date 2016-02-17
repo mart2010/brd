@@ -9,7 +9,7 @@ from scrapy import Item, Field
 
 
 class ReviewItem(Item):
-    """Item names must match staging.review column names (not anymore)
+    """Item names must match staging.review column names
     """
     site_logical_name   = Field()
     username            = Field()
@@ -21,7 +21,7 @@ class ReviewItem(Item):
     likes               = Field()
     work_uid            = Field()
     dup_uid             = Field()
-    parsed_rating       = Field()
+    site_work_uid       = Field()
     book_title          = Field()
     book_author         = Field()
     parsed_review_date  = Field()

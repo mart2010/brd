@@ -19,9 +19,8 @@ COOKIES_ENABLED = False
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 
 ITEM_PIPELINES = {
-    'brd.scrapy.pipelines.ReviewParser': 100,
-    'brd.scrapy.pipelines.DumpToFile': 200
- }
+    'brd.scrapy.pipelines.DumpToFile': 100
+}
 
 
 

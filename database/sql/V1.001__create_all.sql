@@ -50,15 +50,16 @@ comment on table staging.thingisbn is 'Data from thingISBN.xml to load occasiona
 create table staging.review (
     id bigserial primary key,
     site_logical_name text not null,
-    username text not null,
+    username text,
     user_uid text,
     rating text,
     review text,
-    review_date text not null,
+    review_date text,
     review_lang char(3),
     likes text,
     work_uid text not null,
     dup_uid text,
+    site_work_uid text,
     book_title text,
     book_author text,
     parsed_review_date date,
@@ -69,11 +70,11 @@ create table staging.review (
 );
 
 comment on table staging.review is 'Review and/or Rating harvested from site';
-comment on column staging.review.work_uid is 'Unique identifier of the book (a piece of work) used by website';
+comment on column staging.review.work_uid is 'Unique identifier of the book (a piece of work) as used and referenced in lt';
+comment on column staging.review.dup_uid is 'Duplicate id associated to a unique "master" work_uid (used to spot duplicates existing in lt)'
+comment on column staging.review.other_work_uid is 'Work id used in other site, useful to map with lt''s work_uid during harvest';
 comment on column staging.review.parsed_review_date is 'Spider knows how to parse date from raw string';
 comment on column staging.review.likes is 'Nb of users having appreciated the review (concetp likes, or green flag). Implies incremental-update the review';
-comment on column staging.review.dup_uid is 'Duplicate id associated to a unique "master" work_uid (used to spot duplicates existing in lt)'
-
 
 
 create or replace view staging.handy_review as
