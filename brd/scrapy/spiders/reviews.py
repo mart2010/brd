@@ -38,7 +38,7 @@ class BaseReviewSpider(scrapy.Spider):
         super(BaseReviewSpider, self).__init__(**kwargs)
         self.dump_filepath = kwargs['dump_filepath']
         # descending order is the default
-        self.works_to_harvest = kwargs.get('works_to_harvest', {})
+        self.works_to_harvest = kwargs['works_to_harvest']
 
     def build_review_item(self, **kwargs):
         item = ReviewItem(site_logical_name=self.name, **kwargs)
@@ -92,9 +92,8 @@ class LibraryThingWorkReview(BaseReviewSpider):
     raw_date_format = '%b %d, %Y'
     ###########################
 
-    @property
     def start_requests(self):
-        for i in xrange(len(self.works_to_harvest)):
+        for i in range(len(self.works_to_harvest)):
             wid = self.works_to_harvest[i]['work_refid']
             req = scrapy.Request(self.url_workreview % wid, callback=self.parse_nbreview)
             req.meta['work-index'] = i
@@ -216,7 +215,7 @@ class GoodreadsReview(BaseReviewSpider):
     """
     name = 'goodreads'
     allowed_domains = ['www.goodreads.com']
-    ##################reload#########
+    ###########################
     # Control setting
     ###########################  1582099855
     url_search = 'https://www.goodreads.com/search?utf8=%E2%9C%93&query='
@@ -231,9 +230,8 @@ class GoodreadsReview(BaseReviewSpider):
     reviews_sel = '//div[starts-with(@id,"review_")]'
     raw_date_format = '%b %d, %Y'
 
-    @property
     def start_requests(self):
-        for i in xrange(len(self.works_to_harvest)):
+        for i in range(len(self.works_to_harvest)):
             isbns = self.works_to_harvest[i].get('isbns')
             # search by isbn is required first to map gr work-uid
             if isbns:
@@ -242,7 +240,7 @@ class GoodreadsReview(BaseReviewSpider):
                                      callback=self.parse_search_resp)
             else:
                 gr_work_id = self.works_to_harvest[i].get('work_uid')
-                assert(gr_work_id, 'Getting latest reviews requires gr work id')
+                assert(gr_work_id is not None, 'Getting incremental reviews requires gr work id')
                 yield scrapy.Request(self.url_review % (gr_work_id, 1),
                                      meta={'work_index': i},
                                      callback=self.parse_reviews)
@@ -261,9 +259,9 @@ class GoodreadsReview(BaseReviewSpider):
                                      meta={'work_index': widx, 'nb_try': nb_try},
                                      callback=self.parse_search_resp)
             else:
-                print("No work found for '%s' with isbns: %s" % (str(self.works_to_harvest[widx]['work_refid']), str(isbns)))
+                print("No work found for %s with isbns: %s" % (str(self.works_to_harvest[widx]['work_refid']), str(isbns)))
                 yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'])
-        # found it, map gr's id (cannot start harvesting, as reviews are ordered arbitrarily)
+        # found it, map gr's id but cannot start harvesting, as reviews are ordered arbitrarily
         else:
             url = response.url
             gr_work_id = url[url.index('/book/show/') + 11:]
@@ -389,7 +387,6 @@ class CritiquesLibresReview(BaseReviewSpider):
     xpath_reviewer_uid = './td[@class="texte"]/p[2]/a[starts-with(@href,"/i.php/vuser")]/@href'  # return: "/i.php/vuser/?uid=32wdqee2334"
     ###########################
 
-
     def init_max_nb_items(self, response):
         res = json.loads(response.body[1:-1])
         self.max_nb_items = int(res['total'])
@@ -468,9 +465,8 @@ class CritiquesLibresReview(BaseReviewSpider):
 
 class BabelioSpider(BaseReviewSpider):
     """
-    Babelio has no global list to easily crawl for total #ofReviews.  Best approach is to
-    use ISBN from persisted reviews and search reviews based on these.
-    As a consequence, only reviews from already persisted book are scraped from this site.
+    Babelio has no global list to easily crawl for total # of Reviews.  Best approach is to
+    search reviews based on ISBNs.
     """
     name = 'babelio'
     allowed_domains = ['www.babelio.com']
@@ -486,6 +482,8 @@ class BabelioSpider(BaseReviewSpider):
     def start_requests(self):
         pass
         # yield scrapy.Request(self.url_nb_reviews % (0, 2), callback=self.init_max_nb_items)
+
+
 
 
 class DecitreSpider(BaseReviewSpider):

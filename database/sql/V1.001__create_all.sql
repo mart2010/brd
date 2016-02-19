@@ -57,7 +57,7 @@ create table staging.review (
     review_date text,
     review_lang char(3),
     likes text,
-    work_refid text not null,
+    work_refid bigint not null,
     dup_refid text,
     work_uid text,
     book_title text,

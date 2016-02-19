@@ -36,7 +36,6 @@ class WorkReference(scrapy.Spider):
             yield scrapy.Request(self.url_workdetail % wid, callback=self.parse_work)
 
     def parse_work(self, response):
-
         wid = response.url[response.url.index('/work/') + 6: response.url.index('/workdetails')]
         title = response.xpath(self.xpath_title)
         ori_lang = response.xpath(self.xpath_ori_lang)
@@ -55,8 +54,5 @@ class WorkReference(scrapy.Spider):
         #TODO : the ddc_mds and lc_subjs
         item = WorkItem(work_refid=wid, title=title, original_lang=ori_lang, authors_name=authors_name,
                         authors_disamb_id=authors_id, lc_subjects=6, ddc_mds=7, load_audit_id=8)
-
         yield item
-
-
 

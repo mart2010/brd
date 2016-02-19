@@ -5,7 +5,7 @@ import fnmatch
 import os
 from os.path import isfile, join
 import config
-import brd.task as task
+import brd.taskref as task
 import brd.elt
 
 __author__ = 'mouellet'

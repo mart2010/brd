@@ -23,7 +23,7 @@ def treat_loaded_file(processed_filepath, remove, archive_dir):
         return archivefilepath
 
 
-def fetch_workwithisbn_not_harvested(site_logical_name, nb_work):
+def fetch_workIds_not_harvested(site_logical_name, nb_work):
     """
     Find work_refid and their isbns not yet harvested for site.
 
