@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from scrapy import Item
+from brd.scrapy.items import WorkItem
 
 __author__ = 'mouellet'
 
@@ -53,14 +53,8 @@ class WorkReference(scrapy.Spider):
             authors_id.append(sel_authors_href[i].extract()[8:])  # remove prefix of '/author/shaffermaryan'
 
         #TODO : the ddc_mds and lc_subjs
-        item = Item(work_uid=wid,
-                    title=title,
-                    original_lang=ori_lang,
-                    authors_name=authors_name,
-                    authors_disamb_id=authors_id,
-                    lc_subjects=6,
-                    ddc_mds=7,
-                    load_audit_id=8)
+        item = WorkItem(work_refid=wid, title=title, original_lang=ori_lang, authors_name=authors_name,
+                        authors_disamb_id=authors_id, lc_subjects=6, ddc_mds=7, load_audit_id=8)
 
         yield item
 

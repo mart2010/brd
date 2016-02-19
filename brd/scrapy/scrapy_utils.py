@@ -24,9 +24,6 @@ mois = {
 }
 
 
-
-
-
 compile_regex = re.compile(r"\s+")
 
 def convert_book_title_to_sform(title):
@@ -42,45 +39,6 @@ def convert_book_title_to_sform(title):
     """
     ctrim = title.strip().upper()
     return compile_regex.sub("-", ctrim)
-
-
-# should be moved to service
-def fetch_nbreviews(spider_name):
-    query = """select  book_uid
-                      ,count(one_review) as nb_reviews
-                from integration.reviews_persisted_lookup
-                where logical_name = %s
-                group by book_uid;
-             """
-
-    res = elt.get_ro_connection().fetch_all_inTransaction(query, (spider_name, ))
-
-    nbreviews_stored = {}
-    if res is not None:
-        for row in res:
-            nbreviews_stored[row[0]] = row[1]
-    return nbreviews_stored
-
-# should be moved to service
-def fetch_book_titles(scraper_name):
-    """
-    Fetch titles scrapped by other spiders but not for 'scraper_name'.
-    Useful for site scraping new reviews through search (ex. babelio where no global list exist)
-    :param scraper_name:
-    :return:
-    """
-    query = """
-        select max(title_text) as title_not_scraped
-        from integration.book_site_review b
-        where b.book_id not exists
-            (select c.*
-            from integration.book_site_review c
-            join integration.site s on (s.id = c.site_id)
-            where
-            s.logical_name = %s  --logical name of babelio
-            and c.book_id = b.book_id);
-    """
-    return elt.get_ro_connection().fetch_all_inTransaction(query, (scraper_name, ))
 
 
 def resolve_value(selector, xpath, expected=1):

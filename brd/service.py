@@ -25,62 +25,61 @@ def treat_loaded_file(processed_filepath, remove, archive_dir):
 
 def fetch_workwithisbn_not_harvested(site_logical_name, nb_work):
     """
-    Find work_uid and their isbns not yet harvested for site.
-    Use master work (when applicable) to reduce the risk of linking
-    reviews to duplicate work (unfortunately, this may still happen
-    when work was harvested before linkage done by lt)
+    Find work_refid and their isbns not yet harvested for site.
+
+    For lt, simply return the ids...
     :return:
     """
-    sql = \
+    sql_other = \
         """
         with ref as (
-            select coalesce(same.master_uid, w.uid) as wid, array_agg(i.isbn13) as isbn_list
+            select coalesce(same.master_refid, w.refid) as wid, array_agg(i.isbn10) as isbn_list
             from integration.work w
-            left join integration.work_sameas same on (w.uid = same.work_uid)
-            join integration.work_isbn wi on (wi.work_uid = w.uid)
+            left join integration.work_sameas same on (w.refid = same.work_refid)
+            join integration.work_isbn wi on (wi.work_refid = w.refid)
             join integration.isbn i on (i.ean = wi.ean)
             group by 1
         )
-        select ref.wid as work_uid, ref.isbn_list as isbns
+        select ref.wid as work_refid, ref.isbn_list as isbns
         from ref
         left join
-            (select ref_uid, last_harvest_dts
+            (select work_refid, last_harvest_dts
              from integration.work_site_mapping m
              join integration.site s on (m.site_id = s.id and s.logical_name = %(name)s)
-            ) as mapped on (mapped.ref_uid = ref.wid)
+            ) as mapped on (mapped.work_refid = ref.wid)
         where mapped.last_harvest_dts IS NULL
         limit %(nb)s
         """
-    return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work, 'name': site_logical_name}, as_dict=True)
 
-
-def fetch_ltwids_not_harvested(nb_work):
-    sql = \
+    sql_lt = \
         """
-        select work_ori_id as work_uid
+        select refid as work_refid
         from integration.work
         where
         last_harvest_dts IS NULL
         limit %(nb)s
         """
-    return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work})
+
+    if site_logical_name == 'librarything':
+        return elt.get_ro_connection().fetch_all(sql_lt, {'nb': nb_work}, as_dict=True)
+    else:
+        return elt.get_ro_connection().fetch_all(sql_other, {'nb': nb_work, 'name': site_logical_name}, as_dict=True)
 
 
 def fetch_ltwids_stat_harvested(nb_work):
     sql = \
         """
         with cnt_per_lang as (
-            select w.uid, w.last_harvest_dts, r.review_lang, count(1) as cnt
-            from integration.work w
-            left join integration.review r on (w.uid = r.work_uid)
-            where
-            w.last_harvest_dts IS NOT NULL
-            and r.site_id = (select id from integration.site where logical_name = 'librarything')
-            group by 1,2,3
+            select r.work_refid as work_refid, r.review_lang, count(1)
+            from integration.review r
+            join integration.site s on (s.id = r.site_id and s.logical_name = 'librarything')
+            group by 1,2
         )
-        select uid as work_uid, last_harvest_dts,
+        select w.refid, w.last_harvest_dts,
                 array_agg(review_lang) as langs, array_agg(cnt) as cnts
-        from cnt_per_lang
+        from work w
+        left join cnt_per_lang c on (w.refid = c.work_refid)
+        where w.last_harvest_dts IS NOT NULL
         group by 1,2
         order by 2 asc
         limit %(nb)s
@@ -88,14 +87,12 @@ def fetch_ltwids_stat_harvested(nb_work):
     return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work}, as_dict=True)
 
 
-
 def construct_dic(list_dic):
     """
     Construct the following list of dictionary (only work-id keyword mandatory) from tuple list
 
-
-    :param list_dic: [{'work_uid':, 'last_harvest_dts':, 'langs':[], 'cnts':[], 'isbns':[] } ]
-    :return: [  {'work_uid': w1,
+    :param list_dic: [{'work_refid':, 'last_harvest_dts':, 'langs':[], 'cnts':[], 'isbns':[] } ]
+    :return: [  {'work_refid': w1,
         'last_harvest_dts': d1,
         'nb_in_db': {'ENG': 12, 'FRE': 2, ..},
         'isbns': [ix,iy,..]
@@ -105,14 +102,14 @@ def construct_dic(list_dic):
     if list_dic is None or len(list_dic) == 0:
         return res
     for row in list_dic:
-        dic = {'work_uid': row['work_uid']}
+        dic = {'work_refid': row['work_refid']}
         if len(row) > 1:
             dic['last_harvest_dts'] = row.get('last_harvest_dts')
             dic['isbns'] = row.get('isbns')
             if row.get('nb_in_db') and len(row['nb_in_db']) > 0:
                 sub_dic = {}
                 for i in xrange(len(row['nb_in_db'])):
-                    sub_dic[row['nb_in_db'][i]] = row['cnts'][i]
+                    sub_dic[row['langs'][i]] = row['cnts'][i]
                 dic['nb_in_db'] = sub_dic
             else:
                 dic['nb_in_db'] = None
@@ -125,7 +122,7 @@ def fetch_ltwork_list(nb_work):
     """
     Fetch list of work but first looking at the ones not yet harvested, and if none is found then
      fetch already harvested (with additional stat):
-    :return list of dict {'work_uid': x, 'last_harvest_dts': y, 'nb_in_db': {'ENG': n1, 'FRE': n2, ..}}
+    :return list of dict {'work_refid': x, 'last_harvest_dts': y, 'nb_in_db': {'ENG': n1, 'FRE': n2, ..}}
     """
 
     list_of_wids = fetch_ltwids_not_harvested(nb_work)

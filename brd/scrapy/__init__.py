@@ -29,5 +29,6 @@ class SpiderProcessor(object):
         r = process.crawl(self.spidername, dump_filepath=self.dump_filepath, works_to_harvest=self.works_to_harvest)
         # blocks here until crawling is finished
         process.start()
-        return r
-        # return self.dump_filepath
+        # clean termination
+        process.stop()
+        return self.dump_filepath

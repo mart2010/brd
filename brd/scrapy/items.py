@@ -19,17 +19,16 @@ class ReviewItem(Item):
     review_date         = Field()
     review_lang         = Field()
     likes               = Field()
+    work_refid          = Field()
+    dup_refid           = Field()
     work_uid            = Field()
-    dup_uid             = Field()
-    site_work_uid       = Field()
     book_title          = Field()
     book_author         = Field()
     parsed_review_date  = Field()
     parsed_rating       = Field()
 
-
 class WorkItem(Item):
-    work_uid            = Field()
+    work_refid          = Field()
     title               = Field()
     original_lang       = Field()
     authors_name        = Field()

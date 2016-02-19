@@ -37,7 +37,7 @@ create or replace view staging.handy_load_audit as
 
 -- no primary key constraint since there are duplicates <work-id,isbn> in xml feed!
 create table staging.thingisbn (
-    work_uid bigint,
+    work_refid bigint,
     isbn_ori text,
     isbn13 char(13),
     isbn10 char(10),
@@ -57,9 +57,9 @@ create table staging.review (
     review_date text,
     review_lang char(3),
     likes text,
-    work_uid text not null,
-    dup_uid text,
-    site_work_uid text,
+    work_refid text not null,
+    dup_refid text,
+    work_uid text,
     book_title text,
     book_author text,
     parsed_review_date date,
@@ -70,23 +70,17 @@ create table staging.review (
 );
 
 comment on table staging.review is 'Review and/or Rating harvested from site';
-comment on column staging.review.work_uid is 'Unique identifier of the book (a piece of work) as used and referenced in lt';
-comment on column staging.review.dup_uid is 'Duplicate id associated to a unique "master" work_uid (used to spot duplicates existing in lt)'
-comment on column staging.review.other_work_uid is 'Work id used in other site, useful to map with lt''s work_uid during harvest';
+comment on column staging.review.work_refid is 'Unique identifier of the book (a piece of work) as referenced in lt';
+comment on column staging.review.dup_refid is 'Duplicate id associated to a unique "master" work_refid (duplicates exist in lt)';
+comment on column staging.review.work_uid is 'Work id used in other site; to map with lt''s work_refid during harvest';
 comment on column staging.review.parsed_review_date is 'Spider knows how to parse date from raw string';
 comment on column staging.review.likes is 'Nb of users having appreciated the review (concetp likes, or green flag). Implies incremental-update the review';
 
 
 create or replace view staging.handy_review as
-    select id, site_logical_name, username, user_uid, rating, work_uid, dup_uid, load_audit_id
+    select id, work_refid, dup_refid, work_uid, site_logical_name, username, user_uid, rating,  load_audit_id
     from staging.review order by 1;
 
-create table staging.rejected_review as
-            select * from staging.review
-            with no data
-;
-
-comment on table staging.rejected_review is 'Review record not loaded into integration layer (this was useful when only one spider could load new books... and the other MUST link to exsiting..)';
 
 
 
@@ -100,7 +94,7 @@ comment on table staging.rejected_review is 'Review record not loaded into integ
 -- taken from .../work/####/details (to get correct title) and ok since only 1 ISBN taken here: from <meta property="books.isbn" content="xxxxxxxx">
 
 create table staging.work_ref (
-    work_uid bigint unique,
+    work_refid bigint unique,
     title text,
     original_lang text,
     authors_name text[],
@@ -117,7 +111,7 @@ comment on table staging.work_ref is 'Staging for reference <static> features ha
 
 create table staging.work_update (
     id serial primary key,
-    work_uid bigint unique,
+    work_refid bigint unique,
     tags text[],
     tags_freq int[],
     popularity int,
@@ -192,7 +186,7 @@ comment on column integration.language.code2 is 'The ISO 639-1 alpha-2 code (sub
 --Batch loaded from ISBNthing source
 
 create table integration.work (
-    uid bigint primary key,
+    refid bigint primary key,
     last_harvest_dts timestamp,
     create_dts timestamp,
     load_audit_id int,
@@ -200,17 +194,16 @@ create table integration.work (
 );
 
 comment on table integration.work is 'Book as a single piece of work irrespective of translations, editions and title sourced from lt (taken as refernece master data)';
-comment on column integration.work.uid is 'Work identifer created, curated and managed by lt';
-
+comment on column integration.work.refid is 'Work identifer created, curated and managed by lt';
 
 create table integration.work_info (
-    work_uid bigint primary key,
+    work_refid bigint primary key,
     title text,
     original_lang char(3),
     update_dts timestamp,
     create_dts timestamp,
     load_audit_id int,
-    foreign key (work_uid) references integration.work(uid),
+    foreign key (work_refid) references integration.work(refid),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
@@ -218,20 +211,19 @@ comment on table integration.work_info is 'Attribute data related to a Work (unh
 
 
 create table integration.work_sameas (
-    work_uid bigint,
-    master_uid bigint,
+    work_refid bigint,
+    master_refid bigint,
     create_dts timestamp,
     load_audit_id int,
-    primary key (work_uid, master_uid),
-    foreign key (work_uid) references integration.work(uid),
-    foreign key (master_uid) references integration.work(uid),
+    primary key (work_refid, master_refid),
+    foreign key (work_refid) references integration.work(refid),
+    foreign key (master_refid) references integration.work(refid),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
 
-comment on table integration.work_sameas is 'Different work_uid may exist in lt for same "master" Work (harvest request is forwarded to diff work-id)';
-comment on column integration.work_sameas.master_uid is 'The "master" work that work_uid refers to';
-
+comment on table integration.work_sameas is 'Different work_refid may exist in lt for same "master" Work';
+comment on column integration.work_sameas.master_refid is 'The "master" work that work_refid refers to';
 
 
 create table integration.isbn (
@@ -278,13 +270,13 @@ comment on column integration.isbn_sameas.ean_same is 'Ean considered same as th
 
 
 create table integration.work_isbn (
-    work_uid bigint,
+    work_refid bigint,
     ean bigint,
     source_site_id int,
     create_dts timestamp,
     load_audit_id int,
-    primary key (work_uid, ean),
-    foreign key(work_uid) references integration.work(uid),
+    primary key (work_refid, ean),
+    foreign key(work_refid) references integration.work(refid),
     foreign key(ean) references integration.isbn(ean),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
@@ -313,12 +305,12 @@ comment on column integration.author.disamb_name is 'Unique and disambiguation n
 
 
 create table integration.work_author (
-    work_uid bigint,
+    work_refid bigint,
     author_id uuid,
     create_dts timestamp,
     load_audit_id int,
-    primary key (work_uid, author_id),
-    foreign key (work_uid) references integration.work(uid),
+    primary key (work_refid, author_id),
+    foreign key (work_refid) references integration.work(refid),
     foreign key (author_id) references integration.author(id),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
@@ -334,29 +326,26 @@ comment on table integration.work_author is 'Association between Work and its au
 
 -- to be inserted ONLY by other site following harvesting activity
 create table integration.work_site_mapping(
-    ref_uid bigint not null,
-    work_id uuid not null,
+    work_refid bigint not null,
+    work_uid text,
     site_id int not null,
-    work_ori_id text not null,
     last_harvest_dts timestamp not null,
     book_title text,
     book_lang text,
     main_author text,
     create_dts timestamp,
     load_audit_id int,
-    primary key(ref_uid, work_id),
-    unique (work_ori_id, site_id),
-    foreign key(ref_uid) references integration.work(uid),
+    primary key(work_refid, work_uid, site_id),
+    foreign key(work_refid) references integration.work(refid),
     foreign key(site_id) references integration.site(id),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table integration.work_site_mapping is 'Map between work ids in lt and in other site';
-comment on column integration.work_site_mapping.ref_uid is 'Reference work uid used in lt';
-comment on column integration.work_site_mapping.work_id is 'Work-Id made unique throughout sites (MD5 of concatenation of: work_ori_id,site_logical_name)';
-comment on column integration.work_site_mapping.work_ori_id is 'Original id used in other site in text format';
-comment on column integration.work_site_mapping.last_harvest_dts is 'This is mandatory as we load mapping during harvesting for other site';
-comment on column integration.work_site_mapping.book_title is 'Book title, author, lang are for QA purposes (mapping between sites only done through isbn(s) lookup)';
+comment on table integration.work_site_mapping is 'Map between work ref_id in lt and id used in other site';
+comment on column integration.work_site_mapping.work_refid is 'Reference work id used in lt';
+comment on column integration.work_site_mapping.work_uid is 'Id used in  other site';
+comment on column integration.work_site_mapping.last_harvest_dts is 'Last time work was harvested';
+comment on column integration.work_site_mapping.book_title is 'Book title, author, lang are for QA purposes (mapping between sites done through isbn(s) lookup)';
 
 
 
@@ -376,14 +365,14 @@ comment on column integration.tag.tag_upper is 'Tag capitalized, useful for aggr
 
 
 create table integration.work_tag (
-    work_id bigint,
+    work_refid bigint,
     tag_id uuid,
     source_site_id int,
     frequency int,
     create_dts timestamp,
     load_audit_id int,
-    primary key (work_id, tag_id, source_site_id),
-    foreign key (work_id) references integration.work(uid),
+    primary key (work_refid, tag_id, source_site_id),
+    foreign key (work_refid) references integration.work(refid),
     foreign key (tag_id) references integration.tag(id),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
@@ -438,11 +427,11 @@ create table integration.user_info (
 
 --Some sites does not restrict users reviewing many times same book, either remove constraint or adapt insert stmt
 -- and other have identical duplicates of review (ex. lt w=12990555)
--- so for now, we don't impose  unique (work_uid, user_id), to be taken care of downstream
+-- so for now, we don't impose  unique (work_refid, user_id), to be taken care of downstream
 
 create table integration.review(
     id bigserial primary key,
-    work_uid bigint not null,
+    work_refid bigint not null,
     user_id uuid not null,
     site_id int not null,
     rating text,
@@ -452,7 +441,7 @@ create table integration.review(
     review_lang char(3),
     create_dts timestamp,
     load_audit_id int,
-    foreign key (work_uid) references integration.work(uid),
+    foreign key (work_refid) references integration.work(refid),
     foreign key (user_id) references integration.user(id),
     foreign key (site_id) references integration.site(id),
     foreign key (load_audit_id) references staging.load_audit(id)
@@ -487,44 +476,6 @@ comment on column integration.review.user_id is 'User identifier derived from MD
 --comment on column integration.book.author_sform is 'Std author form as (Lname, Fname), see function';
 --comment on column integration.book.lang_code is 'Books in diff language considered distinct';
 --comment on column integration.book.source_site_id is 'Web site where the book is first harvested';
-
-
-
-
-
-
-
-
---create table integration.work_user (
---    id uuid primary key,
---    book_id uuid not null,
---    user_id uuid not null,
---    source_site_id int,
---    create_dts timestamp,
---    update_dts timestamp,
---    load_audit_id int,
---    unique (book_id, user_id),
---    foreign key (book_id) references integration.book(id),
---    foreign key (user_id) references integration.user(id)
---);
---
---comment on table integration.work_user is 'User relationship with Work, such like lt''s collection or gr''s bookshelf';
---comment on column integration.work_user.id is 'Identifier derived from MD5 hashing of work_uid and user_id';
---
---create table integration.book_user_desc (
---    book_user_id uuid not null,
---    qualifier text not null,
---    valid_from timestamp not null,
---    valid_to timestamp,
---    create_dts timestamp,
---    update_dts timestamp,
---    load_audit_id int,
---    primary key (book_user_id, valid_from),
---    foreign key (book_user_id) references integration.book_user_link(id)
---);
---
---comment on table integration.book_user_desc is 'Temporal qualifier of the relationship of book_user';
---comment on column integration.book_user_desc.qualifier is 'Ex. for gr: read, reading, to-read, or lt: your-library, wishlist, to-read, read-but-unowned, reading, favorites (default ones, the custom one will be ignored)';
 
 
 
@@ -569,17 +520,18 @@ comment on table integration.rating_def is 'Simple rating code with its hierarch
 
 -- View that return how many reviews already persisted per site (logical name)
 
-create or replace view integration.reviews_persisted_lookup  as
-    select   s.logical_name
-            ,r.work_uid
-            ,r.lang_code
-            ,count(*) as nb_review
-    from integration.review r
-    join integration.site s on (s.id = r.site_id)
-    group by 1,2,3
-    ;
 
-comment on view integration.reviews_persisted_lookup is 'Report of #Review by work, lang and site currently persisted' ;
+--create or replace view integration.reviews_persisted_lookup  as
+--    select   s.logical_name
+--            ,r.work_refid
+--            ,r.lang_code
+--            ,count(*) as nb_review
+--    from integration.review r
+--    join integration.site s on (s.id = r.site_id)
+--    group by 1,2,3
+--    ;
+--
+--comment on view integration.reviews_persisted_lookup is 'Report of #Review by work, lang and site currently persisted' ;
 
 
 
@@ -619,8 +571,6 @@ CREATE OR REPLACE function integration.derive_userid
         return cast( md5( concat(userid, site_logical_name) ) as uuid);
     END;
 $$ LANGUAGE plpgsql;
-
-
 
 
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import datetime
+import json
 import uuid
 import psycopg2
 import psycopg2.extras
@@ -74,34 +75,20 @@ class DbConnection(object):
             one_row = curs.fetchone()
         return one_row
 
-    def fetch_all_inTransaction(self, query, params=None, as_dict=False):
-        """
-        Execute query, fetch all records into a list and return as list of tuples
-        or as dictionary when as_dict=True (in a single transaction)
-
-        """
-        with self.connection as c:
-            if as_dict:
-                cur = c.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            else:
-                cur = c.cursor()
-            cur.execute(query, params)
-            result = cur.fetchall()
-            cur.close()
-            return result
-
-    def fetch_all(self, query, params=None, as_dict=False):
+    def fetch_all(self, query, params=None, in_trans=False, as_dict=False):
         """
         Execute query, return all records as a list of tuple (or as dictionary)
-        while leaving open the transaction.
+        leaving open the transaction if in_trans=True or commit otherwise.
         """
         if as_dict:
-            cur = self.connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cur = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         else:
             cur = self.connection.cursor()
         cur.execute(query, params)
         result = cur.fetchall()
         cur.close()
+        if in_trans:
+            self.connection.commit()
         return result
 
     def commit(self):
@@ -115,7 +102,6 @@ class DbConnection(object):
 
     def __str__(self):
         return self.connection.__str__()
-
 
 
 # convenient fcts taken from my DbConnection

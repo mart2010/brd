@@ -28,8 +28,8 @@ class BaseReviewSpider(scrapy.Spider):
         with harvesting review (delegating parsing/outputing to pipelines)
         1. dump_filepath:
         2. works_to_harvest: list of dict with  work-ids (and additional info):
-        [{'work_uid': x,
-        'site_work_uid': yy (the other site work id to map lt's work_uid with)
+        [{'work_refid': x,
+        'work_uid': yy (the other site work id to map lt's work_refid with)
         'last_harvest_dts': y,
         'nb_in_db': {'ENG': 12, 'FRE': 2, ..},
         'isbns': [x,y,..]}, {..}...]
@@ -95,7 +95,7 @@ class LibraryThingWorkReview(BaseReviewSpider):
     @property
     def start_requests(self):
         for i in xrange(len(self.works_to_harvest)):
-            wid = self.works_to_harvest[i]['work_uid']
+            wid = self.works_to_harvest[i]['work_refid']
             req = scrapy.Request(self.url_workreview % wid, callback=self.parse_nbreview)
             req.meta['work-index'] = i
             req.meta['wid'] = wid
@@ -140,7 +140,7 @@ class LibraryThingWorkReview(BaseReviewSpider):
                                        formdata=prepare_form(wid, marc_code, nb_in_site, nb_in_db),
                                        callback=self.parse_reviews)
 
-                item = self.build_review_item(work_uid=wid, dup_uid=dup_id, review_lang=marc_code)
+                item = self.build_review_item(work_refid=wid, dup_refid=dup_id, review_lang=marc_code)
                 r.meta['passed_item'] = item
                 yield r
 
@@ -241,7 +241,7 @@ class GoodreadsReview(BaseReviewSpider):
                                      meta={'work_index': i, 'nb_try': 0},
                                      callback=self.parse_search_resp)
             else:
-                gr_work_id = self.works_to_harvest[i]['site_work_uid']
+                gr_work_id = self.works_to_harvest[i].get('work_uid')
                 assert(gr_work_id, 'Getting latest reviews requires gr work id')
                 yield scrapy.Request(self.url_review % (gr_work_id, 1),
                                      meta={'work_index': i},
@@ -261,14 +261,14 @@ class GoodreadsReview(BaseReviewSpider):
                                      meta={'work_index': widx, 'nb_try': nb_try},
                                      callback=self.parse_search_resp)
             else:
-                print("No work found for '%s' with isbns: %s" % (str(self.works_to_harvest[widx]['work_uid']), str(isbns)))
-                yield self.build_review_item(work_uid=self.works_to_harvest[widx]['work_uid'])
+                print("No work found for '%s' with isbns: %s" % (str(self.works_to_harvest[widx]['work_refid']), str(isbns)))
+                yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'])
         # found it, map gr's id (cannot start harvesting, as reviews are ordered arbitrarily)
         else:
             url = response.url
             gr_work_id = url[url.index('/book/show/') + 11:]
-            self.works_to_harvest[widx]['site_work_uid'] = gr_work_id
-            self.works_to_harvest[widx]['last_harvest_dts'] = self.min_harvest_dae
+            self.works_to_harvest[widx]['work_uid'] = gr_work_id
+            self.works_to_harvest[widx]['last_harvest_dts'] = self.min_harvest_date
             yield scrapy.Request(self.url_review % (gr_work_id, 1),
                                  meta={'work_index': widx},
                                  callback=self.parse_reviews)
@@ -292,8 +292,8 @@ class GoodreadsReview(BaseReviewSpider):
         if current_page <= last_page:
             found_older = False
             authors_raw = response.xpath('//a[@class="authorName"]/child::*/text()')
-            item = self.build_review_item(work_uid=self.works_to_harvest[widx]['work_uid'],
-                                          site_work_uid=self.works_to_harvest[widx]['site_work_uid'],
+            item = self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'],
+                                          work_uid=self.works_to_harvest[widx]['work_uid'],
                                           book_author=",".join(authors_raw.extract()),
                                           book_title=response.xpath('//h1[@class="bookTitle"]/text()').extract()[0].strip())
 
@@ -304,13 +304,13 @@ class GoodreadsReview(BaseReviewSpider):
             else:
                 for rev in reviews_sel:
                     self.process_onereview(item, widx, rev)
-                    if item['parsed_review_date'] > self.works_to_havest[widx]['last_harvest_dts']:
+                    if item['parsed_review_date'] > self.works_to_harvest[widx]['last_harvest_dts']:
                         yield item
                     else:
                         found_older = True
                         break
                 if current_page != last_page and not found_older:
-                    gr_work_id = self.works_to_harvest[widx]['site_work_uid']
+                    gr_work_id = self.works_to_harvest[widx]['work_uid']
                     yield scrapy.Request(self.url_review % (gr_work_id, current_page + 1),
                                          meta={'work_index': widx, 'last_page': last_page},
                                          callback=self.parse_reviews)
@@ -329,8 +329,10 @@ class GoodreadsReview(BaseReviewSpider):
         item['username'] = rev.xpath('.//a[@class="user"]/@title').extract()[0]  # u'Jon Liu'
         u_link = rev.xpath('.//a[@class="user"]/@href').extract()[0]  # u'/user/show/52104079-jon-liu'
         item['user_uid'] = u_link[u_link.index('/show/') + 6:]
-        item['review'] = rev.xpath('.//span[starts-with(@id,"freeTextContainer")]/text()').extract()[0]
-        item['likes'] = rev.xpath('.//span[@class="likesCount"]/text()').extract()[0]
+        item['review'] = rev.xpath('.//span[starts-with(@id,"freeText") and @style="display:none"]/text()').extract()[0]
+        likes_raw = rev.xpath('.//span[@class="likesCount"]/text()').extract()
+        if len(likes_raw) == 1:
+            item['likes'] = likes_raw[0]
         return item
 
     def parse_rating(self, rating):
