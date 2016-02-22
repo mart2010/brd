@@ -111,7 +111,7 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
         super(BaseBulkLoadTask, self).run()
 
 
-    # the override copy() is a hack to manage file with col headers and rowscount
+    # the override copy() is needed to handle file with col headers (and return rowscount)
     # TODO: suggest to add to luigi to accept headers and populate columns based on these..
     def copy(self, cursor, file):
         if isinstance(self.columns[0], six.string_types):

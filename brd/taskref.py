@@ -99,7 +99,7 @@ class BatchLoadWorkRef(luigi.Task):
     """
     Entry point to launch loads related to 'thingisbn.csv' reference file
     """
-    filename = luigi.Parameter(default='thingISBN_10000_26-1-2016.csv')
+    filename = luigi.Parameter(default='thingISBN.csv')
     global batch_name
     batch_name = "Ref thingisbn"  # for auditing
 

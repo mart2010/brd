@@ -95,6 +95,7 @@ class LoadUsers(BasePostgresTask):
                     , %(audit_id)s as audit_id
                 from staging.review
                 where site_logical_name = %(site)s
+                and user_uid is not null
             ),
             match_user as (
                 update integration.user u set last_seen_date = new_rows.last_seen_date
@@ -180,7 +181,7 @@ class UpdateLtLastHarvest(BasePostgresTask):
 
     def requires(self):
         return {'wids': FetchNewWorkIds('librarything', self.n_work, self.harvest_dts),
-                'same': LoadLtWorkSameAs('librarything', self.n_work, self.harvest_dts)}
+                'same': LoadLtWorkSameAs(self.n_work, self.harvest_dts)}
 
     def exec_sql(self, cursor, audit_id):
         with self.input()['wids'].open('r') as f:
@@ -221,10 +222,15 @@ class LoadWorkSiteMapping(BasePostgresTask):
         return [LoadReviews(self.site, self.n_work, self.harvest_dts)]
 
     def exec_sql(self, cursor, audit_id):
+        # work_uid=-1 means no work could be found for isbns...
         sql = \
             """
-            insert into integration.work_site_mapping(work_refid, work_uid, site_id, last_harvest_dts, create_dts, load_audit_id)
-            select  work_refid, work_uid, (select id from integration.site where logical_name = %(logical_name)s),
+            insert into integration.work_site_mapping(work_refid, work_uid, site_id, book_title, book_author,
+                last_harvest_dts, create_dts, load_audit_id)
+            select  work_refid,
+                    coalesce(work_uid, '-1'),
+                    (select id from integration.site where logical_name = %(logical_name)s),
+                    book_title, book_author,
                     %(harvest_dts)s, now(), %(audit_id)s
             from
             staging.review

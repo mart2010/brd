@@ -327,12 +327,12 @@ comment on table integration.work_author is 'Association between Work and its au
 -- to be inserted ONLY by other site following harvesting activity
 create table integration.work_site_mapping(
     work_refid bigint not null,
-    work_uid text,
+    work_uid text not null,
     site_id int not null,
     last_harvest_dts timestamp not null,
     book_title text,
     book_lang text,
-    main_author text,
+    book_author text,
     create_dts timestamp,
     load_audit_id int,
     primary key(work_refid, work_uid, site_id),

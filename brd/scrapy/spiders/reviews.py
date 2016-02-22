@@ -208,6 +208,143 @@ class LibraryThingWorkReview(BaseReviewSpider):
         return parsed_rating
 
 
+class BabelioReview(BaseReviewSpider):
+    """
+    Babelio has no global list to easily crawl from.  Best approach is to
+    search reviews based on ISBNs lie goodreads.
+    """
+    name = 'babelio'
+    allowed_domains = ['www.babelio.com']
+    ###########################
+    # Control setting
+    ###########################  1582099855
+    form_search = 'http://www.babelio.com/resrecherche.php'
+    # Book_uid is defined in this site as 'title/id' (ex. 'Green-Nos-etoiles-contraires/436732'
+    # tri=dt order by date descending
+    url_review = "http://www.babelio.com/livres/%s/critiques?pageN=%d&tri=dt"
+    ###########################
+    # Parse setting
+    ###########################
+    result = '//td[@class="titre_livre"]/a[@class="titre_v2"]'
+    reviews_sel = '//div[@class="post_con"]'
+
+    def start_requests(self):
+        for i in range(len(self.works_to_harvest)):
+            isbns = self.works_to_harvest[i].get('isbns')
+            if isbns:
+                yield scrapy.FormRequest(self.form_search,
+                                         formdata={'Recherche': str(isbns[0]), 'item_recherche': 'isbn'},
+                                         meta={'work_index': i, 'nb_try': 0},
+                                         callback=self.parse_search_resp)
+            else:
+                work_uid = self.works_to_harvest[i].get('work_uid')
+                assert(work_uid is not None, 'Getting incremental reviews requires work_uid')
+                yield scrapy.Request(self.url_review % (work_uid, 1),
+                                     meta={'work_index': i},
+                                     callback=self.parse_reviews)
+
+    def parse_search_resp(self, response):
+        widx = response.meta['work_index']
+        isbns = self.works_to_harvest[widx]['isbns']
+        nb_try = response.meta['nb_try']
+        nb_try += 1
+        res_sel = response.xpath(self.result)
+        u = res_sel.xpath('./@href').extract_first()  # u'/livres/Levy-Rien-de-grave/9229'
+        # found it
+        if u:
+            uid = u[u.index('/livres/') + 8:]
+            self.works_to_harvest[widx]['work_uid'] = uid
+            self.works_to_harvest[widx]['last_harvest_dts'] = self.min_harvest_date
+            # these fields only needed to load mapping with new harvest
+            title = res_sel.xpath('./text()').extract_first().strip()
+            author = response.xpath('//td[@class="auteur"]/a/text()').extract_first().strip()
+            yield scrapy.Request(self.url_review % (uid, 1),
+                                 meta={'work_index': widx, 'book_author': author, 'book_title': title},
+                                 callback=self.parse_reviews)
+        # not found
+        else:
+            if nb_try < len(isbns):
+                yield scrapy.FormRequest(self.form_search,
+                                         formdata={'Recherche': str(isbns[nb_try]), 'item_recherche': 'isbn'},
+                                         meta={'work_index': widx, 'nb_try': nb_try},
+                                         callback=self.parse_search_resp)
+            else:
+                print("No work found for %s with isbns: %s" % (str(self.works_to_harvest[widx]['work_refid']), str(isbns)))
+                yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'])
+
+    def parse_reviews(self, response):
+        meta = response.meta
+        widx = meta['work_index']
+        title = meta.get('book_title')
+        author = meta.get('book_author')
+        item = self.build_review_item(book_author=author, book_title=title)
+        item['work_refid'] = self.works_to_harvest[widx]['work_refid']
+        item['work_uid'] = self.works_to_harvest[widx]['work_uid']
+        # this returns u'Critiques (5)'
+        nb_rev = response.xpath('//div[@class="livre_header_con"]//a[contains(@href,"critiques")]/text()').extract_first()
+        nb = int(nb_rev[nb_rev.index('(') + 1:nb_rev.index(')')])
+
+        #  TODO: I will need nb_in_db for 'FR' ... and adjust logic based on that
+        if nb == 0:
+            yield item
+            return
+
+        last_page = meta.get('last_page')
+        if last_page is None:
+            pag_row = response.xpath('//div[@class="pagination row"]')
+            if len(pag_row) == 0:
+                last_page = 1
+            else:
+                last_page = int(pag_row.xpath('./a[last()-1]/text()').extract_first())
+        url = response.url
+        current_page = int(url[url.index('?pageN=') + 7:url.index('&tri=')])
+        if current_page <= last_page:
+            found_older = False
+            reviews_sel = response.xpath(self.reviews_sel)
+            for rev in reviews_sel:
+                self.process_onereview(item, widx, rev)
+                if item['parsed_review_date'] > self.works_to_harvest[widx]['last_harvest_dts']:
+                    yield item
+                else:
+                    found_older = True
+                    break
+            if current_page != last_page and not found_older:
+                work_id = self.works_to_harvest[widx]['work_uid']
+                yield scrapy.Request(self.url_review % (work_id, current_page + 1),
+                                     meta={'work_index': widx, 'last_page': last_page,
+                                           'book_author': author, 'book_title': title},
+                                     callback=self.parse_reviews)
+
+    def process_onereview(self, item, widx, rev):
+        """
+        Process one review in rev selector
+        :return: Item
+        """
+        user_sel = rev.xpath('.//a[starts-with(@href,"/monprofil.php?id_user=")]')
+        u = user_sel.xpath('./@href').extract_first()  # u'/monprofil.php?id_user=221169'
+        item['username'] = u[u.index('id_user') + 8:]
+        item['user_uid'] = user_sel.xpath('./text()').extract_first()
+        d = rev.xpath('.//td[@class="no_img"]/span/text()').extract_first()  # u'22 f\xe9vrier 2016'
+        item['review_date'] = d
+        item['parsed_review_date'] = self.parse_review_date(d)
+        # babelio has 0 to 5 stars with no half-star
+        star = rev.xpath('.//li[@class="current-rating"]/text()').extract_first().strip()  # u'Livres 4.00/5'
+        item['rating'] = star[star.index("Livres ") + 7:star.index("/")]
+        item['parsed_rating'] = float(item['rating']) * 2
+        item['review_lang'] = 'fre'
+        lines = rev.xpath('.//div[@class="text row"]/div/text()').extract()
+        item['review'] = ",".join(lines).strip()
+        item['likes'] = rev.xpath('.//span[@class="post_items_like "]/span[@id]/text()').extract_first()
+        return item
+
+    def parse_review_date(self, raw_date):
+        mois = raw_date[raw_date.index(" ") + 1: raw_date.rindex(" ")]
+        month_nb = int(scrapy_utils.mois[mois])
+        day = int(raw_date[:raw_date.index(" ")])
+        year = int(raw_date[raw_date.rindex(" ") + 1:])
+        return datetime(year, month_nb, day)
+
+
 class GoodreadsReview(BaseReviewSpider):
     """
     This requires isbns in self.works_to_harvest for never harvested work.
@@ -220,8 +357,6 @@ class GoodreadsReview(BaseReviewSpider):
     ###########################  1582099855
     url_search = 'https://www.goodreads.com/search?utf8=%E2%9C%93&query='
     url_review = 'https://www.goodreads.com/book/show/%s?page=%d&sort=newest'
-    # to avoid searching all isbns
-    max_nb_search = 10
 
     ###########################
     # Parse setting
@@ -461,29 +596,6 @@ class CritiquesLibresReview(BaseReviewSpider):
         lname = author_str[0:i]
         fname = author_str[i + 2:]
         return (lname, fname)
-
-
-class BabelioSpider(BaseReviewSpider):
-    """
-    Babelio has no global list to easily crawl for total # of Reviews.  Best approach is to
-    search reviews based on ISBNs.
-    """
-    name = 'babelio'
-    allowed_domains = ['www.babelio.com']
-
-    # Book_uid is defined in this site as 'title/id' (ex. 'Green-Nos-etoiles-contraires/436732'
-    # tri=dt order by date descending
-    review_url_param = "http://www.babelio.com/livres/%s/critiques?pageN=2&tri=dt"
-
-    def __init__(self, **kwargs):
-        super(BabelioSpider, self).__init__(BabelioSpider.name, **kwargs)
-        pass
-
-    def start_requests(self):
-        pass
-        # yield scrapy.Request(self.url_nb_reviews % (0, 2), callback=self.init_max_nb_items)
-
-
 
 
 class DecitreSpider(BaseReviewSpider):
