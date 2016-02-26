@@ -74,12 +74,11 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
     user = brd.config.DATABASE['user']
     password = brd.config.DATABASE['password']
 
+    clear_table_before = False
     # default separator
     column_separator = '|'
-
     # container of values inserted as NULL values (MO added empty string)
     null_values = (None, "")
-
     # added to manage col headers
     input_has_headers = False
 
@@ -91,6 +90,10 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
         self.run_dts = None
         self.audit_id = None
         self.rowscount = None
+
+    def init_copy(self, connection):
+        if self.clear_table_before:
+            connection.cursor().execute('truncate table %s;' % self.table)
 
     def run(self):
 
@@ -112,7 +115,7 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
 
 
     # the override copy() is needed to handle file with col headers (and return rowscount)
-    # TODO: suggest to add to luigi to accept headers and populate columns based on these..
+    # TODO: suggest to add to luigi:  accept headers and populate columns based on these..
     def copy(self, cursor, file):
         if isinstance(self.columns[0], six.string_types):
             column_names = self.columns

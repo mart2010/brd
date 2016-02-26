@@ -22,20 +22,22 @@ class ReviewItem(Item):
     work_refid          = Field()
     dup_refid           = Field()
     work_uid            = Field()
-    book_title          = Field()
-    book_author         = Field()
     parsed_review_date  = Field()
     parsed_rating       = Field()
 
-class WorkItem(Item):
+
+class WorkRefItem(Item):
     work_refid          = Field()
+    dup_refid           = Field()
     title               = Field()
+    authors             = Field()
+    authors_code        = Field()
     original_lang       = Field()
-    authors_name        = Field()
-    authors_disamb_id   = Field()
+    ori_lang_code       = Field()
     lc_subjects         = Field()
-    ddc_mds             = Field()
-    load_audit_id       = Field()
+    mds_code            = Field()
+    mds_text            = Field()
+    popularity          = Field()
 
 
 class ReviewerItem(Item):

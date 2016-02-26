@@ -28,7 +28,7 @@ class TestPipeline(unittest.TestCase):
     def test_dump_item_into_flatfile_ok(self):
 
         # dependencies fixture
-        spider = reviewspiders.CritiquesLibresReview(period='1-1-2001_31-12-2015')
+        spider = reviewspiders.CritiquesLibres(period='1-1-2001_31-12-2015')
         config.SCRAPED_OUTPUT_DIR = '/Users/mart/dev/p/brd/brd/test/mockscrapedfiles/'
 
         pipeline_loader = pipelines.DumpToFile()
@@ -80,7 +80,7 @@ class TestPipeline(unittest.TestCase):
 
     def test_review_filter_is_ok(self):
 
-        scraper = reviewspiders.CritiquesLibresReview(period='1-1-2010_1-2-2010')
+        scraper = reviewspiders.CritiquesLibres(period='1-1-2010_1-2-2010')
         # mock persistence for the specific book
         scraper.stored_nb_reviews = {"100": 1}
         pipeline_loader = pipelines.ReviewParser()

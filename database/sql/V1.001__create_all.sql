@@ -58,12 +58,13 @@ create table staging.review (
     review_lang char(3),
     likes text,
     work_refid bigint not null,
-    dup_refid text,
+    dup_refid bigint,
     work_uid text,
-    book_title text,
-    book_author text,
     parsed_review_date date,
     parsed_rating text,
+    original_lang text,
+    title text,
+    authors text,
     loading_dts timestamp,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
@@ -83,32 +84,28 @@ create or replace view staging.handy_review as
 
 
 
-
-
---ex. of book with multiple authors:
--- https://www.librarything.com/work/26628
--- https://www.librarything.com/work/989447
--- https://www.librarything.com/work/5072307
--- https://www.librarything.com/work/2156700
-
 -- taken from .../work/####/details (to get correct title) and ok since only 1 ISBN taken here: from <meta property="books.isbn" content="xxxxxxxx">
 
-create table staging.work_ref (
+create table staging.work_info (
     work_refid bigint unique,
+    dup_refid bigint,
     title text,
     original_lang text,
-    authors_name text[],
-    authors_disamb_id text[],
-    isbn varchar(13),
-    lc_subjects text[],
-    ddc_mds text[],
-    load_audit_id int not null,
+    ori_lang_code varchar(3),
+    authors text,
+    authors_code text,  --used in lt for disambiguation
+    mds_code text,
+    mds_text text,
+    lc_subjects text,
+    popularity int,
+    load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table staging.work_ref is 'Staging for reference <static> features harvested from work';
+comment on table staging.work_info is 'Staging for reference features harvested from work';
 
 
+-- these should be harvested/refreshed during incremental reviews...(so could add these into staging.review)
 create table staging.work_update (
     id serial primary key,
     work_refid bigint unique,
@@ -200,8 +197,12 @@ create table integration.work_info (
     work_refid bigint primary key,
     title text,
     original_lang char(3),
-    update_dts timestamp,
+    popularity int,
+    mds_code text,
+    mds_text text,
+    lc_subjects text,
     create_dts timestamp,
+    update_dts timestamp,
     load_audit_id int,
     foreign key (work_refid) references integration.work(refid),
     foreign key (load_audit_id) references staging.load_audit(id)
@@ -286,9 +287,20 @@ comment on table integration.work_isbn is 'Association of work and ISBN (sourced
 
 create table integration.author (
     id uuid primary key,
-    disamb_name text unique,
-    first_name text,
-    last_name text,
+    code text unique,
+    create_dts timestamp,
+    load_audit_id int,
+    foreign key (load_audit_id) references staging.load_audit(id)
+);
+
+comment on table integration.author is 'Author sourced from lt';
+comment on column integration.author.id is 'Identifier derived from MD5 hashing of code';
+comment on column integration.author.code is 'Unique and disambiguation code given by lt: /author/lnamefname-x';
+
+
+create table integration.author_info (
+    author_id uuid primary key,
+    name text,
     legal_name text,
     gender char(1),
     nationality text,
@@ -296,12 +308,11 @@ create table integration.author (
     create_dts timestamp,
     update_dts timestamp,
     load_audit_id int,
+    foreign key (author_id) references integration.author(id),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
-comment on table integration.author is 'Author sourced from lt';
-comment on column integration.author.id is 'Identifier derived from MD5 hashing of disamb_name';
-comment on column integration.author.disamb_name is 'Unique and disambiguation name given by url in lt: /author/lnamefname-x';
+comment on table integration.author_info is 'Author info sourced from lt';
 
 
 create table integration.work_author (
@@ -319,8 +330,6 @@ comment on table integration.work_author is 'Association between Work and its au
 
 
 
-
-
 ------------- Data from Reviews, tag, list harvested .... ---------------
 
 
@@ -330,9 +339,9 @@ create table integration.work_site_mapping(
     work_uid text not null,
     site_id int not null,
     last_harvest_dts timestamp not null,
-    book_title text,
+    title text,
     book_lang text,
-    book_author text,
+    authors text,
     create_dts timestamp,
     load_audit_id int,
     primary key(work_refid, work_uid, site_id),
@@ -345,7 +354,7 @@ comment on table integration.work_site_mapping is 'Map between work ref_id in lt
 comment on column integration.work_site_mapping.work_refid is 'Reference work id used in lt';
 comment on column integration.work_site_mapping.work_uid is 'Id used in  other site';
 comment on column integration.work_site_mapping.last_harvest_dts is 'Last time work was harvested';
-comment on column integration.work_site_mapping.book_title is 'Book title, author, lang are for QA purposes (mapping between sites done through isbn(s) lookup)';
+comment on column integration.work_site_mapping.title is 'Book title, author, lang are for QA purposes (mapping between sites done through isbn(s) lookup)';
 
 
 

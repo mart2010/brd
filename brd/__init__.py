@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
+import logging
 from datetime import datetime
 
 import fnmatch
 import os
 from os.path import isfile, join
 import config
-import brd.taskref as task
+import brd.taskref
 import brd.elt
 
 __author__ = 'mouellet'
@@ -99,13 +100,14 @@ def get_column_headers(file_with_header, separator):
 lang_cache = {}
 
 
-def get_marc_code(input, capital=False):
+def get_marc_code(input, capital=True):
     """
-    input can be either alpha-2, alpha-3 code, english or french name
-    (capitalized or not)
-    :param input: code in UTF-8 encoding (otherwise SQL comparison will fail as PS uses UTF-8 encoding)
+    input can be either alpha-2, alpha-3 code, full english or french name (capitalized or not)
+    :param input: text in UTF-8 encoding (otherwise SQL comparison will fail as PS uses UTF-8 encoding)
     :return: marc_code found or None
     """
+    if input is None:
+        return None
     uinput = input.strip().upper()
     if uinput in lang_cache:
         marc_code = lang_cache[uinput]
@@ -123,8 +125,8 @@ def get_marc_code(input, capital=False):
         if ret:
             marc_code = ret[1]
         else:
-            marc_code = 'PAS TROUVE'
-            print "WEEEEIRDDDDDDD  pas trouve de marc_code pour le input: " + uinput
+            marc_code = '---'
+
     lang_cache[uinput] = marc_code
     if capital:
         return marc_code
@@ -176,14 +178,17 @@ def load_static_ref():
         with open(lang_ref_file, 'r') as f:
             n = c.copy_into_table('integration.language', fields, f, delim='\t')
         c.commit()
-        print "Loaded %d records into integration.language" % n
+        logging.info("Loaded %d records into integration.language" % n)
 
     #reference stuff
-    #work_ref = task.BatchLoadWorkReference()
-    #sch = luigi.scheduler.CentralPlannerScheduler()
-    #w = luigi.worker.Worker(scheduler=sch)
-    #w.add(work_ref)
-    #w.run()
+    # nb = c.fetch_one('select count(1) from integration.work')[0]
+    # if nb == 0:
+    #     logging.info("Work reference data empty, must load it first!")
+    #     work_ref = brd.taskref.BatchLoadWorkRef()
+    #     sch = luigi.scheduler.CentralPlannerScheduler()
+    #     w = luigi.worker.Worker(scheduler=sch)
+    #     w.add(work_ref)
+    #     w.run()
 
 load_static_ref()
 

@@ -13,12 +13,13 @@ DATABASE = {
 
 #for now, in french:
 SOURCE_WEBSITES_FR = {
-    'critiqueslibres': 'http://www.critiqueslibres.com',  # 45K livres, 100K critics
+
     'decitre': 'http://www.decitre.fr',
-    'amazon': 'http://www.amazon.fr',  # amazon purchased goodreads, but their reviews are not planned to be integrated..
+    'amazon': 'http://www.amazon.fr',  # amazon purchased goodreads, but reviews not planned to be integrated..
     'fnac': 'http://www.fnac.com',
-    'babelio': 'http://www.babelio.com',
+
     'shelfari': 'http://www.shelfari.com',  # also an amazon co!!
+
     # these sites are quite outdated and/or limited in term of reviews
     'critique-livre': 'http://www.critique-livre.fr',  # only 750 reviews on novel (roman)
     'senscritique': 'http://www.senscritique.com',  # only a number of top-list are available
@@ -26,9 +27,12 @@ SOURCE_WEBSITES_FR = {
 }
 
 
-SOURCE_WEBSITES_EN = {
-    'goodreads': 'http://www.goodreads.com',  # 10M reviews of 700k titles
-    'librarything': 'http://www.librarything.com'  # 2.5M reviews of 1M works
+SOURCE_WEBSITES = {
+    'goodreads': 'http://www.goodreads.com',  # 10M reviews of 700k works
+    'librarything': 'http://www.librarything.com',  # 2.5M reviews of 1M works
+    'critiqueslibres': 'http://www.critiqueslibres.com',  # 45K livres, 100K critics (in french only)
+    'babelio': 'http://www.babelio.com',
+
 }
 
 

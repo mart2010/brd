@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import logging
 import shutil
 
 import brd
@@ -23,11 +24,26 @@ def treat_loaded_file(processed_filepath, remove, archive_dir):
         return archivefilepath
 
 
+def fetch_workIds_no_info(nb_work):
+    sql = \
+        """
+        select w.refid
+        from integration.work w
+        left join integration.work_info wi on (w.refid = wi.work_refid)
+        left join integration.work_sameas s on (w.refid = s.work_refid)
+        where wi.work_refid IS NULL
+        and s.work_refid IS NULL
+        limit %(nb)s
+        """
+    return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work}, as_dict=True)
+
+
 def fetch_workIds_not_harvested(site_logical_name, nb_work):
     """
     Find work_refid and their isbns not yet harvested for site.
+    For lt, simply return the ids...  but using work_info ids to reduce the likelihood
+    of harvesting duplicated work.
 
-    For lt, simply return the ids...
     :return:
     """
     sql_other = \
@@ -50,16 +66,16 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
         where mapped.last_harvest_dts IS NULL
         limit %(nb)s
         """
-
+    # select only the ones with work_info harvested
     sql_lt = \
         """
-        select refid as work_refid
-        from integration.work
+        select wi.work_refid
+        from integration.work_info wi
         where
-        last_harvest_dts IS NULL
+        inner join integration.work w on (wi.work_refid = w.refid)
+        w.last_harvest_dts IS NULL
         limit %(nb)s
         """
-
     if site_logical_name == 'librarything':
         return elt.get_ro_connection().fetch_all(sql_lt, {'nb': nb_work}, as_dict=True)
     else:
@@ -128,7 +144,7 @@ def fetch_ltwork_list(nb_work):
     list_of_wids = fetch_ltwids_not_harvested(nb_work)
     if list_of_wids is None or len(list_of_wids) == 0:
         list_of_wids = fetch_ltwids_stat_harvested(nb_work)
-        print "All work harvested for 'librarything', will go fetch harvested work"
+        logging.info("All work harvested for 'librarything', will go fetch harvested work")
     return construct_dic(list_of_wids)
 
 

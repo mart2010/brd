@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 
 import brd
 import brd.service as service
@@ -7,6 +8,7 @@ import luigi
 import os
 from brd.taskbase import DateSecParameter, BaseBulkLoadTask, BasePostgresTask, batch_name
 
+# TODO: see if better to fetch only work having work_info, and reduce complexity here (simpler fetch wids, no need to load work_sameas, ..
 
 class FetchNewWorkIds(luigi.Task):
     """
@@ -25,6 +27,7 @@ class FetchNewWorkIds(luigi.Task):
     def run(self):
         f = self.output().open('w')
         res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work)
+
         json.dump(res_dic, f, indent=2)
         f.close()
 
@@ -56,8 +59,8 @@ class HarvestReviews(luigi.Task):
                                                     works_to_harvest=workids_list)
         spider_process.start_process()
 
-        print("Harvest of %d works/review completed with spider %s (dump file: '%s')"
-              % (len(workids_list), self.site, self.dump_filepath))
+        logging.info("Harvest of %d works/review completed with spider %s (dump file: '%s')"
+              %(len(workids_list), self.site, self.dump_filepath))
 
 
 class BulkLoadReviews(BaseBulkLoadTask):
@@ -109,9 +112,7 @@ class LoadUsers(BasePostgresTask):
             where not exists (select 1 from match_user where match_user.id = new_rows.id);
             """
         cursor.execute(sql, {'audit_id': audit_id, 'site': self.site})
-        r = cursor.rowcount
-        print "check this should return two counts .. update and insert: " + str(r)
-        return r
+        return cursor.rowcount
 
 
 class LoadReviews(BasePostgresTask):
@@ -147,7 +148,8 @@ class LoadReviews(BasePostgresTask):
 
 class LoadLtWorkSameAs(BasePostgresTask):
     """
-    Used only when loading reviews from lt, to link same works (duplicates)
+    Used only when loading reviews from lt, to link same works (duplicates).
+    TODO: could be removed and avoided as taskref for work-info is now taking care of that!
     """
     n_work = luigi.IntParameter()
     harvest_dts = DateSecParameter()
@@ -160,7 +162,7 @@ class LoadLtWorkSameAs(BasePostgresTask):
         sql = \
             """
             insert into integration.work_sameas(work_refid, master_refid, create_dts, load_audit_id)
-            select distinct cast(dup_refid as bigint), cast(work_refid as bigint), now(), %(audit_id)s
+            select distinct dup_refid, work_refid, now(), %(audit_id)s
             from staging.review r
             where site_logical_name = 'librarything'
             and dup_refid is not null;
@@ -225,12 +227,12 @@ class LoadWorkSiteMapping(BasePostgresTask):
         # work_uid=-1 means no work could be found for isbns...
         sql = \
             """
-            insert into integration.work_site_mapping(work_refid, work_uid, site_id, book_title, book_author,
+            insert into integration.work_site_mapping(work_refid, work_uid, site_id, title, authors,
                 last_harvest_dts, create_dts, load_audit_id)
             select  work_refid,
                     coalesce(work_uid, '-1'),
                     (select id from integration.site where logical_name = %(logical_name)s),
-                    book_title, book_author,
+                    title, authors,
                     %(harvest_dts)s, now(), %(audit_id)s
             from
             staging.review

@@ -12,7 +12,7 @@ import brd.config as config
 class TestLtReview(unittest.TestCase):
 
     def mock_spider(self, wid):
-        spider = spiderreviews.LibraryThingWorkReview(
+        spider = spiderreviews.LibraryThingWork(
             begin_period='1-1-2000',
             end_period='1-1-2016',
             dump_filepath='dummy',
@@ -96,7 +96,7 @@ class TestLtReview(unittest.TestCase):
 class TZZZestCritiqueslibres(unittest.TestCase):
 
     def setUp(self):
-        self.spider = spiderreviews.CritiquesLibresReview(period='1-1-2001_31-12-2015')
+        self.spider = spiderreviews.CritiquesLibres(period='1-1-2001_31-12-2015')
         # overwrite rules for test purposes
         config.MIN_NB_REVIEWS = 2
         self.spider.stored_nb_reviews = {"200": "1", "400": "1", "500": "16"}
