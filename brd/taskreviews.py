@@ -8,12 +8,12 @@ import luigi
 import os
 from brd.taskbase import DateSecParameter, BaseBulkLoadTask, BasePostgresTask, batch_name
 
-# TODO: see if better to fetch only work having work_info, and reduce complexity here (simpler fetch wids, no need to load work_sameas, ..
+logger = logging.getLogger(__name__)
 
 class FetchNewWorkIds(luigi.Task):
     """
-    This fetches n_work NOT yet harvested for site and their associated isbns
-    Used before harvesting sites where the work-uid is unknowns.
+    Fetch n_work NOT yet harvested for site and their associated isbns
+    Used before harvesting sites where the work-uid is unknown.
     """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
@@ -27,10 +27,8 @@ class FetchNewWorkIds(luigi.Task):
     def run(self):
         f = self.output().open('w')
         res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work)
-
         json.dump(res_dic, f, indent=2)
         f.close()
-
 
 class HarvestReviews(luigi.Task):
     site = luigi.Parameter()
@@ -58,9 +56,8 @@ class HarvestReviews(luigi.Task):
                                                     dump_filepath=self.dump_filepath,
                                                     works_to_harvest=workids_list)
         spider_process.start_process()
-
-        logging.info("Harvest of %d works/review completed with spider %s (dump file: '%s')"
-              %(len(workids_list), self.site, self.dump_filepath))
+        logger.info("Harvest of %d works/review completed with spider %s (dump file: '%s')"
+                     % (len(workids_list), self.site, self.dump_filepath))
 
 
 class BulkLoadReviews(BaseBulkLoadTask):
@@ -148,8 +145,8 @@ class LoadReviews(BasePostgresTask):
 
 class LoadLtWorkSameAs(BasePostgresTask):
     """
-    Used only when loading reviews from lt, to link same works (duplicates).
-    TODO: could be removed and avoided as taskref for work-info is now taking care of that!
+    Used with  lt.  This should not happen since this is also done during harvest of work-info.
+    However we leave as it could still happen that during work-info harvest duplicates still existed..
     """
     n_work = luigi.IntParameter()
     harvest_dts = DateSecParameter()
@@ -168,7 +165,9 @@ class LoadLtWorkSameAs(BasePostgresTask):
             and dup_refid is not null;
             """
         cursor.execute(sql, {'audit_id': audit_id})
-        return cursor.rowcount
+        c = cursor.rowcount
+        logger.warning("Found %s duplicates during lt harvest review (audit_id=%s)" %(str(c), str(audit_id)))
+        return c
 
 
 class UpdateLtLastHarvest(BasePostgresTask):
@@ -257,10 +256,9 @@ class BatchLoadReviews(luigi.Task):
     batch_name = "Reviews"  # for auditing
 
     def requires(self):
-        requirements = [LoadReviews(self.site, self.n_work, self.harvest_dts)]
-
+        reqs = [LoadReviews(self.site, self.n_work, self.harvest_dts)]
         if self.site == 'librarything':
-            requirements.append(UpdateLtLastHarvest(self.n_work, self.harvest_dts))
+            reqs.append(UpdateLtLastHarvest(self.n_work, self.harvest_dts))
         else:
-            requirements.append(LoadWorkSiteMapping(self.site, self.n_work, self.harvest_dts))
-        return requirements
+            reqs.append(LoadWorkSiteMapping(self.site, self.n_work, self.harvest_dts))
+        return reqs

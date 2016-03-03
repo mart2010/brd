@@ -333,7 +333,7 @@ comment on table integration.work_author is 'Association between Work and its au
 ------------- Data from Reviews, tag, list harvested .... ---------------
 
 
--- to be inserted ONLY by other site following harvesting activity
+-- ONLY for other site (not lt) following harvesting activity
 create table integration.work_site_mapping(
     work_refid bigint not null,
     work_uid text not null,
@@ -352,7 +352,7 @@ create table integration.work_site_mapping(
 
 comment on table integration.work_site_mapping is 'Map between work ref_id in lt and id used in other site';
 comment on column integration.work_site_mapping.work_refid is 'Reference work id used in lt';
-comment on column integration.work_site_mapping.work_uid is 'Id used in  other site';
+comment on column integration.work_site_mapping.work_uid is 'Id used in  other site (maybe more than one associated to the same refid, e.g. asin for az)';
 comment on column integration.work_site_mapping.last_harvest_dts is 'Last time work was harvested';
 comment on column integration.work_site_mapping.title is 'Book title, author, lang are for QA purposes (mapping between sites done through isbn(s) lookup)';
 

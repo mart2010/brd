@@ -30,8 +30,10 @@ ITEM_PIPELINES = {
 DOWNLOAD_DELAY = 0.25  # 0.25 = 250 ms
 USER_AGENT = 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)'
 
+
+LOG_ENABLED = False
 # default level 'DEBUG'
-LOG_LEVEL = 'INFO'
+# LOG_LEVEL = 'INFO'
 
 # BOT_NAME = 'scrapybot'
 

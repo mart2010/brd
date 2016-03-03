@@ -12,6 +12,7 @@ import luigi.postgres
 import os
 from brd.taskbase import BasePostgresTask, BaseBulkLoadTask, batch_name
 
+logger = logging.getLogger(__name__)
 
 # ----------------------------------  LOAD WORK_REF ------------------------------------------#
 class DownLoadThingISBN(luigi.Task):
@@ -132,7 +133,7 @@ class FetchWorkIdsWithoutInfo(luigi.Task):
         if nb_available == 0:
             raise Exception("No more work without info was found, stop process!")
         elif nb_available < self.n_work:
-            logging.info("Only %d ids found without info (out of %d requested)" % (nb_available, int(self.n_work)))
+            logger.info("Only %d ids found without info (out of %d requested)" % (nb_available, int(self.n_work)))
         json.dump(res_dic, f, indent=2)
         f.close()
 
@@ -159,7 +160,7 @@ class HarvestWorkInfo(luigi.Task):
                                                     dump_filepath=self.dump_filepath,
                                                     works_to_harvest=workids_list)
         spider_process.start_process()
-        logging.info("Harvest of %d work-info completed (dump file: '%s')"
+        logger.info("Harvest of %d work-info completed (dump file: '%s')"
                      % (len(workids_list), self.dump_filepath))
 
 class BulkLoadWorkInfo(BaseBulkLoadTask):
@@ -212,9 +213,9 @@ class LoadWorkInfo(BasePostgresTask):
     def exec_sql(self, cursor, audit_id):
         sql = \
         """
-        insert into integration.work_info(work_refid, title, ori_lang_code, mds_code, mds_text,
-                                          lc_subjects, popularity, create_dts, load_audit_id)
-        select s.work_refid, s.title, s.ori_lang_code, s.mds_code, s.mds_text,
+        insert into integration.work_info(work_refid, title, original_lang, ori_lang_code, mds_code,
+                                          mds_text, lc_subjects, popularity, create_dts, load_audit_id)
+        select s.work_refid, s.title, s.original_lang, s.ori_lang_code, s.mds_code, s.mds_text,
                s.lc_subjects, s.popularity, now(), %(audit_id)s
         from staging.work_info s
         left join integration.work_info w on (w.work_refid = s.work_refid)

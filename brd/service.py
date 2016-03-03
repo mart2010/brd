@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 import logging
+import logging.config
 import shutil
 
 import brd
 import brd.elt as elt
-from brd.elt import EltStepStatus
 import brd.config as config
 import os
 import datetime
-from brd.scrapy import SpiderProcessor
+
 
 __author__ = 'mouellet'
 
+logger = logging.getLogger(__name__)
 
 def treat_loaded_file(processed_filepath, remove, archive_dir):
     if remove:
@@ -41,18 +42,18 @@ def fetch_workIds_no_info(nb_work):
 def fetch_workIds_not_harvested(site_logical_name, nb_work):
     """
     Find work_refid and their isbns not yet harvested for site.
-    For lt, simply return the ids...  but using work_info ids to reduce the likelihood
-    of harvesting duplicated work.
+    For lt, simply return the ids using work_info ids to reduce the likelihood
+    of harvesting duplicated work (still possible for work merged afterward).
 
     :return:
     """
     sql_other = \
         """
         with ref as (
-            select coalesce(same.master_refid, w.refid) as wid, array_agg(i.isbn10) as isbn_list
-            from integration.work w
-            left join integration.work_sameas same on (w.refid = same.work_refid)
-            join integration.work_isbn wi on (wi.work_refid = w.refid)
+            select coalesce(same.master_refid, w.work_refid) as wid, array_agg(i.isbn10) as isbn_list
+            from integration.work_info w
+            left join integration.work_sameas same on (w.work_refid = same.work_refid)
+            join integration.work_isbn wi on (wi.work_refid = w.work_refid)
             join integration.isbn i on (i.ean = wi.ean)
             group by 1
         )
@@ -64,6 +65,8 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
              join integration.site s on (m.site_id = s.id and s.logical_name = %(name)s)
             ) as mapped on (mapped.work_refid = ref.wid)
         where mapped.last_harvest_dts IS NULL
+        and ref.wid > 1007
+        order by 1
         limit %(nb)s
         """
     # select only the ones with work_info harvested
@@ -71,8 +74,8 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
         """
         select wi.work_refid
         from integration.work_info wi
-        where
         inner join integration.work w on (wi.work_refid = w.refid)
+        where
         w.last_harvest_dts IS NULL
         limit %(nb)s
         """
@@ -141,10 +144,10 @@ def fetch_ltwork_list(nb_work):
     :return list of dict {'work_refid': x, 'last_harvest_dts': y, 'nb_in_db': {'ENG': n1, 'FRE': n2, ..}}
     """
 
-    list_of_wids = fetch_ltwids_not_harvested(nb_work)
+    list_of_wids = fetch_workIds_not_harvested('librarything', nb_work)
     if list_of_wids is None or len(list_of_wids) == 0:
         list_of_wids = fetch_ltwids_stat_harvested(nb_work)
-        logging.info("All work harvested for 'librarything', will go fetch harvested work")
+        logger.info("All work harvested for 'librarything', will start fetching harvested work")
     return construct_dic(list_of_wids)
 
 
@@ -173,13 +176,5 @@ def _bulkload_file(filepath, schematable, archive_file=True):
     if n != -1 and archive_file:
         treat_loaded_file(filepath, remove=False, archive_dir=config.SCRAPED_ARCHIVE_DIR)
     return (audit_id, n)
-
-
-
-
-
-
-
-
 
 

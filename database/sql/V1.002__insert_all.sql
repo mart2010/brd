@@ -14,6 +14,7 @@ values
 ,(2, 'goodreads', 'active', now())
 ,(3, 'critiqueslibres', 'active', now())
 ,(4, 'babelio', 'active', now())
+,(5, 'amazon.com', 'active', now())
 ;
 
 insert into integration.site_identifier(site_id, hostname, valid_from, valid_to, create_dts)
@@ -22,6 +23,7 @@ values
 ,(2, 'www.goodreads.com', now(), '''infinity'''::timestamp, now())
 ,(3, 'www.critiqueslibres.com', now(), '''infinity'''::timestamp, now())
 ,(4, 'www.babelio.com', now(), '''infinity'''::timestamp, now())
+,(5, 'www.amazon.com', now(), '''infinity'''::timestamp, now())
 ;
 
 

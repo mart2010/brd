@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import logging
 
 import scrapy
 from brd.scrapy.items import WorkRefItem
@@ -6,11 +7,13 @@ import brd.scrapy.spiders.reviews as reviews
 import brd
 __author__ = 'mouellet'
 
+logger = logging.getLogger(__name__)
 
 # --ex. of book with multiple authors:
 # -- https://www.librarything.com/work/26628
 # -- https://www.librarything.com/work/989447
 # -- https://www.librarything.com/work/5072307
+
 
 class WorkReference(reviews.BaseSpider):
     """
@@ -29,7 +32,7 @@ class WorkReference(reviews.BaseSpider):
         for d in self.works_to_harvest:
             i += 1
             if i % 100 == 0:
-                self.logger.info("Requested the %d-th work (out of %d)" % (i, len(self.works_to_harvest)))
+                logger.info("Requested the %d-th work (out of %d)" % (i, len(self.works_to_harvest)))
 
             wid = str(d['refid'])
             yield scrapy.Request(self.url_workdetail % wid, callback=self.parse_work, meta={'wid': wid})
@@ -37,7 +40,7 @@ class WorkReference(reviews.BaseSpider):
 
     def parse_work(self, response):
         wid = response.url[response.url.index('/work/') + 6: response.url.index('/workdetails')]
-        self.logger.info("about to harvest work %s " % wid)
+        logger.info("about to harvest work %s " % wid)
         dup_id = None
         # when work has duplicate, link it to "master" (ex. 13001031 is dup of 17829)
         if wid != response.meta['wid']:

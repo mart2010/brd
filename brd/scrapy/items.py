@@ -22,8 +22,11 @@ class ReviewItem(Item):
     work_refid          = Field()
     dup_refid           = Field()
     work_uid            = Field()
+    title               = Field()
+    authors             = Field()
     parsed_review_date  = Field()
     parsed_rating       = Field()
+
 
 
 class WorkRefItem(Item):
@@ -41,7 +44,23 @@ class WorkRefItem(Item):
 
 
 class ReviewerItem(Item):
-    pass
+    username            = Field()
+    user_uid            = Field()
+    fname               = Field()
+    lname               = Field()
+    status              = Field()
+    ocupation           = Field()
+    interest            = Field()
+    country             = Field()
+    location            = Field()
+    gender              = Field()
+    birth_year          = Field()
+
+    tags                = Field()
+
+
+
+
 
 
 

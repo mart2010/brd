@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
-import brd.elt
-import datetime
+from scrapy.utils.log import configure_logging
+
 
 __author__ = 'mouellet'
 
+# to avoid any log output set by default
+# configure_logging(install_root_handler=False)
 
 class SpiderProcessor(object):
     """

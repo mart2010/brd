@@ -17,8 +17,7 @@ SOURCE_WEBSITES_FR = {
     'decitre': 'http://www.decitre.fr',
     'amazon': 'http://www.amazon.fr',  # amazon purchased goodreads, but reviews not planned to be integrated..
     'fnac': 'http://www.fnac.com',
-
-    'shelfari': 'http://www.shelfari.com',  # also an amazon co!!
+    'shelfari': 'http://www.shelfari.com',  # also an amazon co.. will be merged with gr!!
 
     # these sites are quite outdated and/or limited in term of reviews
     'critique-livre': 'http://www.critique-livre.fr',  # only 750 reviews on novel (roman)

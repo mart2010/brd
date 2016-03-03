@@ -12,6 +12,12 @@ import brd.elt
 __author__ = 'mouellet'
 
 
+logger = logging.getLogger(__name__)
+# module-level loggers use config file (otherwise, they get created with default values)
+# also done in Luigi.interface so probaby not needed when launching task from command-line
+logging.config.fileConfig('logging.cfg', disable_existing_loggers=False)
+
+
 def get_period_text(begin_period, end_period):
     """
     :param begin_period:
@@ -178,7 +184,7 @@ def load_static_ref():
         with open(lang_ref_file, 'r') as f:
             n = c.copy_into_table('integration.language', fields, f, delim='\t')
         c.commit()
-        logging.info("Loaded %d records into integration.language" % n)
+        logger.info("Loaded %d records into integration.language" % n)
 
     #reference stuff
     # nb = c.fetch_one('select count(1) from integration.work')[0]
