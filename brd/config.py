@@ -14,6 +14,7 @@ DATABASE = {
 #for now, in french:
 SOURCE_WEBSITES_FR = {
 
+    'anobii': 'http://www.anobii.com',   # mostly popular in Italy (has 50M books catalogued)
     'decitre': 'http://www.decitre.fr',
     'amazon': 'http://www.amazon.fr',  # amazon purchased goodreads, but reviews not planned to be integrated..
     'fnac': 'http://www.fnac.com',
@@ -45,17 +46,3 @@ REF_DATA_DIR = "/Users/mart/Temp/ref_data"
 REF_ARCHIVE_DIR = "/Users/mart/Temp/ref_data/archive"
 
 
-# business rules
-
-# Minimum nb of reviews before loading book from website
-MIN_NB_REVIEWS = 5
-
-
-
-# trigger settings
-    
-
-
-
-
-# etc..

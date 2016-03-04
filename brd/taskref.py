@@ -112,11 +112,17 @@ class BatchLoadWorkRef(luigi.Task):
 
 # --------------------------------------------------------------------------------------------- #
 # ----------------------------------  LOAD WORK_INFO  ----------------------------------------- #
+# STAT:
+#  @ DOWNLOAD_DELAY=0.25
+#   - HarvestWorkInfo approx. rate: 100 work/min or 6000/h.  (4M takes over 600hr, too long)
+#  @ DOWNLOAD_DELAY=0.12
+#   - HarvestWorkInfo approx. rate: 200 work/min (linear scaling!)
+#  Database task (wait for PS server)
 # --------------------------------------------------------------------------------------------- #
 class FetchWorkIdsWithoutInfo(luigi.Task):
     """
     This fetches n_work having NO work_info harvested, while avoiding duplicate
-    work-ids (to avoid trying many times same work through its duplicate)
+    work-ids (to avoid re-harvesting same work through its duplicate)
     """
     n_work = luigi.IntParameter()
     harvest_dts = luigi.DateMinuteParameter()

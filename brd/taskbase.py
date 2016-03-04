@@ -5,21 +5,6 @@ from luigi import six
 # defined in Batch entry point Task (shared among all tasks)
 batch_name = "n.a."  # concurrent batch jobs should be launched in separate process
 
-class DateSecParameter(luigi.parameter.DateHourParameter):
-    """
-    My version of Parameter whose value is a :py:class:`~datetime.datetime` specified
-    to the second (luigi only provides DateParam up to the minute)
-
-    A DateSecondParameter is formatted date and time specified to the second.
-    For example, ``2013-07-10T190723`` specifies July 10, 2013 at 19:07:23.
-    """
-
-    date_format = '%Y-%m-%dT%H%M%S'
-    _timedelta = luigi.parameter.timedelta(seconds=1)
-
-    def parse(self, s):
-        return super(DateSecParameter, self).parse(s)
-
 
 class BasePostgresTask(luigi.Task):
     """

@@ -57,6 +57,8 @@ class WorkReference(reviews.BaseSpider):
         # return Mary Ann Shaffer (i.e. fname lname)
         a_names = [sel_authors[i].extract() for i in range(len(sel_authors))]
         author_names = ";".join(a_names)
+        # PS copy_from chokes on the occasional 'tab'
+        author_names = author_names.replace('\t', '')
         # remove prefix of '/author/shaffermaryan'
         a_ids = [sel_authors_href[i].extract()[8:] for i in range(len(sel_authors))]
         author_ids = ";".join(a_ids)
@@ -81,7 +83,14 @@ class WorkReference(reviews.BaseSpider):
         # sometimes no link is found for popularity
         if pop is None:
             pop = response.xpath('//tr[@class="wslcontent"]/td[3]/text()').extract_first()
-        popularity = int(pop.replace(",", ""))
+        if pop.find(',') > 0:
+            pop = pop.replace(",", "")
+        # it may be '--' (probably means not calculated?)
+        try:
+            popularity = int(pop)
+        except:
+            popularity = None
+
         yield WorkRefItem(work_refid=wid, dup_refid=dup_id, title=title, original_lang=ori_lang, ori_lang_code=ori_lang_code,
                           authors=author_names, authors_code=author_ids, lc_subjects=lc_subjects, mds_code=mds_code,
                           mds_text=mds_text, popularity=popularity)
