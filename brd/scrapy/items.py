@@ -18,6 +18,7 @@ class ReviewItem(Item):
     review              = Field()
     review_date         = Field()
     review_lang         = Field()
+    # simple count or text (ex. az: 3 out 6 people found that helpful...indicating both likes and dislikes)
     likes               = Field()
     work_refid          = Field()
     dup_refid           = Field()
@@ -26,7 +27,8 @@ class ReviewItem(Item):
     authors             = Field()
     parsed_review_date  = Field()
     parsed_rating       = Field()
-
+    parsed_likes        = Field()
+    parsed_dislikes     = Field()
 
 
 class WorkRefItem(Item):
@@ -41,6 +43,7 @@ class WorkRefItem(Item):
     mds_code            = Field()
     mds_text            = Field()
     popularity          = Field()
+    other_lang_title    = Field()
 
 
 class ReviewerItem(Item):

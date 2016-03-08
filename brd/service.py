@@ -94,7 +94,7 @@ def fetch_ltwids_stat_harvested(nb_work):
             join integration.site s on (s.id = r.site_id and s.logical_name = 'librarything')
             group by 1,2
         )
-        select w.refid, w.last_harvest_dts,
+        select w.refid, cast(w.last_harvest_dts as date) as last_harvest_date,
                 array_agg(review_lang) as langs, array_agg(cnt) as cnts
         from work w
         left join cnt_per_lang c on (w.refid = c.work_refid)
@@ -108,11 +108,12 @@ def fetch_ltwids_stat_harvested(nb_work):
 
 def construct_dic(list_dic):
     """
-    Construct the following list of dictionary (only work-id keyword mandatory) from tuple list
+    Construct the following list of dictionary (only work-id keyword mandatory)
+    from the list input
 
-    :param list_dic: [{'work_refid':, 'last_harvest_dts':, 'langs':[], 'cnts':[], 'isbns':[] } ]
+    :param list_dic: [{'work_refid':, 'last_harvest_date':, 'langs':[], 'cnts':[], 'isbns':[]}..]
     :return: [  {'work_refid': w1,
-        'last_harvest_dts': d1,
+        'last_harvest_date': d1,
         'nb_in_db': {'ENG': 12, 'FRE': 2, ..},
         'isbns': [ix,iy,..]
         }, ...]
@@ -123,7 +124,7 @@ def construct_dic(list_dic):
     for row in list_dic:
         dic = {'work_refid': row['work_refid']}
         if len(row) > 1:
-            dic['last_harvest_dts'] = row.get('last_harvest_dts')
+            dic['last_harvest_date'] = row.get('last_harvest_date')
             dic['isbns'] = row.get('isbns')
             if row.get('nb_in_db') and len(row['nb_in_db']) > 0:
                 sub_dic = {}

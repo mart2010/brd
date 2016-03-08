@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
-from scrapy.utils.log import configure_logging
 
 
 __author__ = 'mouellet'
 
-# to avoid any log output set by default
-# configure_logging(install_root_handler=False)
 
 class SpiderProcessor(object):
     """
     Responsible in triggering Spider session and feeding dependencies as Spider
 
     """
-    def __init__(self, spidername, **params):
+    def __init__(self, spidername, **kwargs):
         self.spidername = spidername
-        self.dump_filepath = params['dump_filepath']
-        self.works_to_harvest = params['works_to_harvest']
+        self.kwargs = kwargs
 
     def start_process(self):
         """
@@ -28,9 +24,9 @@ class SpiderProcessor(object):
         process = CrawlerProcess(get_project_settings())
 
         # instantiate the spider
-        process.crawl(self.spidername, dump_filepath=self.dump_filepath, works_to_harvest=self.works_to_harvest)
+        process.crawl(self.spidername, **self.kwargs)
         # blocks here until crawling is finished
         process.start()
         # clean termination
         # process.stop()
-        return self.dump_filepath
+        return self.kwargs['dump_filepath']

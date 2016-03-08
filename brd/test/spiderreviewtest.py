@@ -12,7 +12,7 @@ import brd.config as config
 class TestLtReview(unittest.TestCase):
 
     def mock_spider(self, wid):
-        spider = spiderreviews.LibraryThingWork(
+        spider = spiderreviews.LibraryThing(
             begin_period='1-1-2000',
             end_period='1-1-2016',
             dump_filepath='dummy',

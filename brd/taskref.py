@@ -183,8 +183,8 @@ class BulkLoadWorkInfo(BaseBulkLoadTask):
 class LoadWorkNotFound(BasePostgresTask):
     """
     To load new work-id in integration.work.  This may happen with duplicate work-id
-    redirecting to a master work-id not yet present in integration.work.
-    These new id will only be linked to ISBN's on next load of thingISBN.
+    redirecting to a master work-id not yet loaded in integration.work.
+    These new id should be linked to ISBN's with updated thingISBN.
     """
     n_work = luigi.IntParameter()
     harvest_dts = luigi.DateMinuteParameter()
@@ -220,9 +220,9 @@ class LoadWorkInfo(BasePostgresTask):
         sql = \
         """
         insert into integration.work_info(work_refid, title, original_lang, ori_lang_code, mds_code,
-                                          mds_text, lc_subjects, popularity, create_dts, load_audit_id)
+                                          mds_text, lc_subjects, popularity, other_lang_title, create_dts, load_audit_id)
         select s.work_refid, s.title, s.original_lang, s.ori_lang_code, s.mds_code, s.mds_text,
-               s.lc_subjects, s.popularity, now(), %(audit_id)s
+               s.lc_subjects, s.popularity, s.other_lang_title, now(), %(audit_id)s
         from staging.work_info s
         left join integration.work_info w on (w.work_refid = s.work_refid)
         where w.work_refid IS NULL;

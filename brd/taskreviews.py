@@ -6,7 +6,7 @@ import brd
 import brd.service as service
 import luigi
 import os
-from brd.taskbase import DateSecParameter, BaseBulkLoadTask, BasePostgresTask, batch_name
+from brd.taskbase import BaseBulkLoadTask, BasePostgresTask, batch_name
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +17,11 @@ class FetchNewWorkIds(luigi.Task):
     """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
 
     def output(self):
         wids_filepath = '/tmp/newwids_%s_%s.txt' % \
-                        (self.site, self.harvest_dts.strftime(DateSecParameter.date_format))
+                        (self.site, self.harvest_dts.strftime(luigi.DateMinuteParameter.date_format))
         return luigi.LocalTarget(wids_filepath)
 
     def run(self):
@@ -33,13 +33,13 @@ class FetchNewWorkIds(luigi.Task):
 class HarvestReviews(luigi.Task):
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
 
     def __init__(self, *args, **kwargs):
         super(HarvestReviews, self).__init__(*args, **kwargs)
 
         filename = 'ReviewsOf%s_%s.csv' % (self.site,
-                                           self.harvest_dts.strftime(DateSecParameter.date_format))
+                                           self.harvest_dts.strftime(luigi.DateMinuteParameter.date_format))
         self.dump_filepath = os.path.join(brd.config.SCRAPED_OUTPUT_DIR, filename)
 
     def requires(self):
@@ -54,7 +54,8 @@ class HarvestReviews(luigi.Task):
             workids_list = json.load(f)
         spider_process = brd.scrapy.SpiderProcessor(self.site,
                                                     dump_filepath=self.dump_filepath,
-                                                    works_to_harvest=workids_list)
+                                                    works_to_harvest=workids_list,
+                                                    to_date=self.harvest_dts)
         spider_process.start_process()
         logger.info("Harvest of %d works/review completed with spider %s (dump file: '%s')"
                      % (len(workids_list), self.site, self.dump_filepath))
@@ -63,9 +64,10 @@ class HarvestReviews(luigi.Task):
 class BulkLoadReviews(BaseBulkLoadTask):
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
 
     input_has_headers = True
+    clear_table_before = True
     table = 'staging.REVIEW'
 
     def requires(self):
@@ -75,7 +77,7 @@ class BulkLoadReviews(BaseBulkLoadTask):
 class LoadUsers(BasePostgresTask):
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
 
     table = 'integration.USER'
 
@@ -115,7 +117,7 @@ class LoadUsers(BasePostgresTask):
 class LoadReviews(BasePostgresTask):
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
     table = 'integration.REVIEW'
 
     def requires(self):
@@ -149,7 +151,7 @@ class LoadLtWorkSameAs(BasePostgresTask):
     However we leave as it could still happen that during work-info harvest duplicates still existed..
     """
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
     table = 'integration.WORK_SAMEAS'
 
     def requires(self):
@@ -177,7 +179,7 @@ class UpdateLtLastHarvest(BasePostgresTask):
     (note: for other site, this gets done in task LoadWorkSiteMapping)
     """
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
     table = 'integration.WORK'
 
     def requires(self):
@@ -215,7 +217,7 @@ class LoadWorkSiteMapping(BasePostgresTask):
     """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
-    harvest_dts = DateSecParameter()
+    harvest_dts = luigi.DateMinuteParameter()
 
     table = 'integration.WORK_SITE_MAPPING'
 
@@ -244,13 +246,13 @@ class LoadWorkSiteMapping(BasePostgresTask):
 
 
 # python -m luigi --module brd.task BatchLoadReviews --site librarything
-# --n-work 2 --harvest-dts 2016-01-31T190723 --local-scheduler
+# --n-work 2 --harvest-dts 2016-01-31T1907 --local-scheduler
 
 class BatchLoadReviews(luigi.Task):
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
-    # warning: default will trigger different task even after failure!
-    harvest_dts = DateSecParameter(default=datetime.datetime.now())
+    # default values trigger different task even after failure!
+    harvest_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
 
     global batch_name
     batch_name = "Reviews"  # for auditing

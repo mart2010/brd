@@ -62,6 +62,8 @@ create table staging.review (
     work_uid text,
     parsed_review_date date,
     parsed_rating text,
+    parsed_likes int,
+    parsed_dislikes int,
     original_lang text,
     title text,
     authors text,
@@ -98,6 +100,7 @@ create table staging.work_info (
     mds_text text,
     lc_subjects text,
     popularity int,
+    other_lang_title text,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
@@ -126,7 +129,6 @@ comment on table staging.work_update is 'Staging for evolving features harvested
 --
 
 -------------------------------------- Integration layer -------------------------------------
-
 
 create table integration.site (
     id int primary key,
@@ -201,6 +203,7 @@ create table integration.work_info (
     mds_code text,
     mds_text text,
     lc_subjects text,
+    other_lang_title text,
     create_dts timestamp,
     update_dts timestamp,
     load_audit_id int,
@@ -253,21 +256,6 @@ create table integration.isbn_info (
 
 comment on table integration.isbn_info is 'Attribute data related to ISBN (un-historized Satellite-type, could add history if need be)';
 
-
-
-create table integration.isbn_sameas (
-    ean bigint not null,
-    ean_same bigint not null,
-    primary key (ean, ean_same),
-    load_audit_id int,
-    foreign key (ean) references integration.isbn(ean),
-    foreign key (ean_same) references integration.isbn(ean),
-    foreign key (load_audit_id) references staging.load_audit(id)
-);
-
-comment on table integration.isbn_sameas is 'Association between isbn of SAME work taken from lt';
-comment on column integration.isbn_sameas.ean is 'A reference ean taken arbitrarily from the set of same ean''s';
-comment on column integration.isbn_sameas.ean_same is 'Ean considered same as the reference ean (including the reference itself)';
 
 
 create table integration.work_isbn (
