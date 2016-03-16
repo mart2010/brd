@@ -62,7 +62,7 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
     clear_table_before = False
     # default separator
     column_separator = '|'
-    # container of values inserted as NULL values (MO added empty string)
+    # container of values inserted as NULL values (MO: added empty string)
     null_values = (None, "")
     # added to manage col headers
     input_has_headers = False
@@ -120,7 +120,8 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
         Execute copy_expert
         :return rowcount impacted
         """
-        # NULL '%s':now leave default NULL (empty and \N as luigi generated tmp file does not produce the \\N correctly)
+        # removed: "NULL '%s'"  and use default NULL (empty and \N) since luigi generated tmp file
+        # does not produce the \\N correctly)
         sql = \
             """
             copy %s( %s )

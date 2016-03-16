@@ -42,6 +42,7 @@ class WorkRefItem(Item):
     lc_subjects         = Field()
     mds_code            = Field()
     mds_text            = Field()
+    mds_code_corr       = Field()
     popularity          = Field()
     other_lang_title    = Field()
 

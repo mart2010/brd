@@ -8,10 +8,23 @@ __author__ = 'mouellet'
 
 logger = logging.getLogger(__name__)
 
+
 # --ex. of book with multiple authors:
 # -- https://www.librarything.com/work/26628
 # -- https://www.librarything.com/work/989447
 # -- https://www.librarything.com/work/5072307
+
+# Harvest Stat :
+#  @ DOWNLOAD_DELAY=0.25
+#   - HarvestWorkInfo approx. rate: 100 work/min or 6000/h.  (4M takes over 600hr, too long)
+#  @ DOWNLOAD_DELAY=0.12
+#   - HarvestWorkInfo approx. rate: 200 work/min (linear scaling!)
+#  @ DOWNLOAD_DELAY=0.05
+#   - HarvestWorkInfo approx. rate: 400 work/min (still linear ... lt is scaling!)
+#  No DOWNLOAD_DELAY set
+#   - HarvestWorkInfo approx. rate: 700 work/min
+#
+# --------------------------------------------------------------------------------------------- #
 
 
 class WorkReference(scrapy.Spider):
@@ -36,8 +49,8 @@ class WorkReference(scrapy.Spider):
 
     def start_requests(self):
         for i in xrange(len(self.wids)):
-            if i % 100 == 0:
-                logger.info("Requested the %d-th work (out of %d)" % (i, len(self.works_to_harvest)))
+            if i % 1000 == 0:
+                logger.debug("Requested the %d-th work (out of %d)" % (i, len(self.works_to_harvest)))
             wid = str(self.wids[i]['refid'])
             yield scrapy.Request(self.url_workdetail % wid, callback=self.parse_work, meta={'wid': wid})
 
@@ -50,6 +63,10 @@ class WorkReference(scrapy.Spider):
             item['dup_refid'] = response.meta['wid']
         table_t = '//table[@id="book_bookInformationTable"]'
         item['title'] = response.xpath(table_t + '/tr[1]/td[2]/b/text()').extract_first()
+        # Postgres copy_from chokes on occasional 'tab'
+        # TODO: Imple these pesky checks in separate "Extractor/Parsing" class
+        item['title'] = item['title'].replace('\t', '')
+
         item['original_lang'] = response.xpath(table_t + '/tr/td/a[starts-with(@href,"/language.php?")]/text()').extract_first()
         item['ori_lang_code'] = brd.get_marc_code(item['original_lang'])
         other_langs = response.xpath(table_t + '//td[starts-with(text(),"Other language")]/following-sibling::*//text()').extract()
@@ -58,7 +75,6 @@ class WorkReference(scrapy.Spider):
         # return Mary Ann Shaffer (i.e. fname lname)
         authors = response.xpath('//div[@class="headsummary"]/h2/a/text()').extract()
         author_names = ";".join(authors)
-        # Postgres copy_from chokes on occasional 'tab'
         item['authors'] = author_names.replace('\t', '')
 
         # remove prefix of '/author/shaffermaryan'
@@ -67,8 +83,20 @@ class WorkReference(scrapy.Spider):
         item['authors_code'] = ";".join(a_ids)
         all_mds = response.xpath(table_t + '//div[@id="ddcdisplay"]/p[1]/a/text()').extract()
         if len(all_mds) > 0:
-            item['mds_code'] = all_mds[0]
-            item['mds_text'] = "-->".join(all_mds[1:])
+            mds_code = all_mds[0]
+            # ignore error in text with '--'
+            mds_texts = filter(lambda s: s.find(u'-') == -1, all_mds[1:])
+            item['mds_code'] = mds_code
+            item['mds_text'] = "-->".join(mds_texts)
+            # more precise code may have some part of text no set and ignored from mds lt system
+            # ex: 613.04244 (Technology-->Medicine-->Health; Hygiene -->Essays)
+            mds_code_nopt = mds_code.replace('.', '')
+            if len(mds_code_nopt) > len(mds_texts):
+                new_code = mds_code_nopt[:len(mds_texts)]
+                if len(new_code) > 3:
+                    item['mds_code_corr'] = new_code[0:3] + '.' + new_code[3:]
+                else:
+                    item['mds_code_corr'] = new_code
 
         sub_lines = response.xpath(table_t + '//div[@class="subjectLine"]')
         subjects = []
@@ -82,13 +110,9 @@ class WorkReference(scrapy.Spider):
         # sometimes no link is found for popularity
         if pop is None:
             pop = response.xpath('//tr[@class="wslcontent"]/td[3]/text()').extract_first()
-        pop = pop.replace(",", "")
-        # sometimes = '--' (probably means not calculated?)
-        try:
-            item['popularity'] = int(pop)
-        except:
-            pass
-
+        # strange but not same as dash '-' (it seems to be unicode equivalent?)
+        if pop and pop.find(u'—') == -1:
+            item['popularity'] = pop
         yield item
 
     def get_dump_filepath(self):

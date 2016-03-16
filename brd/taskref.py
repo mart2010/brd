@@ -112,13 +112,7 @@ class BatchLoadWorkRef(luigi.Task):
 
 # --------------------------------------------------------------------------------------------- #
 # ----------------------------------  LOAD WORK_INFO  ----------------------------------------- #
-# STAT:
-#  @ DOWNLOAD_DELAY=0.25
-#   - HarvestWorkInfo approx. rate: 100 work/min or 6000/h.  (4M takes over 600hr, too long)
-#  @ DOWNLOAD_DELAY=0.12
-#   - HarvestWorkInfo approx. rate: 200 work/min (linear scaling!)
-#  Database task (wait for PS server)
-# --------------------------------------------------------------------------------------------- #
+
 class FetchWorkIdsWithoutInfo(luigi.Task):
     """
     This fetches n_work having NO work_info harvested, while avoiding duplicate
@@ -180,11 +174,11 @@ class BulkLoadWorkInfo(BaseBulkLoadTask):
     def requires(self):
         return HarvestWorkInfo(self.n_work, self.harvest_dts)
 
-class LoadWorkNotFound(BasePostgresTask):
+class LoadWorkMissing(BasePostgresTask):
     """
     To load new work-id in integration.work.  This may happen with duplicate work-id
-    redirecting to a master work-id not yet loaded in integration.work.
-    These new id should be linked to ISBN's with updated thingISBN.
+    redirecting to a master work-id missing from integration.work.
+    These new id will be linked to ISBN's when updating thingISBN.
     """
     n_work = luigi.IntParameter()
     harvest_dts = luigi.DateMinuteParameter()
@@ -214,15 +208,16 @@ class LoadWorkInfo(BasePostgresTask):
     table = 'integration.WORK_INFO'
 
     def requires(self):
-        return LoadWorkNotFound(self.n_work, self.harvest_dts)
+        return LoadWorkMissing(self.n_work, self.harvest_dts)
 
+    # TODO:  remove the mds stuff integrated into their own (and lc_sub if ever..)
     def exec_sql(self, cursor, audit_id):
         sql = \
         """
         insert into integration.work_info(work_refid, title, original_lang, ori_lang_code, mds_code,
                                           mds_text, lc_subjects, popularity, other_lang_title, create_dts, load_audit_id)
         select s.work_refid, s.title, s.original_lang, s.ori_lang_code, s.mds_code, s.mds_text,
-               s.lc_subjects, s.popularity, s.other_lang_title, now(), %(audit_id)s
+               s.lc_subjects, replace(s.popularity,',','')::int, s.other_lang_title, now(), %(audit_id)s
         from staging.work_info s
         left join integration.work_info w on (w.work_refid = s.work_refid)
         where w.work_refid IS NULL;
@@ -290,7 +285,7 @@ class LoadWorkAuthor(BasePostgresTask):
 
     def requires(self):
         return [LoadAuthorInfo(self.n_work, self.harvest_dts),
-                LoadWorkNotFound(self.n_work, self.harvest_dts)]
+                LoadWorkMissing(self.n_work, self.harvest_dts)]
 
     def exec_sql(self, cursor, audit_id):
         sql = \
@@ -317,7 +312,7 @@ class LoadWorkSameAs(BasePostgresTask):
     table = 'integration.WORK_SAMEAS'
 
     def requires(self):
-        return LoadWorkNotFound(self.n_work, self.harvest_dts)
+        return LoadWorkMissing(self.n_work, self.harvest_dts)
 
     def exec_sql(self, cursor, audit_id):
         sql = \
@@ -330,6 +325,73 @@ class LoadWorkSameAs(BasePostgresTask):
         cursor.execute(sql, {'audit_id': audit_id})
         return cursor.rowcount
 
+# Almost 50% of LC subjects are NULL!!! mabe not worth integrating
+class LoadLcSubjects(BaseBulkLoadTask):
+    pass
+
+# More than 10% of MDS are NULL
+class LoadMDS(BasePostgresTask):
+    n_work = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter()
+    table = 'integration.MDS'
+
+    def requires(self):
+        return BulkLoadWorkInfo(self.n_work, self.harvest_dts)
+
+    def exec_sql(self, cursor, audit_id):
+        # some text are different for same code corrected (keep arbitrarily the max)
+        sql = \
+            """
+            insert into integration.mds(code, code_w_dot, parent_code, mds_text, create_dts, load_audit_id)
+            select  replace(coalesce(mds_code_corr,mds_code),'.',''),
+                    coalesce(mds_code_corr,mds_code),
+                    left(replace(coalesce(mds_code_corr,mds_code), '.',''),-1),
+                    max(mds_text),
+                    now(),
+                    %(audit_id)s
+            from staging.work_info source
+            where
+            coalesce(mds_code_corr,mds_code) is not null
+            and not exists (select code from integration.mds t
+                        where t.code = replace(coalesce(source.mds_code_corr,source.mds_code),'.','')
+                        )
+            group by 1,2,3;
+            """
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
+
+class LoadWorkLangTitle(BasePostgresTask):
+    n_work = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter()
+    table = 'integration.WORK_LANG_TITLE'
+
+    def requires(self):
+        return BulkLoadWorkInfo(self.n_work, self.harvest_dts)
+
+    def exec_sql(self, cursor, audit_id):
+        # Add language text not present in from language reference
+        # filter out empty language string in web page
+        #  lang_title[2:5] used to avoid splitting WHEN title has ':' (4 of these are possible ;-!)
+        sql = \
+            """
+            with title_harvest as
+            (select work_refid, trim(lang_title[1]) lang, trim(array_to_string(lang_title[2:5],'')) as title
+             from (
+                  select work_refid,
+                     string_to_array(unnest(string_to_array(other_lang_title,'__&__')),':') as lang_title
+                  from staging.work_info) as foo
+            )
+            insert into integration.work_lang_title(work_refid, lang_code, lang_text, title, create_dts, load_audit_id)
+            select t.work_refid, l.code, t.lang, t.title, now(), %(audit_id)s
+            from title_harvest t
+            left join integration.language l on (upper(l.english_name) = upper(t.lang))
+            where
+            char_length(t.lang::text) > 1
+            and not exists (select 1 from integration.work_lang_title existing
+                            where existing.work_refid = t.work_refid and existing.lang_text = t.lang);
+            """
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
 
 # python -m luigi --module brd.task BatchLoadWorkInfo --n-work 2 --harvest-dts 2016-01-31T1930 --local-scheduler
 class BatchLoadWorkInfo(luigi.Task):
@@ -343,6 +405,9 @@ class BatchLoadWorkInfo(luigi.Task):
     batch_name = "Load Work-info"
 
     def requires(self):
-        return [LoadWorkInfo(self.n_work, self.harvest_dts), LoadWorkAuthor(self.n_work, self.harvest_dts),
-                LoadWorkSameAs(self.n_work, self.harvest_dts)]
+        return [LoadWorkInfo(self.n_work, self.harvest_dts),
+                LoadWorkAuthor(self.n_work, self.harvest_dts),
+                LoadWorkSameAs(self.n_work, self.harvest_dts),
+                LoadWorkLangTitle(self.n_work, self.harvest_dts),
+                LoadMDS(self.n_work, self.harvest_dts)]
 

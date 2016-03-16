@@ -98,8 +98,9 @@ create table staging.work_info (
     authors_code text,  --used in lt for disambiguation
     mds_code text,
     mds_text text,
+    mds_code_corr text,
     lc_subjects text,
-    popularity int,
+    popularity text,
     other_lang_title text,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
@@ -315,6 +316,51 @@ create table integration.work_author (
 );
 
 comment on table integration.work_author is 'Association between Work and its author(s), sourced from lt';
+
+create table integration.work_lang_title (
+    work_refid bigint,
+    lang_code char(3),
+    lang_text text,
+    title text,
+    create_dts timestamp,
+    load_audit_id int,
+    primary key (work_refid, lang_text),
+    foreign key (load_audit_id) references staging.load_audit(id)
+);
+
+comment on table integration.work_lang_title is 'Title of work in different language edition';
+comment on column integration.work_lang_title.lang_text is 'Language is used as PK and preserve so we spot missing language ref';
+
+
+--Proposal for MDS
+---- there are issues, especially for long mds oce where a lot are 'Not set'
+---- ex. Twisting in the Wind: The Murderess and the English Press has mds_code = 070.4493641523082094209034
+---- except the text is truncated as other item are 'Not set' ( Information > Journalism And Publishing > Journalism And Publishing > Journalism > Special subjects: departments and editors > By Subject
+create table integration.mds (
+    code text primary key,
+    code_w_dot text,
+    mds_text text,
+    parent_code text,
+    create_dts timestamp,
+    load_audit_id int,
+    foreign key (parent_code) references integration.mds(code),
+    foreign key (load_audit_id) references staging.load_audit(id)
+);
+
+comment on table integration.mds is 'Melvil decimal system as of lt (ie. "based on classification work whose assignments are not copyrightable")';
+comment on column integration.mds.code 'Code corrected (original code truncated based on levels found in text)';
+
+
+create table integration.lc_subject (
+    subject text primary key,
+
+
+);
+
+comment on table integration.lc_subject is 'Library of congress subjects def';
+
+
+
 
 
 
