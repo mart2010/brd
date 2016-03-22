@@ -69,7 +69,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
         order by 1
         limit %(nb)s
         """
-    # select only the ones with work_info harvested
+    # select only ones with work_info harvested
     sql_lt = \
         """
         select wi.work_refid
@@ -77,6 +77,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
         inner join integration.work w on (wi.work_refid = w.refid)
         where
         w.last_harvest_dts IS NULL
+        and wi.work_refid > 2000
         limit %(nb)s
         """
     if site_logical_name == 'librarything':
@@ -137,14 +138,12 @@ def construct_dic(list_dic):
     return res
 
 
-
 def fetch_ltwork_list(nb_work):
     """
     Fetch list of work but first looking at the ones not yet harvested, and if none is found then
      fetch already harvested (with additional stat):
     :return list of dict {'work_refid': x, 'last_harvest_dts': y, 'nb_in_db': {'ENG': n1, 'FRE': n2, ..}}
     """
-
     list_of_wids = fetch_workIds_not_harvested('librarything', nb_work)
     if list_of_wids is None or len(list_of_wids) == 0:
         list_of_wids = fetch_ltwids_stat_harvested(nb_work)

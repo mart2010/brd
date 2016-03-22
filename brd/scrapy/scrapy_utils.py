@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
+import re
 
 __author__ = 'mouellet'
 
-import re
-
-
-# TODO: eventually refactor these various utils fcts into fct-based modules
 
 # maybe use locale, but this simple solution works when exact 'mois' name is used!
 mois = {
@@ -21,11 +18,10 @@ mois = {
     u"octobre": "10",
     u"novembre": "11",
     u"décembre": "12"
-
 }
 
 
-compile_regex = re.compile(r"\s+")
+regex_space = re.compile(r"\s+")
 
 def convert_book_title_to_sform(title):
     r"""
@@ -39,7 +35,7 @@ def convert_book_title_to_sform(title):
     'HERE\'S-A-GOOD-"GARDEN",-TO-CONVERT!!?'
     """
     ctrim = title.strip().upper()
-    return compile_regex.sub("-", ctrim)
+    return regex_space.sub("-", ctrim)
 
 
 def resolve_value(selector, xpath, expected=1):

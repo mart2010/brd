@@ -65,7 +65,8 @@ class WorkReference(scrapy.Spider):
         item['title'] = response.xpath(table_t + '/tr[1]/td[2]/b/text()').extract_first()
         # Postgres copy_from chokes on occasional 'tab'
         # TODO: Imple these pesky checks in separate "Extractor/Parsing" class
-        item['title'] = item['title'].replace('\t', '')
+        if item['title']:
+            item['title'] = item['title'].replace('\t', '')
 
         item['original_lang'] = response.xpath(table_t + '/tr/td/a[starts-with(@href,"/language.php?")]/text()').extract_first()
         item['ori_lang_code'] = brd.get_marc_code(item['original_lang'])

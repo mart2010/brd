@@ -210,14 +210,13 @@ class LoadWorkInfo(BasePostgresTask):
     def requires(self):
         return LoadWorkMissing(self.n_work, self.harvest_dts)
 
-    # TODO:  remove the mds stuff integrated into their own (and lc_sub if ever..)
     def exec_sql(self, cursor, audit_id):
         sql = \
         """
-        insert into integration.work_info(work_refid, title, original_lang, ori_lang_code, mds_code,
-                                          mds_text, lc_subjects, popularity, other_lang_title, create_dts, load_audit_id)
-        select s.work_refid, s.title, s.original_lang, s.ori_lang_code, s.mds_code, s.mds_text,
-               s.lc_subjects, replace(s.popularity,',','')::int, s.other_lang_title, now(), %(audit_id)s
+        insert into integration.work_info(work_refid, title, original_lang, ori_lang_code, mds_code, mds_code_ori,
+                                          lc_subjects, popularity, other_lang_title, create_dts, load_audit_id)
+        select s.work_refid, s.title, s.original_lang, s.ori_lang_code, replace(s.mds_code_corr,',',''), s.mds_code,
+                s.lc_subjects, replace(s.popularity,',','')::int, s.other_lang_title, now(), %(audit_id)s
         from staging.work_info s
         left join integration.work_info w on (w.work_refid = s.work_refid)
         where w.work_refid IS NULL;
@@ -342,10 +341,9 @@ class LoadMDS(BasePostgresTask):
         # some text are different for same code corrected (keep arbitrarily the max)
         sql = \
             """
-            insert into integration.mds(code, code_w_dot, parent_code, mds_text, create_dts, load_audit_id)
+            insert into integration.mds(code, code_w_dot, mds_text, create_dts, load_audit_id)
             select  replace(coalesce(mds_code_corr,mds_code),'.',''),
                     coalesce(mds_code_corr,mds_code),
-                    left(replace(coalesce(mds_code_corr,mds_code), '.',''),-1),
                     max(mds_text),
                     now(),
                     %(audit_id)s
@@ -355,7 +353,7 @@ class LoadMDS(BasePostgresTask):
             and not exists (select code from integration.mds t
                         where t.code = replace(coalesce(source.mds_code_corr,source.mds_code),'.','')
                         )
-            group by 1,2,3;
+            group by 1,2;
             """
         cursor.execute(sql, {'audit_id': audit_id})
         return cursor.rowcount

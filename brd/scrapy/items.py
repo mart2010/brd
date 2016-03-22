@@ -25,6 +25,8 @@ class ReviewItem(Item):
     work_uid            = Field()
     title               = Field()
     authors             = Field()
+    tags_t              = Field()
+    tags_n              = Field()
     parsed_review_date  = Field()
     parsed_rating       = Field()
     parsed_likes        = Field()
@@ -58,13 +60,6 @@ class ReviewerItem(Item):
     country             = Field()
     location            = Field()
     gender              = Field()
-    birth_year          = Field()
-
+    birth_text          = Field()
     tags                = Field()
-
-
-
-
-
-
 

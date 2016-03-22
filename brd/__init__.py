@@ -15,8 +15,8 @@ __author__ = 'mouellet'
 logger = logging.getLogger(__name__)
 # module-level loggers use config file (otherwise, they get created with default values)
 # also done in Luigi.interface so probaby not needed when launching task from command-line
-# TODO: this is done by luigi.. now impact the logging of my test (so to be commented during test)
-logging.config.fileConfig('logging.cfg', disable_existing_loggers=False)
+# TODO: this is done by luigi.. now impact the logging of my test (see what to do instead of commented ot)
+#logging.config.fileConfig('logging.cfg', disable_existing_loggers=False)
 
 
 def get_period_text(begin_period, end_period):

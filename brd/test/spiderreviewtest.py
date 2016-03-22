@@ -7,42 +7,58 @@ import unittest
 from mockresponse import fake_response_from_file
 import brd.scrapy.spiders.reviews as spiderreviews
 import brd.config as config
+import datetime
 
 
 class TestLtReview(unittest.TestCase):
 
-    def mock_spider(self, wid):
+    def mock_spider(self, wids, to_date=datetime.datetime.now()):
         spider = spiderreviews.LibraryThing(
-            begin_period='1-1-2000',
-            end_period='1-1-2016',
             dump_filepath='dummy',
-            reviews_order='asc',
-            works_to_harvest=[{'work-site-id': wid, 'last_harvest_dts': None, 'nb_in_db': {}}])
+            to_date=to_date,
+            works_to_harvest=[{'work_refid': wid} for wid in wids])
         return spider
 
-
     def test_start_request(self):
-        wid = '2371329'
-        spider = self.mock_spider(wid)
-        req_gen = spider.start_requests
+        wids = ['1111111', '2222222']
+        spider = self.mock_spider(wids)
+        req_gen = spider.start_requests()
 
         r = req_gen.next()
-        meta = r.meta
-        self.assertEqual(r.url, spider.url_workreview % wid)
-        self.assertEqual(meta['work-index'], 0)
+        self.assertEqual(r.url, spider.url_mainpage % wids[0])
+        self.assertEqual(r.meta['work_index'], 0)
+        r = req_gen.next()
+        self.assertEqual(r.url, spider.url_mainpage % wids[1])
         try:
             req_gen.next()
         except StopIteration:
             pass
 
+    def test_page_noreview(self):
+        wids = ['3440235', 'master']
+        spider = self.mock_spider(wids)
+        meta = {'work_index': 0}
+        item_gen = spider.parse_mainpage(fake_response_from_file("mockobject/LTWorkmain_%s_norev.html" % wids[0],
+                                                                 url=spider.url_mainpage % wids[1],
+                                                                 response_type="Html",
+                                                                 meta=meta))
+        item = item_gen.next()
+        self.assertEqual(item['site_logical_name'], 'librarything')
+        self.assertEqual(item['work_refid'], wids[1])
+        self.assertEqual(item['dup_refid'], wids[0])
+        try:
+            item_gen.next()
+        except StopIteration:
+            pass
 
-    def test_parse_nbreview_withManylangs(self):
+
+    def teeest_parse_nbreview_withManylangs(self):
         wid = '2371329'
         spider = self.mock_spider(wid)
-        # validate parse_nb_review()
-        meta = {'work-index': 0}
-        formreq_gen = spider.parse_nbreview(fake_response_from_file("mockobject/Reviews_lt_%s_manyLangs.html" % wid,
-                                                                    url=spider.url_workreview % wid,
+
+        meta = {'work_index': 0}
+        formreq_gen = spider.parse_mainpage(fake_response_from_file("mockobject/Reviews_lt_%s_manyLangs.html" % wid,
+                                                                    url=spider.url_mainpage % wid,
                                                                     response_type="Html",
                                                                     meta=meta))
         nreq = 0
@@ -56,7 +72,7 @@ class TestLtReview(unittest.TestCase):
             nreq += 1
         self.assertEqual(9, nreq)
 
-    def test_parse_reviews(self):
+    def teeest_parse_reviews(self):
         wid = '2371329'
         spider = self.mock_spider(wid)
         # validate parse_reviews()
@@ -71,12 +87,12 @@ class TestLtReview(unittest.TestCase):
             #print "the item" + str(item)
 
 
-    def test_parse_nbreview_onlyOne(self):
+    def teeest_parse_nbreview_onlyOne(self):
         wid = '413508'
         spider = self.mock_spider(wid)
         meta = {'work-index': 0}
-        req_gen = spider.parse_nbreview(fake_response_from_file("mockobject/Reviews_lt_%s_onlyEnglish.html" % wid,
-                                                                url=spider.url_workreview % wid,
+        req_gen = spider.parse_mainpage(fake_response_from_file("mockobject/Reviews_lt_%s_onlyEnglish.html" % wid,
+                                                                url=spider.url_mainpage % wid,
                                                                 response_type="Html",
                                                                 meta=meta))
         one_req = req_gen.next()

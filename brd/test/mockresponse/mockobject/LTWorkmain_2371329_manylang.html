@@ -1,0 +1,702 @@
+<!DOCTYPE html><html>
+<head><META http-equiv="X-UA-Compatible" CONTENT="IE=EmulateIE8"><title>Fear and Trembling by Amélie Nothomb | LibraryThing</title>
+<link rel="canonical" href="http://www.librarything.com/work/2371329"/><meta name="twitter:card" content="summary"   />
+<meta name="twitter:site" content="LibraryThing"   />
+<meta name="twitter:title" content="Fear and Trembling by Amélie Nothomb"   />
+<meta name="twitter:description" content="Click to read more about Fear and Trembling by Amélie Nothomb.  LibraryThing is a cataloging and social networking site for booklovers"   />
+<meta name="twitter:image:src" content="https://images-na.ssl-images-amazon.com/images/P/2253150711.01._SS250_SS250_SCLZZZZZZZ_.jpg"   />
+<meta property="og:title" content="Fear and Trembling by Amélie Nothomb"   />
+<meta property="og:type" content="books.book"   />
+<meta property="og:url" content="http://www.librarything.com/work/2371329"   />
+<meta property="og:image" content="https://images-na.ssl-images-amazon.com/images/P/2253150711.01._SS250_SS250_SCLZZZZZZZ_.jpg"   />
+<meta property="og:site_name" content="LibraryThing.com"   />
+<meta property="fb:app_id" content="79305890602"   />
+<meta property="books:isbn" content="2253150711"   />
+<meta property="og:description" content="Click to read more about Fear and Trembling by Amélie Nothomb.  LibraryThing is a cataloging and social networking site for booklovers"   />
+
+
+<META NAME="description" CONTENT="All about Fear and Trembling by Amélie Nothomb. LibraryThing is a cataloging and social networking site for booklovers">
+<META NAME="keywords" CONTENT="All about Fear and Trembling by Amélie Nothomb, librarything, library, thing, catalog your books, catalogue your books, book cataloging, library, free book catalog, catalogue">
+<META NAME="apple-itunes-app" CONTENT="app-id=948824489">
+<META NAME="language" CONTENT="en">
+
+<link rel="icon" href="/favicon.ico" type="image/x-icon" /><script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js" type="text/javascript" flag_fte="1" language="Javascript"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/prototype/1.7.0.0/prototype.js" type="text/javascript" flag_fte="1" language="Javascript"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/scriptaculous/1.8.1/scriptaculous.js" type="text/javascript" language="Javascript"></script><script src="https://ajax.googleapis.com/ajax/libs/scriptaculous/1.8.1/effects.js" type="text/javascript" language="Javascript"></script><script src="https://ajax.googleapis.com/ajax/libs/scriptaculous/1.8.1/dragdrop.js" type="text/javascript" language="Javascript"></script><script src="https://ajax.googleapis.com/ajax/libs/scriptaculous/1.8.1/controls.js" type="text/javascript" language="Javascript"></script>
+
+
+<script src="https://www.librarything.com/minified/js/80f165889cca747f33e98bddd45ceba1.js" type="text/javascript" language="Javascript"></script>
+ <script type="text/javascript">if (window.jQuery && (typeof $J == 'undefined')) { $J = jQuery.noConflict();} </script><!--[if lt IE 9]>
+ <script language="javascript" type="text/javascript"> document.createElement("spoiler"); </script>
+ <![endif]-->
+
+<link rel="stylesheet" href="https://www.librarything.com/minified/css/6de0bae00c2b559aa42afc3fcc49ab90.css" type="text/css">
+<link rel="stylesheet" href="/css/translated_rules.php?3072" type="text/css">
+
+<!--[if lt IE 9]>
+ <script language="javascript" type="text/javascript"> document.createElement("spoiler"); </script>
+ <![endif]-->
+
+<link rel="stylesheet" href="https://www.librarything.com/minified/css/985f56b9ce7feab6dcc8599c2412cecb.css" type="text/css">
+<style type="text/css">
+
+div#maincover
+{
+position: relative;
+margin-bottom: 15px
+}
+
+div#maincover img.icon
+{
+display: none;
+position: absolute; 
+bottom: 10px; 
+right: 15px; 
+z-index: 1000;
+}
+
+div#maincover:hover img.icon
+{
+display: block;
+background-color: white;
+padding: 4px;
+border: 2px solid #777;
+}
+
+div#lb_externalresources p
+{
+margin-bottom: 10px;
+}
+
+table.pop 
+{
+table-layout:fixed; 
+}
+
+table.startedfinished td
+{
+white-space: nowrap;
+}
+
+table.bookstats img.ui-datepicker-trigger
+{
+vertical-align: middle;
+margin: 0px 10px 3px 0;
+}
+
+</style>
+
+
+<script language="javascript" type="text/javascript">
+
+if (!LibraryThing) {
+	var LibraryThing = {}; //new function() {};
+}
+LibraryThing.divotUp = '<span class="chdivot" style="font-size:150%;vertical-align:1;">&#9656;</span>';
+LibraryThing.divotDown = '<span class="chdivot" style="font-size:150%;vertical-align:1;">&#9662;</span>';
+
+/* Moved to js2/work.js so addnew could use it.
+
+var recparams = {
+	v: 1.0,
+	width: 620,
+	w: 620,
+	height: 400,
+	modal: true
+	};
+*/
+
+var oscchoice = 0;
+var work = 2371329;
+var bookID = 0;
+var urltogoto = null;
+
+var hoverTimer = null;
+var selectedCoverID = null;
+
+function si( thisID )
+	{
+	try
+		{
+		if(thisID.id != selectedCoverID)
+			{
+			selectedCoverID = thisID.id;
+			coverlocation = $(thisID).cumulativeOffset();
+			$('infoicon').style.left = coverlocation[0] + 'px';
+			$('infoicon').style.top = coverlocation[1] + 'px';
+			$('infoicon').show();
+			clearTimeout(hoverTimer);
+			}
+		}
+	catch(err)
+		{
+	  	alert("Error:" + err.message);
+		}
+	}
+		
+function load_externalresources( theid )
+	{
+	var params = 
+		{
+		height: 600,
+		width: 700
+		};
+	var url = '/ajax_externalresources.php?id=' + theid;
+	LibraryThing.lightbox.ajax(url, params);	
+	return false;
+	}
+	
+function si_info( coverid )
+	{
+	if (typeof coverid === 'undefined')
+		{
+		var myArray = selectedCoverID.split('_'); 
+		}
+	else
+		{
+		var myArray = coverid.split('_'); 
+		}
+	covertype = myArray[0];
+	theid = myArray[1];
+	var params = 
+		{
+		height: 700,
+		width: 975
+		};
+	var url = '/ajax_coverinfo.php?covertype='+covertype+'&id=' + theid + '&book=' + bookID + '&work=' + work;
+	LibraryThing.lightbox.ajax(url, params);	
+	return false;
+	}
+
+function positionclosebox()
+	{
+	LBlocation = $('LT_LB').cumulativeOffset();
+	LBsize = $('LT_LB').getDimensions();
+	$('closeboxicon').style.left = (LBlocation[0] + LBsize.width - 16) + 'px';
+	$('closeboxicon').style.top = (LBlocation[1] - 11) + 'px';
+	$('closeboxicon').show();
+	}	
+	
+function si_choose( optionalid )
+	{
+	if (typeof optionalid === 'undefined')
+		{
+		var myArray = selectedCoverID.split('_'); 
+		}
+	else
+		{
+		var myArray = optionalid.split('_'); 
+		}
+		
+	if( myArray[0] == 'cc' )
+		{
+		changeCover(0, myArray[1], bookID);		
+		}
+	if( myArray[0] == 'am' )
+		{
+		changeCover(1, myArray[1], bookID);		
+		}
+	}
+
+function sio( thisID )
+	{
+	hoverTimer = setTimeout(function() { 
+		$('infoicon').hide();
+		}, 10000);
+	}
+
+function book_deletebook(bookid)
+	{
+	//return confirm('Delete this book?');
+	if (confirm("Delete this book from all collections?"))
+		{
+		var tabs = $('book_bookInformationSection');
+		if (tabs)
+			{
+			LTSetOpacity(tabs, 0.3);
+			}
+		window.location = '/deletebook.php?deleteid='+bookid+'&referpage=';
+		}
+	}
+	
+function changeCover(amazon,changeto,book)
+	{
+		
+	if(amazon)
+		{
+		var confirmmsg = "Choose this cover? This will change your book's ISBN.";
+		}
+	else
+		{
+		var confirmmsg = "Choose this cover?";
+		}
+	
+	if (confirm(confirmmsg))
+		{
+		window.location = '/changecover.php?amazon='+amazon+'&changeto=' + changeto + '&book=' + book + '&return=%2Fwork%2F2371329%2F';
+		}
+	}
+	
+function showTopicTable(mode,sort,offset)
+	{
+	currentid = 'topictable';
+	
+	if (!currentMode) { currentMode = 'all'; }
+	if (!currentSort) { currentSort = 0; }
+	
+	if (mode != currentMode)
+		{
+		//document.getElementById(currentMode).style.fontWeight = 'normal';
+		//document.getElementById(mode).style.fontWeight = 'bold';
+		setCookie("cookie_talkmode", mode, false);
+		currentMode = mode;
+		}
+		
+	if ((sort != currentSort) && (sort > -1))
+		{
+		setCookie("cookie_talksort", sort, false);
+		currentSort = sort;
+		}
+		
+	createXMLHttpRequest();
+	xmlHttp.onreadystatechange = handleStateChange;
+	var URL = "/ajaxinc_topictable.php?mode="+mode;
+	URL = URL + '&w=2371329';
+	if (sort > -1) { URL = URL + "&sort=" + sort; }
+	URL = URL + "&offset=" + offset;
+	URL = URL + "&obeysort=1";
+	xmlHttp.open("GET", URL, true);
+	xmlHttp.send(null);
+	
+	idtohide = "loading";
+	document.getElementById("loading").style.display = 'block';
+	}
+	
+function showall(lang)
+	{
+	$('relatedtagsarea'+lang).innerHTML = '';
+	if (!lang) { $('loader').show(); }
+	var url = "/ajaxinc_showbooktags.php";
+	var params = "work=2371329&all=1&print=1&doit=1&lang="+lang;
+	basic_ajax( url, params, function(r) {
+		$('relatedtagsarea'+lang).innerHTML = r.responseText;
+		if (!lang) { $('loader').hide(); }
+		});
+	}
+
+function change_swapcolumnpreference(checkbox)
+	{
+	currentid = 'swapspan';
+	createXMLHttpRequest();
+	xmlHttp.onreadystatechange = handleStateChange;
+	if (checkbox.checked)
+		{
+		var URL = "/ajax_changeswapcolumnprefs.php?checked=1"
+		}
+	else
+		{
+		var URL = "/ajax_changeswapcolumnprefs.php?checked=0";
+		}
+	xmlHttp.open("GET", URL, true);
+	xmlHttp.send(null);
+	document.getElementById("swapspan").innerHTML = " (saving)";
+	}
+	
+// following added csd because it got left out of redesign of works page.
+function loadlanguages(lang, lang2, lang_original)
+	{
+	currentid = 'languagediv';
+	
+	//Ajax thing
+	createXMLHttpRequest();
+	xmlHttp.onreadystatechange = handleStateChange;
+	xmlHttp.open("GET", "/ajax_cardedit_loadlanguages.php?lang="+lang+"&lang2="+lang2+"&lang_original="+lang_original, true);
+	xmlHttp.send(null);
+	        
+	document.getElementById("loading").innerHTML = "Loading...";
+	}
+	
+function loadScore(work)
+	{
+	var url = '/ajax_willilikeit.php?work=' + work;
+	basic_ajax_updater_loading(url, null, 'score');
+	return false;
+	}
+	
+function ajax_work_makeworkCloud(work, check)
+	{
+	var url = '/ajax_work_makeworkCloud.php?work=' + work + '&check=' + check;
+	basic_ajax_updater( url, null, 'ajax_work_makeworkCloud' );
+	}
+	
+var clickedISBN='';
+
+var removeRelationshipConfirm = "Are you sure?";
+
+function sizeImage()
+	{
+	var mainCoverWidth = $('mainCover').width;
+	var mainCoverHeight = $('mainCover').height;
+	
+	if(mainCoverWidth == 1 && mainCoverHeight == 1)
+		{
+		var imageUrl = $('mainCover').src;
+		var url = "/ajax_problemcoverreporter.php?cover="+imageUrl;
+		basic_ajax_updater(url, null, 'problemcoverreporter');
+		}
+	}
+
+function onchange_upgradeauthors()
+	{
+	var upgradeauthors = $('upgradeauthors').getValue();
+	if(upgradeauthors == 1)
+		{
+		$('otherauthorsnewformat').show();
+		$('otherauthorsnewformat_warning').show();
+		}
+	else
+		{
+		$('otherauthorsnewformat').hide();
+		$('otherauthorsnewformat_warning').hide();
+		}
+	}
+
+function load_popularcovers(work,book)
+	{
+	var url = '/ajaxinc_popularcovers.php?work=' + work + '&book=' + book;
+	basic_ajax_updater(url, null, 'popularcovers');
+	}
+	
+function load_coverlist(suffix, showall, work, book)
+	{
+	var theid = 'coverlist' + suffix;
+	var dimensions = $(theid).getDimensions();
+	
+	var params = {
+		work: 		work,
+		book: 		book,
+		width: 		dimensions.width,
+		showall:	showall
+		};
+	var callback;
+	var url = '/ajaxinc_coverlist' + suffix + '.php';
+	basic_ajax_updater(url, params, theid, callback);
+	return false;
+	}
+
+//Getting the "other" thing working.
+function onchange_otherauthors_role(id)
+	{
+	var menu = $("role" + id);
+	if (menu.options.selectedIndex == (menu.options.length - 1))
+		{
+		var userenteredtext = window.prompt("Please enter a role for this person:","");
+		if (userenteredtext)
+			{
+			var lastoption = menu.options.length;
+			menu.options[lastoption-2] = new Option(userenteredtext,userenteredtext);
+			menu.options[lastoption-1] = new Option('--------------','');
+			menu.options[lastoption] = new Option('Other...','');
+			menu.options.selectedIndex = lastoption-2;
+			}
+		}
+	}
+
+
+function otherAuthorDelete(id)
+	{
+	var didconfirm = confirm("Reject and delete this author?");
+	if (didconfirm)
+		{
+		var url = "/ajax_otherauthors_delete.php?id=" + id + "&check=2369652775";
+		basic_ajax_updater(url, null, "currentotherauthor");
+		}
+	return false;
+	}
+	
+function otherAuthorConfirm( work, wtoa_aid, ticktype, status )
+	{
+	var didconfirm = confirm("Confirm?");
+	if (didconfirm)
+		{
+		var url = "/ajax_otherauthors_otherAuthorConfirm.php?work="+work+"&wtoa_aid="+wtoa_aid+"&ticktype="+ticktype+"&status="+status;
+		basic_ajax_updater_loading(url, null, "currentotherauthor");
+		}
+	return false;
+	}
+	
+</script>
+</head><body class="workpage chrome webkit osx" onload="sizeImage()"><a class="anchor" name="top"></a><a class="anchor" name="t"></a><div id="masthead" class="chrome webkit osx ">
+	<a href="/" target="_top">
+		<div id="masthead_logo_wordmark">
+
+							<img id="masthead_lt_logo" src="https://pics.cdn.librarything.com/pics/LT-logo-square-75-bw-w2.png" alt="LT" height="75px" width="75px"/>
+				<!-- <div id="masthead_wordmark"></div> -->
+				 <!-- <img id="masthead_wordmark" src="https://pics.cdn.librarything.com/pics/lt-wordmark-2013@2x.png" alt="LibraryThing" width="200px" /> -->
+		</div>
+	</a>
+	<div id="tabs">
+		<a class="sitenav_item  g1" data-icon="" id="masttab_home" href="/" target="_top">Home</a><a class="sitenav_item  g3" id="masttab_groups" href="/groups" target="_top">Groups</a><a class="sitenav_item  g3 spacer_after" id="masttab_talk" href="/talk" target="_top">Talk</a><a class="sitenav_item  g4" id="masttab_z" href="/zeitgeist" target="_top">Zeitgeist</a>	</div>
+
+
+	<div id="mast_alt">
+
+		<div id="mastsearch">
+			<form action="/search.php" method="GET" target="_top" id="sbarform" name="sbarform">
+				<div id="mastsearch_container">
+					<input type="text" id="mastsearch_query" tabindex="1" placeholder="Search site" name="term">
+					<img id="mastsearch_glass" src="https://pics.cdn.librarything.com/pics/sbar_3.png" height="13px" width="12px" onclick="document.sbarform.submit();"/>
+				</div>
+			</form>
+		</div>
+
+		<div id="mastuser">
+			<ul>
+				<li class="mastuseritem"><span id="mastheadSigninLink"><a href="/" target="_top">Sign in / Join</a></span></li><li class="mastuseritem"><a href="#" onclick="languagemenu=true;document.getElementById('languagechoice').style.display='';return false;">English</a></li><li class="mastuseritem"><a href="/wiki/index.php/HelpThing:Work" target="_top">Help</a></li>			</ul>
+		</div>
+	</div>
+	<div id="mast_rule"></div>
+<ul id="languagechoice" style="display:none;" onmouseover="languagemenu=true;" onmouseout="languagemenu=false;setTimeout(function(){if (!languagemenu) {document.getElementById('languagechoice').style.display='none';}},1000);"><li><a style="color:#004db9 !important;" href="http://al.librarything.com">Albanian</a></li><li><a style="color:#004db9 !important;" href="http://baq.librarything.com">Basque</a></li><li><a style="color:#004db9 !important;" href="http://bg.librarything.com">Bulgarian</a></li><li><a style="color:#004db9 !important;" href="http://cat.librarything.com">Catalan</a></li><li><a style="color:#004db9 !important;" href="http://hr.librarything.com">Croatian</a></li><li><a style="color:#004db9 !important;" href="http://cz.librarything.com">Czech</a></li><li><a style="color:#004db9 !important;" href="http://dk.librarything.com">Danish</a></li><li><a style="color:#004db9 !important;" href="http://www.librarything.nl">Dutch</a></li><li><a style="color:#004db9 !important;" href="http://www.librarything.com">English</a></li><li><a style="color:#004db9 !important;" href="http://epo.librarything.com">Esperanto</a></li><li><a style="color:#004db9 !important;" href="http://ee.librarything.com">Estonian</a></li><li><a style="color:#004db9 !important;" href="http://fi.librarything.com">Finnish</a></li><li><a style="color:#004db9 !important;" href="http://www.librarything.fr">French</a></li><li><a style="color:#004db9 !important;" href="http://www.librarything.de">German</a></li><li><a style="color:#004db9 !important;" href="http://gr.librarything.com">Greek</a></li><li><a style="color:#004db9 !important;" href="http://hin.librarything.com">Hindi</a></li><li><a style="color:#004db9 !important;" href="http://hu.librarything.com">Hungarian</a></li><li><a style="color:#004db9 !important;" href="http://is.librarything.com">Icelandic</a></li><li><a style="color:#004db9 !important;" href="http://ind.librarything.com">Indonesian</a></li><li><a style="color:#004db9 !important;" href="http://ie.librarything.com">Irish</a></li><li><a style="color:#004db9 !important;" href="http://www.librarything.it">Italian</a></li><li><a style="color:#004db9 !important;" href="http://lat.librarything.com">Latin</a></li><li><a style="color:#004db9 !important;" href="http://lv.librarything.com">Latvian</a></li><li><a style="color:#004db9 !important;" href="http://lt.librarything.com">Lithuanian</a></li><li><a style="color:#004db9 !important;" href="http://no.librarything.com">Norwegian</a></li><li><a style="color:#004db9 !important;" href="http://pir.librarything.com">Piratical</a></li><li><a style="color:#004db9 !important;" href="http://pl.librarything.com">Polish</a></li><li><a style="color:#004db9 !important;" href="http://br.librarything.com">Portuguese (Brazil)</a></li><li><a style="color:#004db9 !important;" href="http://pt.librarything.com">Portuguese (Portugal)</a></li><li><a style="color:#004db9 !important;" href="http://ro.librarything.com">Romanian</a></li><li><a style="color:#004db9 !important;" href="http://sk.librarything.com">Slovak</a></li><li><a style="color:#004db9 !important;" href="http://es.librarything.com">Spanish</a></li><li><a style="color:#004db9 !important;" href="http://se.librarything.com">Swedish</a></li><li><a style="color:#004db9 !important;" href="http://tgl.librarything.com">Tagalog</a></li><li><a style="color:#004db9 !important;" href="http://tr.librarything.com">Turkish</a></li><li><a style="color:#004db9 !important;" href="http://cym.librarything.com">Welsh</a></li></ul></div></div>
+</div><div id="gbss">
+<div class="right"><a href="#" onclick="hidegbs();return false;">Hide this</a></div>
+<h3>Results from Google Books</h3>
+<p>Click on a thumbnail to go to Google Books.</p> 
+<div id="gbss_content"></div>
+</div><div class="content summary">
+<table class="wrapper" width="100%" border=0>
+<col width="160">
+<col>
+<col width="210">
+<tr>
+
+<td class="left"><div id="maincover"><a href="#" onclick="si_info('isbn_2253150711'); return false;"><img src="https://pics.cdn.librarything.com/pics/fugue21/magnifier-left.png" class="icon"></a><a href=""><img width="142" id="mainCover" class="workCoverImage" src="https://images-na.ssl-images-amazon.com/images/P/2253150711.01._SX142_SY224_SCLZZZZZZZ_.jpg" alt="Fear and Trembling by Amélie Nothomb" data-adaptive-background="1"></a></div><div class="leftnav workleftnav alwaysblue noline"><ul><li class="first selected"><a href="/work/2371329/summary">Main page</a></li>
+<li class="gap"><a href="/work/2371329/workdetails">Work details</a></li>
+<li class="gap"><a href="/work/2371329/reviews">Reviews</a> <span class="count">(57)</span></li>
+<li ><a href="/work/2371329/recommendations">Recommendations</a></li>
+<li ><a href="/work/2371329/members">Members</a></li>
+<li ><a href="/work/2371329/descriptions">Descriptions</a> <span class="count">(7)</span></li>
+<li ><a href="/work/2371329/conversations">Conversations</a> <span class="count">(107)</span></li>
+<li ><a href="/work/2371329/commonknowledge">Common Knowledge</a></li>
+<li ><a href="/work/2371329/popularity">Popularity</a></li>
+<li ><a href="/work/2371329/covers">Cover images</a></li>
+<li ><a href="/work/2371329/editions">Editions</a></li></ul></div>
+</td>
+<td class="middle" id="middleColumn">
+<div id="loading">Loading...</div><div class="headsummary"><h1>Fear and Trembling <span class="date">(1999)</span></h1><h2>by <a href="/author/nothombamelie">Amélie Nothomb</a><hr></h2><div class="authorsandseries"><h3><b>Other authors:</b> See the <a href="#otherauthors">other authors</a> section.</h3></div></div><div class="wslcontainer"><table cellpadding="0" cellspacing="0" class="wsltable"><tr class="wslheader"><td width="18%" class="firstchild">Members</td><td width="18%">Reviews</td><td width="18%">Popularity</td><td width="22%">Average rating</td><td width="25%" class="lastchild">Mentions</td></tr><tr class="wslcontent"><td valign="middle" class="firstchild"><a href="/work/2371329/members">1,823</a></td><td valign="middle"><a href="/work/2371329/reviews">57</a></td><td valign="middle"><a href="/work/2371329/popularity">3,834</a></td><td valign="middle"><nobr><a href="/work/2371329/members"><img src="https://pics.cdn.librarything.com/pics/ss7.gif" style="margin-bottom: -2px;"></a>
+			<span class="dark_hint">(3.65)</span></nobr></td><td valign="middle" class="lastchild"><a href="/work/2371329/conversations">107</a></td></tr></table></div><div class="addbuttons"><span  id="yourlibraryButton"  class="ltbtn ltbtn-inline-block sp16  ltbtn-webkit "  style="margin-right:0.5em" ><a  href="/addbooks.php?plusbook=Fear+and+Trembling" ><div class="ltbtn-outer-box ltbtn-inline-block"><div class="ltbtn-inner-box ltbtn-inline-block"><div class="ltbtn-pos"><div class="ltbtn-top-shadow"> </div><div class="ltbtn-content"><div class="ltbtn-body "  style="margin-right: 2px;" ><span class="sp_c  sp16 " style="background-position: -17px -68px;"></span>Add to Your books</div></div></div></div></div></a></span><span  id="wishlistButton"  class="ltbtn ltbtn-inline-block sp16  ltbtn-webkit " ><a  href="/addbooks.php?dc=4&plusbook=Fear+and+Trembling" ><div class="ltbtn-outer-box ltbtn-inline-block"><div class="ltbtn-inner-box ltbtn-inline-block"><div class="ltbtn-pos"><div class="ltbtn-top-shadow"> </div><div class="ltbtn-content"><div class="ltbtn-body "  style="margin-right: 2px;" ><span class="sp_c  sp16 " style="background-position: -34px -68px;"></span>Add to wishlist</div></div></div></div></div></a></span></div><div id="workpagesort_10" class="quickedit light"><div class="nav"><div class="sectionhead_rbutcontainer"><span style="font-size:9px;font-weight:normal;"><span  class="ltbtn ltbtn-inline-block ltbtn-size-mini  ltbtn-button-float-right  ltbtn-webkit " ><a  href="/work/2371329/members/" ><div class="ltbtn-outer-box ltbtn-inline-block"><div class="ltbtn-inner-box ltbtn-inline-block"><div class="ltbtn-pos"><div class="ltbtn-top-shadow"> </div><div class="ltbtn-content"><div class="ltbtn-body  ltbtn-size-mini " >all members</div></div></div></div></div></a></span></span></div><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'members', 'ult_4216374303', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Members</span><span class="sectionTitleST"></span></div><div class="qelcontent" id="ult_4216374303" style="display:block;"><table class="wstable" cellspacing="0" cellpadding="0" border="0"><tr><td class="label memberlistLabel"><span style="white-space:nowrap;text-align:right;">Recently added by</span></td><td class="wide memberlistvalue" id="ult_3788799078">private library, <a href="/profile/OceanMer">OceanMer</a>, <a href="/profile/thimel">thimel</a>, <a href="/profile/MartynChuzz">MartynChuzz</a>, <a href="/profile/pathogenik">pathogenik</a>, <a href="/profile/Youry">Youry</a>, <a href="/profile/WimDB">WimDB</a>, <a href="/profile/Leticia.Toraci">Leticia.Toraci</a></td></tr></table></div></div><div id="workpagesort_20" class="quickedit light"><div class="nav"><div class="sectionhead_rbutcontainer"><span  id="ult_1153919786_snb"  class="ltbtn ltbtn-inline-block ltbtn-size-mini  ltbtn-button-float-right  ltbtn-webkit "  onclick="LibraryThing.work.showTagNumbers('ult_1153919786'); return false;"  style="margin-right: 1em;" ><a  href="#" ><div class="ltbtn-outer-box ltbtn-inline-block"><div class="ltbtn-inner-box ltbtn-inline-block"><div class="ltbtn-pos"><div class="ltbtn-top-shadow"> </div><div class="ltbtn-content"><div class="ltbtn-body  ltbtn-size-mini " >numbers</div></div></div></div></div></a></span><span  id="ult_1153919786_sab"  class="ltbtn ltbtn-inline-block ltbtn-size-mini  ltbtn-button-float-right  ltbtn-webkit "  onclick="LibraryThing.work.showallTags('ult_1153919786', '2371329', ''); return false;" ><a  href="#" ><div class="ltbtn-outer-box ltbtn-inline-block"><div class="ltbtn-inner-box ltbtn-inline-block"><div class="ltbtn-pos"><div class="ltbtn-top-shadow"> </div><div class="ltbtn-content"><div class="ltbtn-body  ltbtn-size-mini " >show all</div></div></div></div></div></a></span></div><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'tags', 'ult_1153919786', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Tags</span></div><div class="qelcontent tagcloudContainer" id="ult_1153919786" style="display:block;font-family:Arial, Verdana, Helvetica, Sans-serif;"><div id="ajax_work_makeworkCloud"></div></div></div><a name="recommendations"></a><div id="ult_3062350683" class="quickedit light"><div class="nav"><div class="sectionhead_rbutcontainer"><div id="chrome_ult_2169372527"><a href="#" onclick="return bsplay.aj('ult_1933166207','ult_2169372527','combo',0,0,1);"><img src="https://pics.cdn.librarything.com//pics/bsplay-0-light.png" class="icon1213 iconflip bsplay0"></a><a href="#" onclick="return bsplay.aj('ult_1933166207','ult_2169372527','combo',1,0,1);"><img src="https://pics.cdn.librarything.com//pics/bsplay-1-light.png" class="icon1213 iconflip bsplay1"></a></div></div><span class="navInfoTitle"><span class="divotBig" 
+			onclick="LibraryThing.work.handleSectionHide(this, 'recs', 'ult_2169372527', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>LibraryThing Recommendations</span></div></div><div id="ult_2169372527" style="display:block" class="qelcontent_bsplay" ><img src="https://pics.cdn.librarything.com/pics/fbloader.gif" class="fbloader"></div><a name="memberrecs"></a><div id="workpagesort_35" class="quickedit light"><div class="nav"><div class="sectionhead_rbutcontainer"><span  id="ult_1041864991_snb"  class="ltbtn ltbtn-inline-block ltbtn-size-mini  ltbtn-button-float-right  ltbtn-webkit "  onclick="ajax_memberrecommendations(2371329, 25); return false; return false;" ><a  href="#" ><div class="ltbtn-outer-box ltbtn-inline-block"><div class="ltbtn-inner-box ltbtn-inline-block"><div class="ltbtn-pos"><div class="ltbtn-top-shadow"> </div><div class="ltbtn-content"><div class="ltbtn-body  ltbtn-size-mini " >refresh</div></div></div></div></div></a></span></div><span class="navInfoTitle"><span class="divotBig" 
+					onclick="LibraryThing.work.handleSectionHide(this, 'memberrecs', 'ult_1041864991', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Member recommendations</span><span class="sectionTitleST"></span></div><div class="qelcontent" id="ult_1041864991" style="display:block;"><div id="memberrecommendations" class="simpleSection"><ol class="memberrecommendations"><li><div class="thumbvoter" id="vote_6_38981"><span class="main"><img src="https://pics.cdn.librarything.com/pics/st-up.png">1<img src="https://pics.cdn.librarything.com/pics/st-down.png"><span class="gray">0</span></span></div><a href="/work/3991171">Hell</a> by <a href="/author/tsutsuiyasutaka">Yasutaka Tsutsui</a> <span class="by">(<a href="/profile/SqueakyChu">SqueakyChu</a>)</span><blockquote><a href="/profile/SqueakyChu">SqueakyChu</a>: Satire of certain aspects of the Japanese psyche. In addition, a fun read!</blockquote></li></ol></div></div></div><div id="workpagesort_37" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'lists', 'ult_1361789687', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Lists</span></div><div class="qelcontent" id="ult_1361789687" style="display:block"><div class="showmore" id="ult_764340454"><div><a href="/list/508/all/1001-Books-You-Must-Read-Before-You-Die">1001 Books You Must Read Before You Die</a> <span class="count">(526)</span></div><div><a href="/list/305/all/Recommend-the-20-best-books-youve-read-in-the-last-five-years">Recommend the 20 best books you've read in the last five years</a> <span class="count">(416)</span></div><div><a href="/list/9467/all/stories-at-work">stories at work</a> <span class="count">(7)</span></div><div class="showmore_showlink">&raquo; <a href="javascript:showMore('ult_764340454')">4 more</a></div><div class="showmore_hide"><div><a href="/list/141/all/Best-Contemporary-Literary-Fiction-Around-the-Last-30-Years-">Best Contemporary Literary Fiction (Around the Last 30 Years)</a> <span class="count">(191)</span></div><div><a href="/list/893/all/Female-Protagonist">Female Protagonist</a> <span class="count">(275)</span></div><div><a href="/list/830/all/Best-of-French-Literature">Best of French Literature</a> <span class="count">(108)</span></div><div><a href="/list/677/all/Best-Books-Set-in-Japan">Best Books Set in Japan</a> <span class="count">(31)</span></div></div></div></div></div><div id="workpagesort_40" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'willilikeit', 'ult_259840886', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Will you like it?</span></div><div class="qelcontent" id="ult_259840886" style="display:block;"><div id="score"><div class="score ">
+	<div id="lbloading">Loading...</div>
+	<img src="https://pics.cdn.librarything.com//pics/score-disabled.gif" width="453" height="15"><div></div><p class="text" style="margin-top: 10px;"><a href="/">Sign up</a> for LibraryThing to find out whether you'll like this book.</p></div></div></div></div><div id="workpagesort_45" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'abouts', 'ult_3098759316', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Conversations (About links)</span></div><div class="qelcontent" id="ult_3098759316" style="display:block"><p>No current <a href="/talk">Talk</a> conversations about this book.</p><p><a href="/work/2371329/conversations">&raquo; See also 107 mentions</a></div></div><div id="workpagesort_50" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'reviews', 'ult_3458911720', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Member reviews</span></div><div class="qelcontent" id="ult_3458911720" style="display:block;"><div id="wp_reviews" name="reviews"><div class="workSection"><div id='mainreviews_reviewnav' class='reviewnav'><div class="languagepick"><a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'eng', 'profile');">English</a> (38) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'fre', 'profile');">French</a> (5) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'dut', 'profile');">Dutch</a> (4) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'spa', 'profile');">Spanish</a> (4) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'cat', 'profile');">Catalan</a> (2) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'fin', 'profile');">Finnish</a> (1) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'ger', 'profile');">German</a> (1) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'rus', 'profile');">Russian</a> (1) &nbsp;<a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'ita', 'profile');">Italian</a> (1) &nbsp;<b><a href="javascript:loadReviewsIntoContainer('',0,3,3,'wp_reviews',5,'','2371329','',false,'all', 'profile');">All languages</a> (57)</b></div><div class="right"><strong><a href="#" onclick="loadReviewsIntoContainer('',0,0,3,'wp_reviews',5,'','2371329','',false, null, 'profile');return false;">date<span class="sortArrow"> &#x25B2;</span></a></strong> | <a href="#" onclick="loadReviewsIntoContainer('',0,2,3,'wp_reviews',5,'','2371329','',false, null, 'profile'); return false;">votes</a></div>Showing 1-5 of 57 (<a href="#" onclick="loadReviewsIntoContainer('',5,3,3,'wp_reviews',5,'','2371329','', false, null, 'profile'); return false;">next</a> | <a href="#" onclick="loadReviewsIntoContainer('',0,3,3,'wp_reviews',10000,'','2371329','', false, null, 'profile'); return false;">show all</a>)</div><div class="bookReview"><div class="commentHeader"></div> <!-- commentHeader --><div id="brtext_3184932" class="commentText">Retour au Japon de l'auteur où elle a vécu son enfance - choc culturel et aventures carrément cocasses <span class="rating">( <img src="https://pics.cdn.librarything.com/pics/ss8.gif"> )</span></div><div id="rfd_3184932" class="reviewFlagDialogBox"></div><div class="commentFooter"><span class="reviewMods"><span class="reviewVoteInfo"><span class="reviewVoteCount" id="rvc_3184932">&nbsp;</span> </span><!-- reviewVoteInfo --><span class="reviewFlags"> <img id="rfi1_3184932" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"> <img id="rfi2_3184932" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"><span id="rfrf_3184932"> </span></span></span> <!-- reviewMods --><span class="controlItems"><a href="/profile/Cecilturtle" target="_top">Cecilturtle</a> | May 22, 2006 |  <a href="/review/3184932"><img src="https://pics.cdn.librarything.com/pics/permalink.gif" width="16" height="7" /></a></span> <!-- controlItems --></div> <!-- commentFooter --></div> <!-- comment --><div class="bookReview"><div class="commentHeader"></div> <!-- commentHeader --><div id="brtext_4785051" class="commentText">Belgian girl graduate (22) spends humiliating, amusing year interning at a Japanese business, cleaning toilets and fetching tea. <span class="rating">( <img src="https://pics.cdn.librarything.com/pics/ss8.gif"> )</span></div><div id="rfd_4785051" class="reviewFlagDialogBox"></div><div class="commentFooter"><span class="reviewMods"><span class="reviewVoteInfo"><span class="reviewVoteCount" id="rvc_4785051">&nbsp;</span> </span><!-- reviewVoteInfo --><span class="reviewFlags"> <img id="rfi1_4785051" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"> <img id="rfi2_4785051" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"><span id="rfrf_4785051"> </span></span></span> <!-- reviewMods --><span class="controlItems"><a href="/profile/featherbooks" target="_top">featherbooks</a> | Jul 17, 2006 |  <a href="/review/4785051"><img src="https://pics.cdn.librarything.com/pics/permalink.gif" width="16" height="7" /></a></span> <!-- controlItems --></div> <!-- commentFooter --></div> <!-- comment --><div class="bookReview"><div class="commentHeader"></div> <!-- commentHeader --><div id="brtext_8244286" class="commentText">"Страх и трепет" - самый знаменитый роман бельгийк​и Амели Нотомб. Он номинировался на Гонкуровскую п​ремию, был удостоен премии Французской академии (Г​1999) и переведен на десятки языков. В основе книги - ​реальный факт авторской биографии: едва окончив ун​иверситет, Нотомб год проработала в крупной токийс​кой компании. Амели родилась в Японии, и теперь во​звращается туда как на долгожданную родину, чтобы ​остаться навсегда. Но попытки соблюдать японские т​радиции и обычаи всякий раз приводят к неприятност​ям и оборачиваются жестокими уроками. Нотомб заста​вляет читателя смеяться, пугает и удивляет, а в ко​нце концов выворачивает наизнанку миф о Японии, вы​строив сюжет вокруг психологической дуэли двух юны​ <span class="rating">( <img src="https://pics.cdn.librarything.com/pics/ss10.gif"> )</span></div><div id="rfd_8244286" class="reviewFlagDialogBox"></div><div class="commentFooter"><span class="reviewMods"><span class="reviewVoteInfo"><span class="reviewVoteCount" id="rvc_8244286">&nbsp;</span> </span><!-- reviewVoteInfo --><span class="reviewFlags"> <img id="rfi1_8244286" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"> <img id="rfi2_8244286" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"><span id="rfrf_8244286"> </span></span></span> <!-- reviewMods --><span class="controlItems"><a href="/profile/alish" target="_top">alish</a> | Nov 13, 2006 |  <a href="/review/8244286"><img src="https://pics.cdn.librarything.com/pics/permalink.gif" width="16" height="7" /></a></span> <!-- controlItems --></div> <!-- commentFooter --></div> <!-- comment --><div class="bookReview"><div class="commentHeader"></div> <!-- commentHeader --><div id="brtext_12261671" class="commentText">Le meilleur d'Amélie Nothomb. J'ai découvert qu'il est au programme des terminales!</div><div id="rfd_12261671" class="reviewFlagDialogBox"></div><div class="commentFooter"><span class="reviewMods"><span class="reviewVoteInfo"><span class="reviewVoteCount" id="rvc_12261671">&nbsp;</span> </span><!-- reviewVoteInfo --><span class="reviewFlags"> <img id="rfi1_12261671" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"> <img id="rfi2_12261671" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"><span id="rfrf_12261671"> </span></span></span> <!-- reviewMods --><span class="controlItems"><a href="/profile/briconcella" target="_top">briconcella</a> | Mar 4, 2007 |  <a href="/review/12261671"><img src="https://pics.cdn.librarything.com/pics/permalink.gif" width="16" height="7" /></a></span> <!-- controlItems --></div> <!-- commentFooter --></div> <!-- comment --><div class="bookReview"><div class="commentHeader"></div> <!-- commentHeader --><div id="brtext_10867083" class="commentText">Je ne lis que très rarement des livres autobiographiques. C'est la réputation de l'auteur et une recommandation qui m'ont amené à lire ce livre.<br>L'auteur-narratrice est employée dans une grande société japonaise et subit toutes sortes de brimades et de vexations parce qu'elle ne rentre pas dans le moule. Je savais le monde de l'entreprise nippone assez rigide mais j'ai été effaré par le formalisme exacerbéjusqu'à l'absurde raconté dans le livre.<br>Les comportements des différents intervenants paraissent absurdes et excessifs, transformant ce livre en une farce tragi-comique.<br><br>Le style est excellent, foisonnant de formules croustillantes. C'est passionnant et procure un vrai plaisir de lecture.<br>Je recommande ! <span class="rating">( <img src="https://pics.cdn.librarything.com/pics/ss6.gif"> )</span></div><div id="rfd_10867083" class="reviewFlagDialogBox"></div><div class="commentFooter"><span class="reviewMods"><span class="reviewVoteInfo"><span class="reviewVoteCount" id="rvc_10867083">&nbsp;</span> </span><!-- reviewVoteInfo --><span class="reviewFlags"> <img id="rfi1_10867083" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"> <img id="rfi2_10867083" src="https://pics.cdn.librarything.com/pics/flag-trans.gif"><span id="rfrf_10867083"> </span></span></span> <!-- reviewMods --><span class="controlItems"><a href="/profile/grimm" target="_top">grimm</a> | Mar 14, 2007 |  <a href="/review/10867083"><img src="https://pics.cdn.librarything.com/pics/permalink.gif" width="16" height="7" /></a></span> <!-- controlItems --></div> <!-- commentFooter --></div> <!-- comment --><div class='reviewnav'><!-- languagenav --><div class="right"><strong><a href="#" onclick="loadReviewsIntoContainer('',0,0,3,'wp_reviews',5,'','2371329','',false, null, 'profile');return false;">date<span class="sortArrow"> &#x25B2;</span></a></strong> | <a href="#" onclick="loadReviewsIntoContainer('',0,2,3,'wp_reviews',5,'','2371329','',false, null, 'profile'); return false;">votes</a></div>Showing 1-5 of 57 (<a href="#" onclick="loadReviewsIntoContainer('',5,3,3,'wp_reviews',5,'','2371329','', false, null, 'profile'); return false;">next</a> | <a href="#" onclick="loadReviewsIntoContainer('',0,3,3,'wp_reviews',10000,'','2371329','', false, null, 'profile'); return false;">show all</a>)</div></div></div></div></div></div><div id="workpagesort_53" class="quickedit light"><div class="nav"><div style="float: right;"><span class="sectionTitleHelp"><a title="Help" href="/wiki/index.php/Published_Reviews"><img alt="?" src="http://static.librarything.com/pics/helpq.png" class="helpIcon" style="vertical-align: middle;"/></a></span></div>
+	<a name="publishedreviews"></a><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'mediareviews', 'ult_2575393666', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Published reviews</span></div><div class="qelcontent" id="ult_2575393666" style="display:block;"><div id="mediareviews_container"><div id="mediareviews">no reviews | <a href="#" onclick="LibraryThing.mediareviews.edit({'workid':'2371329'});return false;">add a review</a></div><!-- mediareviews -->
+</div></div></div><div id="workpagesort_56" class="quickedit light"><div class="nav"><a name="otherauthors"></a><span class="navInfoTitle"><span class="divotBig" 
+				onclick="LibraryThing.work.handleSectionHide(this, 'otherauthors', 'ult_1138183556', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Other authors</span></div><div class="qelcontent" id="ult_1138183556" style="display:block;"><div id="otherauthors_container"><p style="margin-top: 5px !important;"><a href="javascript:otherauthors_edit(2371329)">&raquo; Add other authors (12 possible)</a></p><table cellspacing="0" cellpadding="0" border="0" class="otherauthor"><tr class="head"><td>Author name</td><td>Role</td><td>Type of author</td><td>Work?</td><td>Status</td></tr><tr><td><a href="/author/nothombamelie">Amélie Nothomb</a></td><td>&mdash;</td><td>primary author</td><td>all editions</td><td>confirmed</td></tr><tr><td><a href="/author/hunteradriana-4">Hunter, Adriana</a></td><td>Translator</td><td>secondary author</td><td>some editions</td><td>confirmed</td></tr></table></div></div></div><div id="workpagesort_57" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" 
+				onclick="LibraryThing.work.handleSectionHide(this, 'relationships', 'ult_521833851', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Work-to-work relationships</span></div><div class="qelcontent" id="ult_521833851" style="display:block;"><div id="relationships_container"><h2>Is contained in</h2><div id="ult_888236625" class="showmore"><p><a href="/work/6348808">Coffret Am&eacute;lie Nothomb : Cosm&eacute;tique - Catilinaires - Stupeurs et tremblements</a> by <a href="/author/nothombameacutelie">Am&eacute;lie Nothomb</a></p></div></div></div></div><div id="workpagesort_60" class="quickedit light"><div class="nav"><div class="sectionhead_rbutcontainer"><span  class="ltbtn ltbtn-inline-block ltbtn-size-mini  ltbtn-webkit " ><a  href="/commonknowledge/changelog.php?item=2371329&type=1" ><div class="ltbtn-outer-box ltbtn-inline-block"><div class="ltbtn-inner-box ltbtn-inline-block"><div class="ltbtn-pos"><div class="ltbtn-top-shadow"> </div><div class="ltbtn-content"><div class="ltbtn-body  ltbtn-size-mini " >view history</div></div></div></div></div></a></span></div><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'ck', 'ult_2946104087', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Common Knowledge</span><span class="sectionTitleST"></span></div><div class="qelcontent" id="ult_2946104087" style="display:block;"><div id="fwikiContainerTablediv"><table class="fwikiContainerTable">
+		<tr>
+			<td COLSPAN="2">
+				<div class="fwikiHint fwikiTopHint"><div class="fwikiWarningHint">You must <a href="/">log in</a> to edit Common Knowledge data.</div> For more help see the <a href="/wiki/index.php/Common_Knowledge">Common Knowledge help page</a>.
+				</div>
+			</td>
+		</tr>
+					<tr>
+				<td valign="top" class="fwikiLabel">Series (with order)</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_3338141685'  itemType='1'  itemNum='2371329'  fieldType='23'  name='ult_3338141685'  allowmultiple='1'  hasHistory = '1'  fieldName = 'series'  uitype = '1'  ltlang='eng' hint = 'examples: Lord of the Rings (book 2); The Chronicles of Prydain (0|prequel) ' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Canonical title</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_1092363463'  itemType='1'  itemNum='2371329'  fieldType='21'  name='ult_1092363463'  allowmultiple='0'  hasHistory = '1'  fieldName = 'canonicaltitle'  uitype = '1'  ltlang='eng' hint = 'Authoritative title for a work in the language of the site you are on' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/commonknowledge/search.php?q=Fear+and+Trembling&f=21&exact=1&type=1">Fear and Trembling</a> </div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Original title</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_2336450165'  itemType='1'  itemNum='2371329'  fieldType='41'  name='ult_2336450165'  allowmultiple='1'  hasHistory = '1'  fieldName = 'originaltitle'  uitype = '1'  ltlang='eng' hint = 'The original title in the original language' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/commonknowledge/search.php?q=Stupeur+et+tremblements&f=41&exact=1&type=1">Stupeur et tremblements</a> </div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Alternative titles</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_3013242434'  itemType='1'  itemNum='2371329'  fieldType='42'  name='ult_3013242434'  allowmultiple='1'  hasHistory = '0'  fieldName = 'alternativetitles'  uitype = '1'  ltlang='eng' hint = 'Avoid titles already listed as the Canonical or Original titles as well as foreign-language titles available on the &quot;Details&quot; tab.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Original publication date</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_3633177911'  itemType='1'  itemNum='2371329'  fieldType='16'  name='ult_3633177911'  allowmultiple='1'  hasHistory = '1'  fieldName = 'originalpublicationdate'  uitype = '1'  ltlang='eng' hint = '1952-12-30,
+1933-10,
+1902,
+or 120 BCE' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/commonknowledge/search.php?q=1999&f=16&exact=1&type=1">1999</a> </div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">People/Characters</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField fwikiGroup' id='ult_153370227'  itemType='1'  itemNum='2371329'  fieldType='3'  name='ult_153370227'  allowmultiple='1'  hasHistory = '1'  fieldName = 'characternames'  uitype = '1'  ltlang='eng' hint = 'Enter each character&#039;s name in a separate box. Examples: Hermione Granger, Andrew Jackson, Oberon, St. Paul of Tarsus, or Zeus (Deity)' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/character/Amelie">Amelie</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/character/Fubuki+Mori">Fubuki Mori</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/character/Omochi">Omochi</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/character/Saito">Saito</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/character/Haneda">Haneda</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class="itemnumberoverflow" id="link_ult_3195027569">(<a href="javascript:showHiddenfieldcontent('ult_3195027569')">show all 6 items</a>)</div><div id="ult_3195027569" style="display: none;"><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/character/Mister+Tenshi">Mister Tenshi</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></div></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Important places</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_1434372278'  itemType='1'  itemNum='2371329'  fieldType='2'  name='ult_1434372278'  allowmultiple='1'  hasHistory = '1'  fieldName = 'placesmentioned'  uitype = '1'  ltlang='eng' hint = '&quot;Boston, Massachusetts, USA&quot;, &quot;London, England&quot;, &quot;The Plaza Hotel, New York, New York, USA&quot;, &quot;Hogwarts&quot;, &quot;Alpha Centauri&quot;, &quot;Hell&quot;' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/place/Tokyo%2C+Japan">Tokyo, Japan</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Important events</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_3689956365'  itemType='1'  itemNum='2371329'  fieldType='34'  name='ult_3689956365'  allowmultiple='1'  hasHistory = '0'  fieldName = 'events'  uitype = '1'  ltlang='eng' hint = 'Great Fire of London (1666), Battle of the Bulge (1944|1945), Assassination of John F. Kennedy (1963-11-22), Battle of Hoth' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Related movies</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_470262861'  itemType='1'  itemNum='2371329'  fieldType='37'  name='ult_470262861'  allowmultiple='1'  hasHistory = '1'  fieldName = 'movies'  uitype = '1'  ltlang='eng' hint = 'Blade Runner (1982), The Fellowship of the Ring (2001), The Three Musketeers (1993)' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;"  editVal="Stupeur et tremblements (2003) http://www.imdb.com/title/tt0318725/" ><a href="/commonknowledge/search.php?q=Stupeur+et+tremblements+%282003%29+http%3A//www.imdb.com/title/tt0318725/&f=37&exact=1&type=1">Stupeur et tremblements (2003) http://www.imdb.com/title/tt0318725/</a>  <span class="fwikiAutoLinks">(<a class="fwikiAutoLink" href="/commonknowledge/search.php?q=2003">2003</a>)</span></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Awards and honors</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField fwikiGroup' id='ult_1516625657'  itemType='1'  itemNum='2371329'  fieldType='4'  name='ult_1516625657'  allowmultiple='1'  hasHistory = '1'  fieldName = 'awards'  uitype = '1'  ltlang='eng' hint = '&quot;Pulitzer Prize (History, 1991)&quot;, &quot;Hugo (1991)&quot;
+Awards given for a specific work should only be entered on the work page, not the author page.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/bookaward/Prix+des+libraires+du+Qu%C3%A9bec">Prix des libraires du Québec (Roman hors Québéc, 2000)</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/bookaward/Grand+Prix+du+Roman+de+l%27Acad%C3%A9mie+fran%C3%A7aise">Grand Prix du Roman de l'Académie française (1999)</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/bookaward/1001+Books+You+Must+Read+Before+You+Die">1001 Books You Must Read Before You Die (2006/2008/2010/2012 Edition)</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/bookaward/Prix+des+Lecteurs+du+Livre+de+Poche">Prix des Lecteurs du Livre de Poche (2001)</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/bookaward/Prix+de+La+Nuit+du+Livre">Prix de La Nuit du Livre ([Coffret Noël, 2007] Poche - Manga, 2008)</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Epigraph</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_468987073'  itemType='1'  itemNum='2371329'  fieldType='28'  name='ult_468987073'  allowmultiple='1'  hasHistory = '0'  fieldName = 'epigraph'  uitype = '3'  ltlang='eng' hint = 'The work&#039;s epigraph, &quot;a phrase, quotation, or poem that is set at the beginning of a document or component.&quot;
+' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Dedication</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_2120633273'  itemType='1'  itemNum='2371329'  fieldType='30'  name='ult_2120633273'  allowmultiple='1'  hasHistory = '0'  fieldName = 'dedication'  uitype = '3'  ltlang='eng' hint = 'Author&#039;s dedication' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">First words</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField fwikiGroup' id='ult_2740289754'  itemType='1'  itemNum='2371329'  fieldType='25'  name='ult_2740289754'  allowmultiple='1'  hasHistory = '1'  fieldName = 'firstwords'  uitype = '3'  ltlang='eng' hint = 'The first sentence of the work.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" >Mister Haneda was senior to Mister Omochi, who was senior to Mister Saito, who was senior to Miss Mori, who was senior to me.</div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" >Monsieur Haneda était le supérieur de monsieur Omochi, qui était le supérieur de monsieur Saito, qui était le supérieur de mademoiselle Mori, qui était ma supérieure.</div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Quotations</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_2842024603'  itemType='1'  itemNum='2371329'  fieldType='27'  name='ult_2842024603'  allowmultiple='1'  hasHistory = '0'  fieldName = 'quotations'  uitype = '3'  ltlang='eng' hint = 'Well-known, relevant or interesting quotations from the work; Quotation marks are unnecessary.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Last words</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField fwikiGroup' id='ult_905516197'  itemType='1'  itemNum='2371329'  fieldType='26'  name='ult_905516197'  allowmultiple='1'  hasHistory = '1'  fieldName = 'lastwords'  uitype = '3'  ltlang='eng' hint = 'The last sentence of the work. Content will be hidden unless clicked.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" id="ult_827010323" style="display: none; min-height:12px;" >The letter brought me great happiness.</div><a href="javascript:showHiddenfieldcontent('ult_827010323')" id="link_ult_827010323">(Click to show. Warning: May contain spoilers.)</a><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" id="ult_579274907" style="display: none; min-height:12px;" >Mais il comportait un détail qui me ravit au plus haut point: il était écrit en japonais.</div><a href="javascript:showHiddenfieldcontent('ult_579274907')" id="link_ult_579274907">(Click to show. Warning: May contain spoilers.)</a><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Disambiguation notice</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_3280086217'  itemType='1'  itemNum='2371329'  fieldType='13'  name='ult_3280086217'  allowmultiple='0'  hasHistory = '1'  fieldName = 'disambiguation'  uitype = '3'  ltlang='eng' hint = 'Clarifications to be used by future combiners and separators, or just as information.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" >Original title: <i>Stupeur et tremblements</i></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Publisher's editors</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_2227147142'  itemType='1'  itemNum='2371329'  fieldType='1'  name='ult_2227147142'  allowmultiple='1'  hasHistory = '0'  fieldName = 'literaryeditors'  uitype = '1'  ltlang='eng' hint = 'Publisher&#039;s or acquiring editor' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Blurbers</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_4287416509'  itemType='1'  itemNum='2371329'  fieldType='29'  name='ult_4287416509'  allowmultiple='1'  hasHistory = '1'  fieldName = 'blurbers'  uitype = '1'  ltlang='eng' hint = 'Who blurbed the book? A blurb is defined as a super-short review, done before the book is published or reviewed professionally. As Rachael Donadio wrote, &quot;Book blurbs are a tangled mass of friendships, rivalries, favors traded and debts repaid, not always in good faith.&quot; This field aims to capture that tangle! &lt;b&gt;Note:&lt;/b&gt; Please enter only the names of people, not publications. Use the form: Lastname, Firstname.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>
+			<tr>
+				<td valign="top" class="fwikiLabel">Publisher series</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_2176267044'  itemType='1'  itemNum='2371329'  fieldType='40'  name='ult_2176267044'  allowmultiple='1'  hasHistory = '1'  fieldName = 'publisherseries'  uitype = '1'  ltlang='eng' hint = 'examples: Britannica Great Books, The Oxford Mark Twain' ><div class="currentlyFrom">Information from the German Common Knowledge. Edit to localize it to your language.</div><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/publisherseries/detebe">detebe (23325)</a></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>		
+			<tr>
+				<td valign="top" class="fwikiLabel">Original language</td>
+				<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_2389585117'  itemType='1'  itemNum='2371329'  fieldType='58'  name='ult_2389585117'  allowmultiple='1'  hasHistory = '1'  fieldName = 'originallanguage'  uitype = '1'  ltlang='eng' hint = '' ><div class="currentlyFrom">Information from the French Common Knowledge. Edit to localize it to your language.</div><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ><a href="/commonknowledge/search.php?q=Fran%C3%A7ais&f=58&exact=1&type=1">Français</a> </div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+			</tr>		
+			</table></div></div></div><a name="references"></a><div id="workpagesort_65" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" onclick="LibraryThing.work.handleSectionHide(this, 'references', 'ult_2014113901', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>References</span></div><div class="qelcontent references alwaysblue" id="ult_2014113901" style="display:block;"><p>References to this work on external resources.</p><h2><img src="/pics/favicon_wikipedia.gif" class="icon">Wikipedia in English (3)</h2><div class="showmore" id="3141103636"><table cellspacing="0" cellpadding="0" border="0" class="autotable"><tr><td style="width: 33%"><p><a href="#" onclick="return load_externalresources(73164);" rel="nofollow">Amélie Nothomb</a></p><p><a href="#" onclick="return load_externalresources(79927);" rel="nofollow">Fear and Trembling (novel)</a></p></td><td style="width: 33%"><p><a href="#" onclick="return load_externalresources(209112);" rel="nofollow">Wolfgang Krege</a></p></td></tr></table></div></div></div><div id="workpagesort_70" class="quickedit light"><div class="nav"><div class="sectionhead_rbutcontainer"><span class="sectionTitleHelp"><a href="/wiki/index.php/Common_Knowledge#LibraryThing_members.27_description" title="Help"><img style="vertical-align:middle;" class="helpIcon" src="https://pics.cdn.librarything.com/pics/helpq.png" alt="?"></a></span></div><span class="navInfoTitle"><span class="divotBig" 
+			onclick="LibraryThing.work.handleSectionHide(this, 'ckdesc', 'ult_346040417', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>LibraryThing members' description</span></div><div class="qelcontent" id="ult_346040417" style="display:block;">
+		<div class="workSection">
+		<table class="fwikiContainerTable">
+		<tr>
+			<td valign="top" class="fwikiLabel">Book description</td>
+			<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_561005243'  itemType='1'  itemNum='2371329'  fieldType='14'  name='ult_561005243'  allowmultiple='0'  hasHistory = '1'  fieldName = 'description'  uitype = '3'  ltlang='eng' hint = 'This is a general description. It is not a review.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" >Nuori, akateemisesti koulutettu belgialainen Amélie on saanut työpaikan suuryrityksestä Japanissa, lapsuutensa idyllissä. Hän hallitsee täydellisesti japanin kielen, mutta kulttuurien kuilu on ylittämätön. Väärinkäsitykset takaavat, että ura on jyrkästi laskujohteinen.</div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+		</tr>
+		</table></div>
+		<a name="haiku"></a>
+		<div class="workSection">
+		<table class="fwikiContainerTable">
+		<tr>
+			<td valign="top" class="fwikiLabel">Haiku summary</td>
+			<td><table class="fwikiGroup"><tr><td class='fwikiField' id='ult_2473091251'  itemType='1'  itemNum='2371329'  fieldType='57'  name='ult_2473091251'  allowmultiple='1'  hasHistory = '0'  fieldName = 'haikusummary'  uitype = '3'  ltlang='eng' hint = 'Add a summary or other appreciation in haiku form (17 syllables; 5/7/5); include your member name in parentheses.' ><div class='fwikiItem'><div class='fwikiItemText  fwikiItemTextLong  fwikiItemTextUnknownUser'><div class="fwikiAtomicValue" style="min-height:12px;" ></div><img style="float:left;" src='https://pics.cdn.librarything.com/pics/transdot.gif' height='12px' width='1px' alt=''></div></div> <!-- fwikiItem --></td><td class='fwikiItemControls'></td></td></tr></table></td>
+		</tr>
+		</table></div>
+		</div></div><div id="workpagesort_80" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'desc', 'ult_1726062875', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Book descriptions</span></div><div class="qelcontent" id="ult_1726062875" style="display:block;"><div class="description"><h4 class="first"><b>Amazon.com Product Description</b> (<a href="http://www.amazon.com/exec/obidos/ASIN/0312288573/ref=nosim/librarythin08-20">ISBN 0312288573</a>, Paperback)</h4>
+<div>According to ancient Japanese protocol, foreigners deigning to approach the emperor did so only with fear and trembling. Terror and self-abasement conveyed respect. Amélie, our well-intentioned and eager young Western heroine, goes to Japan to spend a year working at the Yumimoto Corporation. Returning to the land where she was born is the fulfillment of a dream for Amélie; working there turns into comic nightmare. <br><br>Alternately disturbing and hilarious, unbelievable and shatteringly convincing, <i>Fear and Trembling</i> will keep readers clutching tight to the pages of this taut little novel, caught up in the throes of fear, trembling, and, ultimately, delight.<br></div></div>
+<p class="amazonaccess">(retrieved from Amazon Thu, 12 Mar 2015 17:58:06 -0400)</p><div style="clear:both;"></div><p class="seealldescriptions">(<a href="/work/2371329/descriptions">see all 4 descriptions</a>)</p></div></div><div id="workpagesort_25" class="quickedit light"><div class="nav"><span class="navInfoTitle"><span class="divotBig" 
+						onclick="LibraryThing.work.handleSectionHide(this, 'libdesc', 'ult_2811593371', '0');"><span class="chdivot" style="font-size:150%;vertical-align:bottom;">&#9662;</span></span>Library descriptions</span></div><div class="qelcontent" id="ult_2811593371" style="display:block;"><p><p>A novel set in contemporary Japan depicting Japanese corporate culture and the sexism and racism that exist in Japanese society.</p></p><p class="seealldescriptions"><a href="/work/2371329/descriptions">&raquo; see all 3 descriptions</a></p></div></div>	
+	</td>
+	<td class="right">
+	
+	</div></div><div id="buyborrowswapbox" class="greenbox bluntbottom"><table cellpadding=0 cellspacing=0 width="100%"><tr><td><h2 class="first">Quick Links</h2></td><td width="20px"></td></tr></table><div class="quicklinks_in_greenbox"><div class="ql_printdisplay_line" bsm_code="500:395"><a href="javascript:eda(2371329, 500, 395);"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-1.gif"></a><a href="javascript:eda(2371329, 500, 395);">Amazon.com</a> (<a href="http://www.amazon.com/exec/obidos/ASIN/2253150711/ref=nosim/librarythin08-20">direct</a>)</div><div class="ql_printdisplay_line" bsm_code="500:388"><a href="javascript:eda(2371329, 500, 388);"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-1.gif"></a><a href="javascript:eda(2371329, 500, 388);">Abebooks.com</a></div><div class="ql_printdisplay_line" bsm_code="800:6"><a href="javascript:edal(2371329,6);void(0);"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-4.gif"></a><a href="javascript:edal(2371329,6);void(0);">Amazon Kindle</a> <span class="detail">(4 editions)</span></div><div class="ql_printdisplay_line" bsm_code="800:7"><a href="javascript:edbp('http://www.audible.com/');"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-3.gif"></a><a href="javascript:edbp('http://www.audible.com/');">Audible</a> <span class="detail gray">(0 editions)</span></div><div class="ql_printdisplay_line" bsm_code="800:19"><a href="javascript:edal(2371329,19);void(0);"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-4.gif"></a><a href="javascript:edal(2371329,19);void(0);">CD Audiobook</a> <span class="detail">(1 edition)</span></div><div class="ql_printdisplay_line" bsm_code="800:2"><a href="javascript:edbp('http://www.gutenberg.org');"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-3.gif"></a><a href="javascript:edbp('http://www.gutenberg.org');">Project Gutenberg</a> <span class="detail gray">(0 editions)</span></div><div class="ql_printdisplay_line" bsm_code="800:0"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-3.5-off.gif"><span class=" gtb-googlebooks-title">Google Books</span> &mdash; <span class="gbssummary">Loading...</span></div><div class="ql_printdisplay_line" bsm_code="700:1"><a href="javascript:eda(2371329, 700, 1);"><img class="ql_iconthing flim" src="https://pics.cdn.librarything.com//pics/steps-1.gif"></a><a href="javascript:eda(2371329, 700, 1);">WorldCat</a></div></div></div><div id="getthisbooklinks" class="greenbox blunttop bluntbottom"><div class="ql_printdisplay_line"><a href="/work/2371329/get">
+				<img class="ql_iconthing" src="https://pics.cdn.librarything.com/pics/getthisbook.png" height="16px" width="16px" alt=""></a><a class="alwaysblue" href="/work/2371329/get">Get this book</a></div><div class="ql_printdisplay_line"><a href="/work/2371329/getlocal">
+				<img class="ql_iconthing" src="https://pics.cdn.librarything.com/pics/fugue/target.png" height="16px" width="16px" alt=""></a><a class="alwaysblue" href="/work/2371329/getlocal">Local Book Search</a></div><div class="ql_printdisplay_line" style="margin-bottom: 0px;"><a href="/work/2371329/quicklinks" rel="nofollow">
+				<img class="ql_iconthing" src="https://pics.cdn.librarything.com/pics/fugue21/globe-model.png" height="16px" width="16px" alt=""></a><a class="alwaysblue" href="/work/2371329/quicklinks" rel="nofollow">All sources</a></div></div></div><div class="greenbox ebooksummary blunttop alwaysblue"><table cellpadding="0" cellspacing="0" border="0" class="ebooksummary">
+		<tr class="h">
+			<td align="center">Swap</td>
+			<td align="center">Ebooks</td>
+			<td align="center">Audio</td>
+		</tr><tr><td align="center"><a href="/work/2371329/get#swap">5 avail.</a><br><a href="/work/2371329/get#swap">79 wanted</a></td><td align="center"><a href="/work/2371329/get"><nobr>4 pay</nobr></a></td><td align="center"><a href="/work/2371329/get"><nobr>1 pay</nobr></a></td></tr>	
+		</table></div><div class="greenbox popularcovers"><h2>Popular covers</h2><div id="popularcovers"></div></div>
+<div class="greenbox">
+<h2>Rating</h2>Average: <nobr><img src="https://pics.cdn.librarything.com/pics/ss7.gif" style="margin-bottom: -2px;"> <span class="work_hint">(3.65)</span></nobr><table border=0 cellspacing=0 cellpadding=0 class="greenbar"><tr><td class='gbl'>0.5</td><td class='gbr'><tr><td class='gbl'>1</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=6> 10</td></tr><tr><td class='gbl'>1.5</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=1> 1</td></tr><tr><td class='gbl'>2</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=27> 48</td></tr><tr><td class='gbl'>2.5</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=13> 23</td></tr><tr><td class='gbl'>3</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=82> 146</td></tr><tr><td class='gbl'>3.5</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=29> 51</td></tr><tr><td class='gbl'>4</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=110> 195</td></tr><tr><td class='gbl'>4.5</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=16> 28</td></tr><tr><td class='gbl'>5</td><td class='gbr'><img src='https://pics.cdn.librarything.com/pics/gb.gif' height=5 width=60> 106</td></tr></table>
+</div><div class="greenbox"><h2 class="first"><a href="/publisher/1487/Voland-Edizioni/"><img src="https://pics.librarything.com/picsizes/c8/9f/c89f849c875f8a26371424e6651413841455941.jpg" class="colophon"></a><a href="/publisher/1487/Voland-Edizioni/">Voland Edizioni</a></h2><p>2 editions of this book were published by <a href="/publisher/1487/Voland-Edizioni/">Voland Edizioni</a>.</p><p class="last">Editions: 8886586728, 8886586957</p></div> 
+	<div class="greenbox">
+	<h2 class="first">Is this you?</h2>
+	<p class="last">Become a <a href="/author_claim.php?work=2371329">LibraryThing Author</a>.</p>
+	</div><div class="greenboxxxx"><script type="text/javascript"><!--
+google_ad_client = "pub-8056724785594632";
+google_ad_width = 160;
+google_ad_height = 600;
+google_ad_format = "160x600_as";
+google_ad_type = "text";
+//2007-10-06: work, work-popular
+google_ad_channel = "3238990039+8837977233";
+google_color_border = "FFFFFF";
+google_color_bg = "FFFFFF";
+google_color_link = "0000FF";
+google_color_text = "000000";
+google_color_url = "008000";
+//-->
+</script>
+<script type="text/javascript"
+  src="http://pagead2.googlesyndication.com/pagead/show_ads.js">
+</script></div>	
+	</div>
+	
+		
+	</td>
+	
+	</tr>
+
+</table>
+
+</div>
+</div><!--end content-->
+
+<p style="clear: both;">&nbsp;</p>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.2/jquery-ui.min.js" type="text/javascript" flag_fte="1" language="Javascript"></script>
+
+<script src="https://www.librarything.com/minified/js/65e8ef0bf9db01e86c461357ad402116.js" type="text/javascript" language="Javascript"></script>
+ <script type="text/javascript">if (window.jQuery && (typeof $J == 'undefined')) { $J = jQuery.noConflict();} </script>			<script type="text/javascript">
+			var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+			document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+			</script>
+			<script type="text/javascript">
+			try {
+			var pageTracker = _gat._getTracker("UA-1192086-1");
+			pageTracker._trackPageview();
+			} catch(err) {}</script>
+			<script type="text/javascript">pageTracker._setVar('LTNonMember');</script>
+		<div class="bottombar">
+		<a href="/wiki/index.php/Help_and_FAQ" target="_top">Help/FAQs</a> |
+		<a href="/about" target="_top">About</a> |
+		<a href="/privacy" target="_top">Privacy/Terms</a> |
+		<a href="/blog" target="_top">Blog</a> |
+		<a href="/more/store" target="_top">Store</a> |
+			<a href="/contact" target="_top">Contact</a> | <a href="http://www.librarything.com/work/2371329" target="_top">LibraryThing.com</a> | <a href="/services/" target="_top">APIs</a> | <a href="/wiki/" target="_top">WikiThing</a> | <a target="_top" href="/commonknowledge/">Common Knowledge</a> | <a target="_top" href="/legacylibraries">Legacy Libraries</a> | <a target="_top" href="/er/list">Early Reviewers</a> | <a href="/zeitgeist" target="_top">104,383,991 books!</a> | <a href="/togglescrolling.php" target="_top">Top bar: Always visible</a><div class="copyright">Copyright LibraryThing and/or members of LibraryThing, authors, publishers, libraries, cover designers, Amazon, Bol, Bruna, etc.  | static: /1454861342</div></div><a name="bottom"></a><script type="text/javascript">var hideIfNoGoogleInfo = 0;</script><script type="text/javascript">LibraryThing.deferedJS('https://books.google.com/books?jscmd=viewapi&bibkeys=LCCN:00045967,LCCN:00345846,OCLC:ocn9511167855,OCLC:ocn9511186671,ISBN:2253150711,ISBN:0312288573,ISBN:0312347324,ISBN:2226109501,ISBN:0571220487,ISBN:0312272189,ISBN:3257233256,ISBN:8433969196,ISBN:9076682054,ISBN:8882468976,ISBN:9076682313,ISBN:8886586957,ISBN:9511186671,ISBN:3257062508,ISBN:8495971194,ISBN:2253123749,ISBN:221075495X,ISBN:9511167855,ISBN:0571233899,ISBN:8499300618,ISBN:222610951X,ISBN:2253161934,ISBN:8886586728,ISBN:8483009846,ISBN:8072462164,ISBN:9185063002,ISBN:9985310799,ISBN:8370796508,ISBN:8372006938,ISBN:9001561462,ISBN:5941454066,ISBN:2744135003,ISBN:8501058408,ISBN:9616221396,ISBN:9734603906,ISBN:9955087455,ISBN:9725300831,ISBN:9602211849,ISBN:3899037200,ISBN:2702837751,ISBN:7780021580,ISBN:2914428340,ISBN:3899031199,ISBN:9536791064&callback=ProcessGBSBookInfo');</script>
+	<script language="javascript">
+
+	Event.observe(window, "load", function() 
+		{
+		ajax_work_makeworkCloud(2371329, 1675774466)
+bsplay.aj('ult_1933166207','ult_2169372527','combo',0,0)
+load_popularcovers(2371329,0)
+		});
+
+	</script>
+	
+<span id="ltworkisbn" style="display: none;">2253150711</span><pre style="clear: both;text-align:left;"></pre>
+
+<div id="problemcoverreporter"></div>
+
+</body>
+</html>

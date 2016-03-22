@@ -20,7 +20,7 @@ class FetchNewWorkIds(luigi.Task):
     harvest_dts = luigi.DateMinuteParameter()
 
     def output(self):
-        wids_filepath = '/tmp/newwids_%s_%s.txt' % \
+        wids_filepath = '/tmp/reviewids_%s_%s.txt' % \
                         (self.site, self.harvest_dts.strftime(luigi.DateMinuteParameter.date_format))
         return luigi.LocalTarget(wids_filepath)
 

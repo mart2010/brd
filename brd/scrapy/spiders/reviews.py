@@ -18,7 +18,7 @@ class BaseReviewSpider(scrapy.Spider):
     Superclass of all review spider
 
     """
-    # to convert review Date string (defined in subclass)
+    # to convert review Date string (to define in subclass)
     raw_date_format = None
     min_harvest_date = datetime.datetime(1900, 1, 1).date()
 
@@ -57,10 +57,7 @@ class BaseReviewSpider(scrapy.Spider):
         return self.dump_filepath
 
     def parse_review_date(self, raw_date):
-        parse_date = None
-        if raw_date:
-            parse_date = datetime.datetime.strptime(raw_date, self.raw_date_format).date()
-        return parse_date
+        return datetime.datetime.strptime(raw_date, self.raw_date_format).date()
 
     def emit_review_withinperiod(self, item, last_harvest_date):
         """
@@ -82,8 +79,6 @@ class BaseReviewSpider(scrapy.Spider):
         raise NotImplementedError
 
 
-
-
 class LibraryThing(BaseReviewSpider):
     """
     Spider reviews in desc order (latest-first) so only needed ones are taken.
@@ -96,11 +91,10 @@ class LibraryThing(BaseReviewSpider):
     """
     name = 'librarything'
     allowed_domains = ['www.librarything.com']
-
     ###########################
     # Control setting
     ###########################
-    url_workreview = 'https://www.librarything.com/work/%s/reviews'
+    url_mainpage = 'https://www.librarything.com/work/%s'
     url_formRequest = 'https://www.librarything.com/ajax_profilereviews.php'
     form_static = {'offset': '0', 'type': '3', 'container': 'wp_reviews', 'sort': '0'}
     # 'offset': 25 (i.e. skip first 25.. showing 26 to 50), 'sort': '0'  (0=desc, 3=asc)
@@ -114,65 +108,86 @@ class LibraryThing(BaseReviewSpider):
     def start_requests(self):
         for i in range(len(self.works_to_harvest)):
             wid = self.works_to_harvest[i]['work_refid']
-            meta = {'work_index': i, 'wid': wid}
-            yield scrapy.Request(self.url_workreview % wid, callback=self.parse_nbreview, meta=meta)
+            yield scrapy.Request(self.url_mainpage % wid, callback=self.parse_mainpage, meta={'work_index': i})
 
-    def parse_nbreview(self, response):
+    def parse_mainpage(self, response):
         def prepare_form(workid, langpick, n_to_fetch):
             return dict(self.form_static, workid=workid, languagePick=langpick, showCount=str(n_to_fetch))
 
-        wid = response.url[response.url.index('/work/') + 6: response.url.index('/reviews')]
-        requested_wid = response.meta['wid']
+        work_index = response.meta['work_index']
+        requested_wid = self.works_to_harvest[work_index]['work_refid']
+        wid = response.url[response.url.index('/work/') + 6:]
         dup_id = None
         # duplicate id no longer if we select wid with detail-ref harvested, but we leave it here as security
         if wid != requested_wid:
             dup_id = requested_wid
-        work_index = response.meta['work_index']
+
+        tags_t = []
+        tags_n = []
+        for tag_sel in response.xpath('//div[@class="tags"]/span'):
+            tags_t.append(tag_sel.xpath('./a/text()').extract_first())
+            # returns ' (1)'
+            np = tag_sel.xpath('./span[@class="count"]/text()').extract_first()
+            tags_n.append(np[np.index('(') + 1:np.index(')')])
+
+        item = self.build_review_item(work_refid=wid, dup_refid=dup_id)
+        item['tags_t'] = "__&__".join(tags_t)
+        item['tags_n'] = ";".join(tags_n)
         nb_page_site = self.scrape_langs_nb(response)
-        last_harvest_date = self.works_to_harvest[work_index].get('last_harvest_date')
-        # initial harvest
-        if last_harvest_date is None:
-            self.works_to_harvest[work_index]['last_harvest_date'] = self.min_harvest_date
-            for lang in nb_page_site:
-                marc_code = brd.get_marc_code(lang, capital=False)
-                r = scrapy.FormRequest(self.url_formRequest,
-                                       formdata=prepare_form(wid, marc_code, nb_page_site[lang]),
-                                       meta={'work_index': work_index},
-                                       callback=self.parse_reviews)
-                item = self.build_review_item(work_refid=wid, dup_refid=dup_id, review_lang=marc_code)
-                r.meta['passed_item'] = item
-                yield r
+        # there are no review (to correct this default 'English' ...)
+        if len(nb_page_site) == 0 or nb_page_site.get('English') == 0:
+            yield item
         else:
-            raise NotImplementedError('incremental harvest not implemented')
+            last_harvest_date = self.works_to_harvest[work_index].get('last_harvest_date')
+            # initial harvest
+            if last_harvest_date is None:
+                self.works_to_harvest[work_index]['last_harvest_date'] = self.min_harvest_date
+                for lang in nb_page_site:
+                    marc_code = brd.get_marc_code(lang, capital=False)
+                    item['review_lang'] = marc_code
+                    yield scrapy.FormRequest(self.url_formRequest,
+                                             formdata=prepare_form(wid, marc_code, nb_page_site[lang]),
+                                             meta={'work_index': work_index, 'passed_item': item},
+                                             callback=self.parse_reviews)
+            else:
+                raise NotImplementedError('incremental harvest not implemented')
 
     def parse_reviews(self, response):
         widx = response.meta['work_index']
         last_harvest_date = self.works_to_harvest[widx]['last_harvest_date']
+        passed_item = response.meta['passed_item']
         for review_sel in response.xpath('//div[@class="bookReview"]'):
-            item = response.meta['passed_item']
-            sel1 = review_sel.xpath('./div[@class="commentText"]')
-            all_text = sel1.xpath('.//text()').extract()
-            item['review'] = '\n'.join(all_text)
-            r_list = sel1.xpath('./span[@class="rating"]/img/@src').extract()  # gives list of [http://pics..../ss6.gif]
-            if r_list or len(r_list) == 1:
-                r = r_list[0]
-                item['rating'] = r[r.rindex('pics/') + 5:]  # gives ss10.gif
-                item['parsed_rating'] = self.parse_rating(item['parsed_rating'])
-
-            date_user_sel = review_sel.xpath('./div[@class="commentFooter"]/span[@class="controlItems"]')
-            # /profile/yermat
-            username = date_user_sel.xpath('./a[starts-with(@href,"/profile/")]/@href').extract_first()
-            item['username'] = username[username.rindex('/') + 1:]
-            # for lt, username and userid are the same
-            item['user_uid'] = item['username']
-            # gives :   |  Nov 22, 2012  |
-            rdate = date_user_sel.xpath('./text()').extract_first()
-            item['review_date'] = rdate[rdate.index('|') + 1:rdate.rindex('|')].strip()
-            item['parsed_review_date'] = self.parse_review_date(item['review_date'])
-            item['likes'] = review_sel.xpath('.//span[@class="reviewVoteCount"]/text()').extract_first()
-            if item['likes'] and item['likes'].find(u'nbsp') == -1:
-                item['parsed_likes'] = int(item['likes'])
+            item = self.extract_onereview(passed_item, review_sel)
             self.emit_review_withinperiod(item, last_harvest_date)
+
+    def extract_onereview(self, passed_item, rev_sel):
+        new_item = dict(passed_item)
+        sel1 = rev_sel.xpath('./div[@class="commentText"]')
+        all_text = sel1.xpath('.//text()').extract()
+        new_item['review'] = '\n'.join(all_text)
+        r_list = sel1.xpath('./span[@class="rating"]/img/@src').extract()  # gives list of [http://pics..../ss6.gif]
+        if r_list or len(r_list) == 1:
+            r = r_list[0]
+            new_item['rating'] = r[r.rindex('pics/') + 5:]  # gives ss10.gif
+            new_item['parsed_rating'] = self.parse_rating(new_item['rating'])
+
+        date_user_sel = rev_sel.xpath('./div[@class="commentFooter"]/span[@class="controlItems"]')
+        # /profile/yermat
+        username = date_user_sel.xpath('./a[starts-with(@href,"/profile/")]/@href').extract_first()
+        new_item['username'] = username[username.rindex('/') + 1:]
+        # for lt, username and userid are the same
+        new_item['user_uid'] = new_item['username']
+        # gives :   |  Nov 22, 2012  |
+        rdate = date_user_sel.xpath('./text()').extract_first()
+        new_item['review_date'] = rdate[rdate.index('|') + 1:rdate.rindex('|')].strip()
+        new_item['parsed_review_date'] = self.parse_review_date(new_item['review_date'])
+        new_item['likes'] = rev_sel.xpath('.//span[@class="reviewVoteCount"]/text()').extract_first()
+        if new_item['likes']:  # and len(item['likes'] >= 1) and item['likes'].find(u'nbsp') == -1:
+            try:
+                new_item['parsed_likes'] = int(new_item['likes'])
+            except ValueError:
+                pass
+        return new_item
 
     def scrape_langs_nb(self, response):
         """Extract language/nb of reviews (assuming English only when lang bar menu not found)
