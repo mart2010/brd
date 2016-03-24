@@ -650,16 +650,20 @@ create table presentation.dim_date (
     id int primary key
 );
 
--- model review text as dim, while keeping cleansed text :
---  remove tag, special format character (\t, \n, many continuous space, )
--- would be ideal place for storing special exatfcted features or text dim-reduced representation ...)
+-- model review text as dim, while keeping text only (stripped from html tag/content):
+-- would be ideal place for storing special extracted features or text dim-reduced representation ...)
 create table presentation.dim_review_text (
     id uuid,
     review_t text,
 
-
 );
 
+-- the idea is that if I want to be able to report similar review (for account duplication, plagirism, ..)
+-- then I need to preserve each review here (as opposed to clean them upstream and loose this capability in presentation layer!)
+create table presentation.review_similar_to (
+-- sort of dim outrigger!
+
+);
 
 create table presentation.dim_mds (
     id int primary key

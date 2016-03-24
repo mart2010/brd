@@ -11,13 +11,12 @@ import brd.elt
 
 __author__ = 'mouellet'
 
-
-logger = logging.getLogger(__name__)
 # module-level loggers use config file (otherwise, they get created with default values)
 # also done in Luigi.interface so probaby not needed when launching task from command-line
-# TODO: this is done by luigi.. now impact the logging of my test (see what to do instead of commented ot)
-#logging.config.fileConfig('logging.cfg', disable_existing_loggers=False)
+# need to put absolute path in order for test to work
+logging.config.fileConfig('/Users/mart/dev/brd/logging.cfg', disable_existing_loggers=False)
 
+logger = logging.getLogger(__name__)
 
 def get_period_text(begin_period, end_period):
     """
@@ -111,7 +110,7 @@ def get_marc_code(input, capital=True):
     """
     input can be either alpha-2, alpha-3 code, full english or french name (capitalized or not)
     :param input: text in UTF-8 encoding (otherwise SQL comparison will fail as PS uses UTF-8 encoding)
-    :return: marc_code found or None
+    :return: marc_code found or u'--' when None is found
     """
     if input is None:
         return None
@@ -132,7 +131,7 @@ def get_marc_code(input, capital=True):
         if ret:
             marc_code = ret[1]
         else:
-            marc_code = '---'
+            marc_code = u'--'
 
     lang_cache[uinput] = marc_code
     if capital:

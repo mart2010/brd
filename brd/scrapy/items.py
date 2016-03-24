@@ -52,14 +52,15 @@ class WorkRefItem(Item):
 class ReviewerItem(Item):
     username            = Field()
     user_uid            = Field()
-    fname               = Field()
-    lname               = Field()
+    name                = Field()
     status              = Field()
     ocupation           = Field()
     interest            = Field()
+    fav_books           = Field()
     country             = Field()
     location            = Field()
     gender              = Field()
     birth_text          = Field()
+    parsed_birthyear    = Field()
     tags                = Field()
 
