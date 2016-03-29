@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from brd.scrapy.items import ReviewItem
-
-
 import unittest
 from mockresponse import fake_response_from_file
 import brd.scrapy.spiders.reviews as spiderreviews
-import brd.config as config
 import datetime
+import scrapy
 
 
 class TestLtReview(unittest.TestCase):
@@ -48,7 +46,8 @@ class TestLtReview(unittest.TestCase):
         self.assertEqual(item['work_refid'], "master")
         self.assertEqual(item['dup_refid'], wids[0])
         self.assertEqual(item['tags_n'], u'1;1;1;1;1;1;1;1')
-        self.assertEqual(item['tags_t'], u'21st century__&__biography__&__fiction__&__FRA 848 LAF 2001__&__French__&__Haiti__&__littérature québécoise__&__Quebec')
+        self.assertEqual(item['tags_t'],
+            u'21st century__&__biography__&__fiction__&__FRA 848 LAF 2001__&__French__&__Haiti__&__littérature québécoise__&__Quebec')
         try:
             item_gen.next()
             self.fail("no more item expected")
@@ -66,7 +65,8 @@ class TestLtReview(unittest.TestCase):
                                                                  meta=meta))
         item = item_gen.next()
         self.assertEqual(item['tags_n'], u'1;2;2;1;1;2;1;2;1;1;1;7;1;2;1;1;1;4;1;4;1;3;1;1;4;1;1;7;1;1')
-        self.assertEqual(item['tags_t'], u'2008__&__21st century__&___global_reads__&__AF__&__BTBA longlist 2012__&__Canada__&__Canadian__&__Canadian literature__&__contemporary literature__&__diaspora__&__ethnic identity__&__fiction__&__French literature__&__Haiti__&__Haitian/Canadian/Japanese__&__home__&__importjan__&__Japan__&__Japan - Novel__&__littérature québécoise__&__my library__&__novel__&__postmodern__&__Q4 12__&__Quebec__&__stream of consciousness__&__to-buy__&__to-read__&__world fiction__&__writing')
+        self.assertEqual(item['tags_t'],
+            u'2008__&__21st century__&___global_reads__&__AF__&__BTBA longlist 2012__&__Canada__&__Canadian__&__Canadian literature__&__contemporary literature__&__diaspora__&__ethnic identity__&__fiction__&__French literature__&__Haiti__&__Haitian/Canadian/Japanese__&__home__&__importjan__&__Japan__&__Japan - Novel__&__littérature québécoise__&__my library__&__novel__&__postmodern__&__Q4 12__&__Quebec__&__stream of consciousness__&__to-buy__&__to-read__&__world fiction__&__writing')
 
 
     def test_mainpage_revs_nolang(self):
@@ -234,6 +234,78 @@ class TestLtReview(unittest.TestCase):
                     pass
 
         self.assertEqual(127, nb)
+
+
+class TestGrReview(unittest.TestCase):
+
+    def mock_spider(self, wids, isbns_l, to_date=datetime.datetime.now()):
+        works_to_harvest = [{'work_refid': wids[i], 'isbns': isbns_l[i]} for i in range(len(wids))]
+        spider = spiderreviews.Goodreads(dump_filepath='dummy', to_date=to_date, works_to_harvest=works_to_harvest)
+        return spider
+
+    def test_start_request_and_search(self):
+        spider = self.mock_spider([1000, 2000], [['9780590406406', '1111111111111'], ['1111111111112']])
+        start_reqs = spider.start_requests()
+
+        work_req = start_reqs.next()
+        self.assertEqual(work_req.meta['work_index'], 0)
+        self.assertEqual(work_req.meta['nb_try'], 0)
+        self.assertEqual(work_req.url, spider.url_search + '9780590406406')
+
+        r = spider.parse_search_resp(fake_response_from_file("mockobject/GR_noresults.html", response_type="Html", meta=work_req.meta))
+        sec_req = r.next()
+        self.assertEqual(sec_req.meta['work_index'], 0)
+        self.assertEqual(sec_req.meta['nb_try'], 1)
+        self.assertEqual(sec_req.url, spider.url_search + '1111111111111')
+
+        finish_nores = spider.parse_search_resp(fake_response_from_file("mockobject/GR_noresults.html", response_type="Html", meta=sec_req.meta))
+        item = finish_nores.next()
+        self.assertEqual(item['work_refid'], 1000)
+
+        work_req = start_reqs.next()
+        meta = work_req.meta
+        self.assertEqual(meta['work_index'], 1)
+        self.assertEqual(meta['nb_try'], 0)
+        self.assertEqual(work_req.url, spider.url_search + '1111111111112')
+
+        try:
+            start_reqs.next()
+            self.fail("only one request per work_refid")
+        except StopIteration:
+            pass
+
+    def test_parse_reviews(self):
+        wid = 1000
+        wuid = "2776527-traffic"
+        spider = self.mock_spider([wid], [['9780590406406']])
+        # mock-up
+        spider.works_to_harvest[0]['last_harvest_date'] = spider.min_harvest_date
+        spider.works_to_harvest[0]['work_uid'] = wuid
+
+        meta = {'work_index': 0}
+        resp = spider.parse_reviews(fake_response_from_file("mockobject/GR_%s_reviews_p2of32.html" % wuid,
+                                                            response_type="Html", meta=meta,
+                                                            url=spider.url_review % (wuid, 2)))
+        i = 0
+        for item in resp:
+            if i < 30:
+                self.assertEqual(item['site_logical_name'], 'goodreads')
+                self.assertEqual(item['authors'], u'Tom Vanderbilt')
+                self.assertEqual(item['title'], u'Traffic: Why We Drive the Way We Do (and What It Says About Us)')
+                self.assertEqual(item['work_refid'], 1000)
+                self.assertEqual(item['review_lang'], u'und')
+                if i == 5:
+                    self.assertEqual(item['username'], u'Rayfes Mondal')
+                    self.assertEqual(item['user_uid'], u'35461072-rayfes-mondal')
+                    self.assertEqual(item['parsed_rating'], 8)
+                    self.assertEqual(item['review'], u"A fascinating look at how traffic works and how we drive. Some controversial viewpoints but this was a fun book for me. There's so much idiocy in how we drive and set up our road system.")
+                    self.assertEqual(item['parsed_review_date'], datetime.date(2015, 7, 14))
+            # the request to next page
+            if i == 30:
+                self.assertEqual(type(item), scrapy.http.request.Request)
+                self.assertEqual(item.url, "https://www.goodreads.com/book/show/2776527-traffic?page=3&sort=newest")
+                self.assertEqual(item.meta['last_page'], 32)
+            i += 1
 
 
 if __name__ == '__main__':

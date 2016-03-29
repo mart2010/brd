@@ -281,7 +281,7 @@ class Amazon(BaseReviewSpider):
         work_refid = self.works_to_harvest[widx]['work_refid']
         no_result = int(response.xpath('boolean(//h1[@id="noResultsTitle"])').extract_first())
         if no_result == 1:
-            logger.info("Nothing found for work-refid %s" % (str(work_refid)))
+            logger.info("Nothing found for work-refid %s" % (work_refid))
             yield self.build_review_item(work_refid=work_refid)
         else:
             # dic to hold: { (nb_rev, avg_rev): 'asin'}
@@ -300,7 +300,7 @@ class Amazon(BaseReviewSpider):
                         nrev_avg[(nb_reviews, avg_stars)] = asin
                 # otherwise, generate item record for mapping between refid and asin
                 else:
-                    logger.info("No reviews found for asin %s (work-refid=%s)" %(asin, str(work_refid)))
+                    logger.info("No reviews found for asin %s (work-refid=%s)" %(asin, work_refid))
                     yield self.build_review_item(work_refid=work_refid,
                                                  work_uid=asin)
             for tu in nrev_avg:
@@ -438,7 +438,7 @@ class Babelio(BaseReviewSpider):
                                          meta={'work_index': widx, 'nb_try': nb_try},
                                          callback=self.parse_search_resp)
             else:
-                logger.info("Nothing found for work-refid %s, isbns:%s" % (str(self.works_to_harvest[widx]['work_refid']), str(isbns)))
+                logger.info("Nothing found for work-refid %s, isbns:%s" % (self.works_to_harvest[widx]['work_refid'], isbns))
                 yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'])
 
     def parse_reviews(self, response):
@@ -520,8 +520,8 @@ class Babelio(BaseReviewSpider):
 
 class Goodreads(BaseReviewSpider):
     """
-    This requires isbns in self.works_to_harvest for never harvested work.
-    and relies on last_harvest_date to filter needed reviews (no need for nb_in_db)
+    This requires isbns in self.works_to_harvest for those never harvested,
+    and relies only on last_harvest_date to filter needed reviews
     """
     name = 'goodreads'
     allowed_domains = ['www.goodreads.com']
@@ -555,21 +555,21 @@ class Goodreads(BaseReviewSpider):
         nb_try += 1
         no_result = response.xpath('//h3[@class="searchSubNavContainer"]//text()').extract()
         # not found
-        if u'Looking for a book?' in response.body or \
-        (len(no_result) > 0 and no_result[0].startswith(u'No result')):
+        if u'No Results' in response.body_as_unicode() or \
+            (len(no_result) > 0 and no_result[0].startswith(u'No result')):
             if nb_try < len(isbns):
                 yield scrapy.Request(self.url_search + str(isbns[nb_try]),
                                      meta={'work_index': widx, 'nb_try': nb_try},
                                      callback=self.parse_search_resp)
             else:
-                logger.info("Nothing found for work-refid %s, isbns:%s" % (str(self.works_to_harvest[widx]['work_refid']), str(isbns)))
+                logger.info("Search unsuccessful for work-refid: %s, isbns: %s" % (self.works_to_harvest[widx]['work_refid'], isbns))
                 yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'])
-        # found it, map gr's id but cannot start harvesting, as reviews are ordered arbitrarily
+        # found it, map gr's id and trigger new Request to have reviews ordered correctly
         else:
             url = response.url
             gr_work_id = url[url.index('/book/show/') + 11:]
             self.works_to_harvest[widx]['work_uid'] = gr_work_id
-            self.works_to_harvest[widx]['last_harvest_dts'] = self.min_harvest_date
+            self.works_to_harvest[widx]['last_harvest_date'] = self.min_harvest_date
             yield scrapy.Request(self.url_review % (gr_work_id, 1),
                                  meta={'work_index': widx},
                                  callback=self.parse_reviews)
@@ -579,7 +579,7 @@ class Goodreads(BaseReviewSpider):
         widx = meta['work_index']
         last_page = meta.get('last_page')
         if last_page is None:
-            # get how many pages of reviews (TODO:  max is 100...: see how to get missing ones)
+            # get how many pages of reviews (TODO:  max is 100...: how to get missing ones?)
             # last page is the text just before the "next page" link
             pageno_before_next = response.xpath('//a[@class="next_page"]/preceding-sibling::*[1]/text()')
             if len(pageno_before_next) > 0:
@@ -632,7 +632,10 @@ class Goodreads(BaseReviewSpider):
         new_item['username'] = rev.xpath('.//a[@class="user"]/@title').extract_first()  # u'Jon Liu'
         u_link = rev.xpath('.//a[@class="user"]/@href').extract_first()  # u'/user/show/52104079-jon-liu'
         new_item['user_uid'] = u_link[u_link.index(u'/show/') + 6:]
-        new_item['review'] = rev.xpath('.//span[starts-with(@id,"freeText") and @style="display:none"]/text()').extract_first()
+        # no logical rules: review text may or may not have style, and its attribute can have diff values ...
+        # for now, simply take the first /span (TODO: will need diff feed to get this right)
+        r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][1]//text()').extract()
+        new_item['review'] = "\n".join(r_texts)
         new_item['review_lang'] = u'und'
         likes_raw = rev.xpath('.//span[@class="likesCount"]/text()').extract()
         if len(likes_raw) == 1:
