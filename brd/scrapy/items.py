@@ -18,7 +18,6 @@ class ReviewItem(Item):
     review              = Field()
     review_date         = Field()
     review_lang         = Field()
-    # simple count or text (ex. az: 3 out 6 people found that helpful...indicating both likes and dislikes)
     likes               = Field()
     work_refid          = Field()
     dup_refid           = Field()

@@ -2,24 +2,40 @@
 
 from brd.scrapy.items import ReviewItem
 import unittest
-from mockresponse import fake_response_from_file
+from mockresponse import mock_from_file
 import brd.scrapy.spiders.reviews as spiderreviews
 import datetime
 import scrapy
 
 
-class TestLtReview(unittest.TestCase):
-
-    def mock_spider(self, wids, to_date=datetime.datetime.now()):
-        spider = spiderreviews.LibraryThing(
-            dump_filepath='dummy',
-            to_date=to_date,
-            works_to_harvest=[{'work_refid': wid} for wid in wids])
+class BaseTestReview(unittest.TestCase):
+    def mock_spider(self, spider_class, wids, isbns_l=None, to_date=datetime.datetime.now()):
+        if isbns_l:
+            works_to_harvest = [{'work_refid': wids[i], 'isbns': isbns_l[i]} for i in range(len(wids))]
+        else:
+            works_to_harvest = [{'work_refid': wid} for wid in wids]
+        spider = spider_class(dump_filepath='dummy', to_date=to_date, works_to_harvest=works_to_harvest)
         return spider
 
+    def assert_not_none(self, item):
+        self.assertTrue(item['username'])
+        self.assertTrue(item['user_uid'])
+        self.assertTrue(item['parsed_review_date'] < datetime.datetime.now().date())
+        self.assertTrue(item['review'])
+        if item.get('rating'):
+            self.assertTrue(1 <= item['parsed_rating'] <= 10)
+        if item.get('likes'):
+            try:
+                n_likes = int(item['likes'])
+                self.assertEquals(n_likes, item['parsed_likes'])
+            except ValueError:
+                pass
+
+
+class TestLtReview(BaseTestReview):
     def test_start_request(self):
         wids = ['1111111', '2222222']
-        spider = self.mock_spider(wids)
+        spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         req_gen = spider.start_requests()
 
         r = req_gen.next()
@@ -35,12 +51,12 @@ class TestLtReview(unittest.TestCase):
 
     def test_mainpage_noreview(self):
         wids = ['3440235', 'dummy']
-        spider = self.mock_spider(wids)
+        spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         meta = {'work_index': 0}
-        item_gen = spider.parse_mainpage(fake_response_from_file("mockobject/LTWorkmain_%s_norev.html" % wids[0],
-                                                                 url=spider.url_mainpage % "master",
-                                                                 response_type="Html",
-                                                                 meta=meta))
+        item_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_norev.html" % wids[0],
+                                                        url=spider.url_mainpage % "master",
+                                                        response_type="Html",
+                                                        meta=meta))
         item = item_gen.next()
         self.assertEqual(item['site_logical_name'], 'librarything')
         self.assertEqual(item['work_refid'], "master")
@@ -57,12 +73,12 @@ class TestLtReview(unittest.TestCase):
     # although there is one review, we skip it as no information on how may is available
     def test_mainpage_onereview_nolang(self):
         wids = ['5266585']
-        spider = self.mock_spider(wids)
+        spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         meta = {'work_index': 0}
-        item_gen = spider.parse_mainpage(fake_response_from_file("mockobject/LTWorkmain_%s_onerev_nolang.html" % wids[0],
-                                                                 url=spider.url_mainpage % "master",
-                                                                 response_type="Html",
-                                                                 meta=meta))
+        item_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_onerev_nolang.html" % wids[0],
+                                                        url=spider.url_mainpage % "master",
+                                                        response_type="Html",
+                                                        meta=meta))
         item = item_gen.next()
         self.assertEqual(item['tags_n'], u'1;2;2;1;1;2;1;2;1;1;1;7;1;2;1;1;1;4;1;4;1;3;1;1;4;1;1;7;1;1')
         self.assertEqual(item['tags_t'],
@@ -71,13 +87,13 @@ class TestLtReview(unittest.TestCase):
 
     def test_mainpage_revs_nolang(self):
         wids = ['413508']
-        spider = self.mock_spider(wids)
+        spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         meta = {'work_index': 0}
 
-        req_gen = spider.parse_mainpage(fake_response_from_file("mockobject/LTWorkmain_%s_revs_nolang.html" % wids[0],
-                                                                url=spider.url_mainpage % wids[0],
-                                                                response_type="Html",
-                                                                meta=meta))
+        req_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_revs_nolang.html" % wids[0],
+                                                       url=spider.url_mainpage % wids[0],
+                                                       response_type="Html",
+                                                       meta=meta))
         form_req = req_gen.next()
         self.assertEqual(spider.works_to_harvest[0]['last_harvest_date'], spider.min_harvest_date)
 
@@ -103,13 +119,13 @@ class TestLtReview(unittest.TestCase):
 
     def test_mainpage_revs_manylang(self):
         wids = ['2371329']
-        spider = self.mock_spider(wids)
+        spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         meta = {'work_index': 0}
 
-        req_gen = spider.parse_mainpage(fake_response_from_file("mockobject/LTWorkmain_%s_manylang.html" % wids[0],
-                                                                url=spider.url_mainpage % wids[0],
-                                                                response_type="Html",
-                                                                meta=meta))
+        req_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_manylang.html" % wids[0],
+                                                       url=spider.url_mainpage % wids[0],
+                                                       response_type="Html",
+                                                       meta=meta))
         nb_req = 0
         for form_req in req_gen:
             nb_req += 1
@@ -152,14 +168,14 @@ class TestLtReview(unittest.TestCase):
 
     def test_parse_reviews(self):
         wid = ['2371329']
-        spider = self.mock_spider(wid)
+        spider = self.mock_spider(spiderreviews.LibraryThing, wid)
         # mock dependency
         spider.works_to_harvest[0]['last_harvest_date'] = spider.min_harvest_date
         # validate parse_reviews()
         meta = {'work_index': 0, 'passed_item': ReviewItem()}
-        review_items = spider.parse_reviews(fake_response_from_file("mockobject/LTRespReviews_%s.html" % wid[0],
-                                                                    response_type="Html",
-                                                                    meta=meta))
+        review_items = spider.parse_reviews(mock_from_file("mockobject/LTRespReviews_%s.html" % wid[0],
+                                                           response_type="Html",
+                                                           meta=meta))
         usernames = []
         userids = []
         parsed_dates = []
@@ -198,53 +214,35 @@ class TestLtReview(unittest.TestCase):
         wid = ['7571386']
 
         # mock a spider with specific last-harvest and launch dates
-        spider = self.mock_spider(wid, to_date=datetime.date(2013, 8, 7))
+        spider = self.mock_spider(spiderreviews.LibraryThing, wid, to_date=datetime.date(2013, 8, 7))
 
         spider.works_to_harvest[0]['last_harvest_date'] = datetime.date(2013, 4, 4)
         meta = {'work_index': 0, 'passed_item': ReviewItem()}
-        review_items = spider.parse_reviews(fake_response_from_file("mockobject/LTRespReviews_%s.html" % wid[0],
-                                                                    response_type="Html",
-                                                                    meta=meta))
+        review_items = spider.parse_reviews(mock_from_file("mockobject/LTRespReviews_%s.html" % wid[0],
+                                                           response_type="Html",
+                                                           meta=meta))
         nb = 0
         # only expected to have the 3 duplicated reviews done on the 4/4/2013
         for rev in review_items:
             nb += 1
         self.assertEqual(3, nb)
 
-        # otherwise initial load should have
-        spider = self.mock_spider(wid)
+        # otherwise initial load must yield all reviews
+        spider = self.mock_spider(spiderreviews.LibraryThing, wid)
         spider.works_to_harvest[0]['last_harvest_date'] = spider.min_harvest_date
-        review_items = spider.parse_reviews(fake_response_from_file("mockobject/LTRespReviews_%s.html" % wid[0],
-                                                                    response_type="Html",
-                                                                    meta=meta))
+        review_items = spider.parse_reviews(mock_from_file("mockobject/LTRespReviews_%s.html" % wid[0],
+                                                           response_type="Html",
+                                                           meta=meta))
         nb = 0
         for item in review_items:
             nb += 1
-            self.assertTrue(item['username'])
-            self.assertTrue(item['user_uid'])
-            self.assertTrue(item['parsed_review_date'] < datetime.datetime.now().date())
-            self.assertTrue(item['review'])
-            if item.get('rating'):
-                self.assertTrue(1 <= item['parsed_rating'] <= 10)
-            if item.get('likes'):
-                try:
-                    n_likes = int(item['likes'])
-                    self.assertEquals(n_likes, item['parsed_likes'])
-                except ValueError:
-                    pass
+            self.assert_not_none(item)
 
         self.assertEqual(127, nb)
 
-
-class TestGrReview(unittest.TestCase):
-
-    def mock_spider(self, wids, isbns_l, to_date=datetime.datetime.now()):
-        works_to_harvest = [{'work_refid': wids[i], 'isbns': isbns_l[i]} for i in range(len(wids))]
-        spider = spiderreviews.Goodreads(dump_filepath='dummy', to_date=to_date, works_to_harvest=works_to_harvest)
-        return spider
-
+class TestGrReview(BaseTestReview):
     def test_start_request_and_search(self):
-        spider = self.mock_spider([1000, 2000], [['9780590406406', '1111111111111'], ['1111111111112']])
+        spider = self.mock_spider(spiderreviews.Goodreads, [1000, 2000], [['9780590406406', '1111111111111'], ['1111111111112']])
         start_reqs = spider.start_requests()
 
         work_req = start_reqs.next()
@@ -252,13 +250,13 @@ class TestGrReview(unittest.TestCase):
         self.assertEqual(work_req.meta['nb_try'], 0)
         self.assertEqual(work_req.url, spider.url_search + '9780590406406')
 
-        r = spider.parse_search_resp(fake_response_from_file("mockobject/GR_noresults.html", response_type="Html", meta=work_req.meta))
+        r = spider.parse_search_resp(mock_from_file("mockobject/GR_noresults.html", response_type="Html", meta=work_req.meta))
         sec_req = r.next()
         self.assertEqual(sec_req.meta['work_index'], 0)
         self.assertEqual(sec_req.meta['nb_try'], 1)
         self.assertEqual(sec_req.url, spider.url_search + '1111111111111')
 
-        finish_nores = spider.parse_search_resp(fake_response_from_file("mockobject/GR_noresults.html", response_type="Html", meta=sec_req.meta))
+        finish_nores = spider.parse_search_resp(mock_from_file("mockobject/GR_noresults.html", response_type="Html", meta=sec_req.meta))
         item = finish_nores.next()
         self.assertEqual(item['work_refid'], 1000)
 
@@ -277,23 +275,29 @@ class TestGrReview(unittest.TestCase):
     def test_parse_reviews(self):
         wid = 1000
         wuid = "2776527-traffic"
-        spider = self.mock_spider([wid], [['9780590406406']])
+        spider = self.mock_spider(spiderreviews.Goodreads, [wid], [['9780590406406']])
         # mock-up
         spider.works_to_harvest[0]['last_harvest_date'] = spider.min_harvest_date
         spider.works_to_harvest[0]['work_uid'] = wuid
 
         meta = {'work_index': 0}
-        resp = spider.parse_reviews(fake_response_from_file("mockobject/GR_%s_reviews_p2of32.html" % wuid,
-                                                            response_type="Html", meta=meta,
-                                                            url=spider.url_review % (wuid, 2)))
+        resp = spider.parse_reviews(mock_from_file("mockobject/GR_%s_reviews_p2of32.html" % wuid,
+                                                   response_type="Html", meta=meta,
+                                                   url=spider.url_review % (wuid, 2)))
+        #self.assertEqual(spider.current_page, 2)
         i = 0
         for item in resp:
             if i < 30:
+                self.assert_not_none(item)
                 self.assertEqual(item['site_logical_name'], 'goodreads')
                 self.assertEqual(item['authors'], u'Tom Vanderbilt')
                 self.assertEqual(item['title'], u'Traffic: Why We Drive the Way We Do (and What It Says About Us)')
                 self.assertEqual(item['work_refid'], 1000)
+                self.assertEqual(item['work_uid'], wuid)
                 self.assertEqual(item['review_lang'], u'und')
+                # check the tags (genre)
+                self.assertEqual(item['tags_n'], u'386 ;92 ;83 ;52 ;20 ;20 ;17 ;13 ;9 ;7 ')
+                self.assertEqual(item['tags_t'], u'Non Fiction__&__Psychology__&__Science__&__Sociology__&__Cities > Urban Planning__&__Culture__&__Social Science__&__History__&__Adult__&__Business')
                 if i == 5:
                     self.assertEqual(item['username'], u'Rayfes Mondal')
                     self.assertEqual(item['user_uid'], u'35461072-rayfes-mondal')
@@ -306,6 +310,88 @@ class TestGrReview(unittest.TestCase):
                 self.assertEqual(item.url, "https://www.goodreads.com/book/show/2776527-traffic?page=3&sort=newest")
                 self.assertEqual(item.meta['last_page'], 32)
             i += 1
+
+class TestAZReview(BaseTestReview):
+    def test_startreq_and_nores(self):
+        more_than_100 = [str(i) for i in range(200)]
+        spider = self.mock_spider(spiderreviews.Amazon, [1], [more_than_100])
+        reqs = spider.start_requests()
+        r = reqs.next()
+        self.assertEqual(spider.search_url % "|".join(more_than_100[0:100]), r.url)
+        m = r.meta
+        self.assertEqual(m['work_index'], 0)
+        try:
+            reqs.next()
+            self.fail("no more request expected")
+        except StopIteration:
+            pass
+
+        itera = spider.parse_search_resp(mock_from_file("mockobject/AZ_noresults.html", response_type="Html", meta=m))
+        nores = itera.next()
+        self.assertEqual(nores, ReviewItem(work_refid=1, site_logical_name='amazon.com'))
+        try:
+            itera.next()
+            self.fail("no more item")
+        except StopIteration:
+            pass
+
+    def test_many_search_res(self):
+        spider = self.mock_spider(spiderreviews.Amazon, [1000], [['theisbn']])
+        meta = {'work_index': 0}
+        iterato = spider.parse_search_resp(mock_from_file("mockobject/AZ_9036_resp_searchISBN.html",
+                                                          response_type="Html",
+                                                          meta=meta))
+        all_wuids = list()
+        for req in iterato:
+            u = req.url
+            work_uid = u[u.index('/product-reviews/') + 17:u.index('/ref=')]
+            all_wuids.append(work_uid)
+            self.assertTrue(work_uid in ['014044114X', '0143039512', '0883683822', '1591094003', '1565481542'])
+        self.assertEqual(len(all_wuids), 5)
+
+        items = spider.parse_search_resp(mock_from_file("mockobject/AZ_821501_worksFound_noreview.html",
+                                                        response_type="Html",
+                                                        meta=meta))
+        item = items.next()
+        self.assertEqual(item['work_refid'], 1000)
+        try:
+            items.next()
+            self.fail()
+        except StopIteration:
+            pass
+
+    def test_parse_reviews(self):
+        spider = self.mock_spider(spiderreviews.Amazon, [10])
+        asin = '0199537828'
+        spider.works_to_harvest[0]['last_harvest_date'] = spider.min_harvest_date
+        results = spider.parse_reviews(mock_from_file("mockobject/AZ_reviews_9036_asin0199537828.html",
+                                                      url=spider.review_url % asin,
+                                                      response_type="Html",
+                                                      meta={'work_index': 0}))
+        i = 0
+        for item in results:
+            if type(item) == dict:
+                self.assert_not_none(item)
+                self.assertEqual(item['site_logical_name'], 'amazon.com')
+                self.assertEqual(item['authors'], u'Saint Augustine')
+                self.assertEqual(item['title'], u"Confessions (Oxford World's Classics)")
+                self.assertEqual(item['work_refid'], 10)
+                self.assertEqual(item['work_uid'], asin)
+                self.assertEqual(item['review_lang'], u'eng')
+                if i == 0:
+                    self.assertEqual(item['username'], u'warhorse')
+                    self.assertEqual(item['user_uid'], u'A17OZNHU82VFAE')
+                    self.assertEqual(item['parsed_rating'], 10)
+                    self.assertEqual(item['review'], u"What can anyone say but excellent")
+                    self.assertEqual(item['parsed_review_date'], datetime.date(2016, 3, 29))
+                i += 1
+            else:
+                self.assertEqual(type(item), scrapy.Request)
+                self.assertEqual(item.url, "http://www.amazon.com/Confessions-Oxford-Worlds-Classics-Augustine/product-reviews/0199537828/ref=cm_cr_arp_d_paging_btm_2?ie=UTF8&pageNumber=2&sortBy=recent" )
+
+        self.assertEqual(i, 10)
+
+
 
 
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ import os
 from scrapy.http import Response, Request, TextResponse, HtmlResponse
 
 
-def fake_response_from_file(file_name, url=None, response_type="Response", meta=None):
+def mock_from_file(file_name, url=None, response_type="Response", meta=None):
     """
     Create a Scrapy fake HTTP response from a HTML file
     @param file_name: The relative filename from the responses directory,

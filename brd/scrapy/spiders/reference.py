@@ -88,7 +88,7 @@ class WorkReference(scrapy.Spider):
             # ignore error in text with '--'
             mds_texts = filter(lambda s: s.find(u'-') == -1, all_mds[1:])
             item['mds_code'] = mds_code
-            item['mds_text'] = "-->".join(mds_texts)
+            item['mds_text'] = "-->".join(mds_texts).replace('\t','')
             # more precise code may have some part of text no set and ignored from mds lt system
             # ex: 613.04244 (Technology-->Medicine-->Health; Hygiene -->Essays)
             mds_code_nopt = mds_code.replace('.', '')

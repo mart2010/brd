@@ -215,8 +215,8 @@ class LoadWorkInfo(BasePostgresTask):
         """
         insert into integration.work_info(work_refid, title, original_lang, ori_lang_code, mds_code, mds_code_ori,
                                           lc_subjects, popularity, other_lang_title, create_dts, load_audit_id)
-        select s.work_refid, s.title, s.original_lang, s.ori_lang_code, replace(s.mds_code_corr,',',''), s.mds_code,
-                s.lc_subjects, replace(s.popularity,',','')::int, s.other_lang_title, now(), %(audit_id)s
+        select s.work_refid, s.title, s.original_lang, s.ori_lang_code, replace(coalesce(s.mds_code_corr, s.mds_code),'.',''),
+               s.mds_code, s.lc_subjects, replace(s.popularity,',','')::int, s.other_lang_title, now(), %(audit_id)s
         from staging.work_info s
         left join integration.work_info w on (w.work_refid = s.work_refid)
         where w.work_refid IS NULL;

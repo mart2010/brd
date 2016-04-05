@@ -6,6 +6,15 @@ from luigi import six
 batch_name = "n.a."  # concurrent batch jobs should be launched in separate process
 
 
+def postgres_target(target_table, update_id):
+    return luigi.postgres.PostgresTarget(
+            host        =brd.config.DATABASE['host'],
+            database    =brd.config.DATABASE['database'],
+            user        =brd.config.DATABASE['user'],
+            password    =brd.config.DATABASE['password'],
+            table       =target_table,
+            update_id   =update_id)
+
 class BasePostgresTask(luigi.Task):
     """
     Provides to subclass Task function to write to DB target
@@ -140,12 +149,3 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
         if self.audit_id:
             brd.elt.update_auditing(self.audit_id, brd.elt.EltStepStatus.FAILED,
                                     run_dts=self.run_dts, output=str(exception))
-
-def postgres_target(target_table, update_id):
-    return luigi.postgres.PostgresTarget(
-            host        =brd.config.DATABASE['host'],
-            database    =brd.config.DATABASE['database'],
-            user        =brd.config.DATABASE['user'],
-            password    =brd.config.DATABASE['password'],
-            table       =target_table,
-            update_id   =update_id)

@@ -250,7 +250,7 @@ class Amazon(BaseReviewSpider):
     raw_date_format = 'on %B %d, %Y'
 
     # isbn must be | separated; sort on customer reviews results in only first lines having reviews..)
-    search_req = 'http://www.amazon.com/gp/search/ref=sr_adv_b/?search-alias=stripbooks&unfiltered=1&field-isbn=%s' \
+    search_url = 'http://www.amazon.com/gp/search/ref=sr_adv_b/?search-alias=stripbooks&unfiltered=1&field-isbn=%s' \
                  '&sort=reviewrank_authority&Adv-Srch-Books-Submit.x=35&Adv-Srch-Books-Submit.y=5'   # + a bunch of empty param
     # %s is placeholder for 'asin'
     review_url = 'http://www.amazon.com/product-reviews/%s/ref=cm_cr_dp_see_all_btm?ie=UTF8&showViewpoints=1&sortBy=recent'
@@ -260,18 +260,16 @@ class Amazon(BaseReviewSpider):
             isbns = self.works_to_harvest[i].get('isbns')
             if isbns:
                 self.works_to_harvest[i]['last_harvest_date'] = self.min_harvest_date
-                # limit to 100 isbn to avoid too long url and request error 400
-                for j in range(0, len(isbns), 100):
-                    sub_isbns = isbns[j:j + 100]
-                    logger.debug("Requesting from isbn %d-th to %d-th out of %d" % (j, j + 100, len(isbns)))
-                    yield scrapy.Request(self.search_req % "|".join(sub_isbns),
-                                         meta={'work_index': i},
-                                         callback=self.parse_search_resp)
+                # limit to 100 to avoid too long url (error 400)
+                # only trigger one set of 100th, otherwise could harvest same (aggregated) work twice
+                sub_isbns = isbns[0:100]
+                yield scrapy.Request(self.search_url % "|".join(sub_isbns),
+                                     meta={'work_index': i},
+                                     callback=self.parse_search_resp)
             else:
                 work_uid = self.works_to_harvest[i].get('work_uid')
                 last_harvest_date = self.works_to_harvest[i].get('last_harvest_date')
-                assert work_uid, 'Getting incremental reviews requires work_uid'
-                assert last_harvest_date, 'Getting incremental reviews requires last_harvest_date'
+                assert work_uid and last_harvest_date, 'Getting incremental reviews requires work_uid & last_harvest_date'
                 # yield scrapy.Request(self.url_review % (work_uid),
                 #                     meta={'work_index': i},
                 #                     callback=self.parse_reviews)
@@ -284,7 +282,7 @@ class Amazon(BaseReviewSpider):
             logger.info("Nothing found for work-refid %s" % (work_refid))
             yield self.build_review_item(work_refid=work_refid)
         else:
-            # dic to hold: { (nb_rev, avg_rev): 'asin'}
+            # dic to hold: {(nb_rev, avg_rev): 'asin'}
             nrev_avg = {}
             for res in response.xpath('//li[starts-with(@id,"result_")]'):
                 asin = res.xpath('./@data-asin').extract_first()
@@ -298,15 +296,16 @@ class Amazon(BaseReviewSpider):
                     # RULE: same (nb,avg) correspond to duplicates as editions may be merged
                     if (nb_reviews, avg_stars) not in nrev_avg:
                         nrev_avg[(nb_reviews, avg_stars)] = asin
-                # otherwise, generate item record for mapping between refid and asin
-                else:
-                    logger.info("No reviews found for asin %s (work-refid=%s)" %(asin, work_refid))
-                    yield self.build_review_item(work_refid=work_refid,
-                                                 work_uid=asin)
-            for tu in nrev_avg:
-                yield scrapy.Request(self.review_url % nrev_avg[tu],
-                                     meta={'work_index': widx},
-                                     callback=self.parse_reviews)
+            if len(nrev_avg) > 0:
+                for tu in nrev_avg:
+                    yield scrapy.Request(self.review_url % nrev_avg[tu],
+                                         meta={'work_index': widx},
+                                         callback=self.parse_reviews)
+            else:
+                logger.info("No reviews found for work-refid= %s" % work_refid)
+                # generate item to avoid re-sending sames isbns, but without tying to any 'asin'
+                yield self.build_review_item(work_refid=work_refid)
+
 
     def parse_reviews(self, response):
         widx = response.meta['work_index']
@@ -322,15 +321,14 @@ class Amazon(BaseReviewSpider):
         all_revs_sel = response.xpath('//div[@class="a-section review"]')
         for rev in all_revs_sel:
             ret_item = self.extract_onereview(item, rev)
-            if ret_item['parsed_review_date'] < self.works_to_harvest[widx]['last_harvest_date']:
+            if self.is_withinperiod(ret_item, self.works_to_harvest[widx]['last_harvest_date']):
+                yield ret_item
+            else:
                 found_older = True
                 break
-            else:
-                if self.is_withinperiod(ret_item, self.works_to_harvest[widx]['last_harvest_date']):
-                    yield ret_item
 
         next_sel = response.xpath('//ul[@class="a-pagination"]/li[@class="a-last"]')
-        # as long as there is recent enough reviews, request next page
+        # as long as there are newer reviews, request next page
         if not found_older and len(next_sel) == 1:
             # get next page url
             next_rq = next_sel.xpath('./a/@href').extract_first()
@@ -578,7 +576,9 @@ class Goodreads(BaseReviewSpider):
         meta = response.meta
         widx = meta['work_index']
         last_page = meta.get('last_page')
-        if last_page is None:
+        tag_t = []
+        tag_n = []
+        if not last_page:
             # get how many pages of reviews (TODO:  max is 100...: how to get missing ones?)
             # last page is the text just before the "next page" link
             pageno_before_next = response.xpath('//a[@class="next_page"]/preceding-sibling::*[1]/text()')
@@ -586,6 +586,11 @@ class Goodreads(BaseReviewSpider):
                 last_page = int(pageno_before_next.extract()[0])
             else:
                 last_page = 1
+            # also harvest tag (i.e. Genres in GR)
+            for tline in response.xpath('//div[starts-with(@class,"bigBoxContent")]/div[starts-with(@class,"elementList")]'):
+                ts = tline.xpath('./div[@class="left"]/a/text()').extract()
+                tag_t.append(u" > ".join(ts))
+                tag_n.append(tline.xpath('./div[@class="right"]/a/text()').extract_first().replace(u'users', u''))
 
         url = response.url
         current_page = int(url[url.index('?page=') + 6:url.index('&sort=')])
@@ -597,6 +602,9 @@ class Goodreads(BaseReviewSpider):
                                           work_uid=self.works_to_harvest[widx]['work_uid'],
                                           authors=",".join(authors_raw.extract()),
                                           title=response.xpath('//h1[@class="bookTitle"]/text()').extract()[0].strip())
+            if len(tag_t) > 0:
+                item['tags_t'] = u"__&__".join(tag_t)
+                item['tags_n'] = u";".join(tag_n)
 
             reviews_sel = response.xpath('//div[starts-with(@id,"review_")]')
             # no review yet

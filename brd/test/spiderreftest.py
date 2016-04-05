@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-from mockresponse import fake_response_from_file
+from mockresponse import mock_from_file
 import brd.scrapy.spiders.reference as spiderref
 
 
@@ -12,10 +12,10 @@ class TestLtReference(unittest.TestCase):
         meta = {'wid': '1'}
         # validate parse_work()
         ref_items = spider.parse_work(
-                fake_response_from_file("mockobject/Workdetails_Rien_de_grave_LibraryThing.html",
-                                        response_type="Html",
-                                        url="https://www.librarything.com/work/1/workdetails",
-                                        meta=meta))
+                mock_from_file("mockobject/Workdetails_Rien_de_grave_LibraryThing.html",
+                               response_type="Html",
+                               url="https://www.librarything.com/work/1/workdetails",
+                               meta=meta))
 
         item = ref_items.next()
         self.assertEqual(item['work_refid'], '1')
@@ -44,10 +44,10 @@ class TestLtReference(unittest.TestCase):
         meta = {'wid': '1'}
         # validate parse_work()
         ref_items = spider.parse_work(
-                fake_response_from_file("mockobject/Workdetails_2authors_work.html",
-                                        response_type="Html",
-                                        url="https://www.librarything.com/work/1/workdetails",
-                                        meta=meta))
+                mock_from_file("mockobject/Workdetails_2authors_work.html",
+                               response_type="Html",
+                               url="https://www.librarything.com/work/1/workdetails",
+                               meta=meta))
 
         item = ref_items.next()
         self.assertEqual(item['title'], u"Nick & Norah's Infinite Playlist")
