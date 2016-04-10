@@ -14,7 +14,10 @@ from brd.taskbase import BasePostgresTask, BaseBulkLoadTask, batch_name
 
 logger = logging.getLogger(__name__)
 
-# ----------------------------------  LOAD WORK_REF ------------------------------------------#
+
+# --------------------------------------------------------------------------------------------- #
+# ----------------------------------  LOAD THINGISBN ------------------------------------------ #
+
 class DownLoadThingISBN(luigi.Task):
     filepath = luigi.Parameter()
 
@@ -324,7 +327,7 @@ class LoadWorkSameAs(BasePostgresTask):
         cursor.execute(sql, {'audit_id': audit_id})
         return cursor.rowcount
 
-# Almost 50% of LC subjects are NULL!!! mabe not worth integrating
+# Almost 50% of LC subjects are NULL!!! not worth integrating
 class LoadLcSubjects(BaseBulkLoadTask):
     pass
 
