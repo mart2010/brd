@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
 from brd.scrapy.items import ReviewItem
 import unittest
@@ -247,13 +249,13 @@ class TestGrReview(BaseTestReview):
 
         work_req = start_reqs.next()
         self.assertEqual(work_req.meta['work_index'], 0)
-        self.assertEqual(work_req.meta['nb_try'], 0)
+        self.assertEqual(work_req.meta['nb_try'], 1)
         self.assertEqual(work_req.url, spider.url_search + '9780590406406')
 
         r = spider.parse_search_resp(mock_from_file("mockobject/GR_noresults.html", response_type="Html", meta=work_req.meta))
         sec_req = r.next()
         self.assertEqual(sec_req.meta['work_index'], 0)
-        self.assertEqual(sec_req.meta['nb_try'], 1)
+        self.assertEqual(sec_req.meta['nb_try'], 2)
         self.assertEqual(sec_req.url, spider.url_search + '1111111111111')
 
         finish_nores = spider.parse_search_resp(mock_from_file("mockobject/GR_noresults.html", response_type="Html", meta=sec_req.meta))
@@ -263,7 +265,7 @@ class TestGrReview(BaseTestReview):
         work_req = start_reqs.next()
         meta = work_req.meta
         self.assertEqual(meta['work_index'], 1)
-        self.assertEqual(meta['nb_try'], 0)
+        self.assertEqual(meta['nb_try'], 1)
         self.assertEqual(work_req.url, spider.url_search + '1111111111112')
 
         try:
@@ -278,9 +280,8 @@ class TestGrReview(BaseTestReview):
         spider = self.mock_spider(spiderreviews.Goodreads, [wid], [['9780590406406']])
         # mock-up
         spider.works_to_harvest[0]['last_harvest_date'] = spider.min_harvest_date
-        spider.works_to_harvest[0]['work_uid'] = wuid
-
-        meta = {'work_index': 0}
+        meta = {'work_index': 0, 'item': spider.build_review_item(work_refid=wid,
+                                                                  work_uid=wuid)}
         resp = spider.parse_reviews(mock_from_file("mockobject/GR_%s_reviews_p2of32.html" % wuid,
                                                    response_type="Html", meta=meta,
                                                    url=spider.url_review % (wuid, 2)))
@@ -290,14 +291,18 @@ class TestGrReview(BaseTestReview):
             if i < 30:
                 self.assert_not_none(item)
                 self.assertEqual(item['site_logical_name'], 'goodreads')
-                self.assertEqual(item['authors'], u'Tom Vanderbilt')
-                self.assertEqual(item['title'], u'Traffic: Why We Drive the Way We Do (and What It Says About Us)')
+                # self.assertEqual(item['authors'], u'Tom Vanderbilt')
+                # self.assertEqual(item['title'], u'Traffic: Why We Drive the Way We Do (and What It Says About Us)')
                 self.assertEqual(item['work_refid'], 1000)
                 self.assertEqual(item['work_uid'], wuid)
                 self.assertEqual(item['review_lang'], u'und')
                 # check the tags (genre)
                 self.assertEqual(item['tags_n'], u'386 ;92 ;83 ;52 ;20 ;20 ;17 ;13 ;9 ;7 ')
                 self.assertEqual(item['tags_t'], u'Non Fiction__&__Psychology__&__Science__&__Sociology__&__Cities > Urban Planning__&__Culture__&__Social Science__&__History__&__Adult__&__Business')
+                if i == 3:
+                    self.assertEqual(item['username'], u'Rebecca')
+                    self.assertEqual(item['likes'], u'1 like')
+                    self.assertEqual(item['parsed_likes'], 1)
                 if i == 5:
                     self.assertEqual(item['username'], u'Rayfes Mondal')
                     self.assertEqual(item['user_uid'], u'35461072-rayfes-mondal')
@@ -308,7 +313,7 @@ class TestGrReview(BaseTestReview):
             if i == 30:
                 self.assertEqual(type(item), scrapy.http.request.Request)
                 self.assertEqual(item.url, "https://www.goodreads.com/book/show/2776527-traffic?page=3&sort=newest")
-                self.assertEqual(item.meta['last_page'], 32)
+                self.assertEqual(item.meta['lastpage_no'], 32)
             i += 1
 
 class TestAZReview(BaseTestReview):
@@ -362,8 +367,38 @@ class TestAZReview(BaseTestReview):
 
     def test_parse_reviews(self):
         spider = self.mock_spider(spiderreviews.Amazon, [10])
-        asin = '0199537828'
+        asin = '0439358078'
         spider.works_to_harvest[0]['last_harvest_date'] = spider.min_harvest_date
+        results = spider.parse_reviews(mock_from_file("mockobject/AZ_HP_0439358078_reviews_p774_of_775.html",
+                                                      url=spider.review_url % asin,
+                                                      response_type="Html",
+                                                      meta={'work_index': 0}))
+        i = 0
+        for item in results:
+            if type(item) == dict:
+                self.assert_not_none(item)
+                self.assertEqual(item['site_logical_name'], 'amazon.com')
+                self.assertEqual(item['authors'], u'J.K. Rowling')
+                self.assertEqual(item['title'], u"Harry Potter And The Order Of The Phoenix")
+                self.assertEqual(item['work_refid'], 10)
+                self.assertEqual(item['work_uid'], asin)
+                self.assertEqual(item['review_lang'], u'eng')
+                if i == 0:
+                    self.assertEqual(item['username'], u'Amazon Customer')
+                    self.assertEqual(item['user_uid'], u'A3FVDEFHGRLLYH')
+                    self.assertEqual(item['parsed_rating'], 10)
+                    self.assertEqual(item['parsed_likes'], 2)
+                    self.assertEqual(item['review'], u"This book is simply amazing. You will never guess who dies :(\nCan't wait for book 6!!")
+                    self.assertEqual(item['parsed_review_date'], datetime.date(2003, 6, 21))
+                i += 1
+            else:
+                self.assertEqual(type(item), scrapy.Request)
+                self.assertEqual(item.url, "http://www.amazon.com/Harry-Potter-And-Order-Phoenix/product-reviews/0439358078/ref=cm_cr_arp_d_paging_btm_775?ie=UTF8&pageNumber=775&sortBy=recent" )
+        self.assertEqual(i, 10)
+
+        asin = '0199537828'
+        # test limited time period (1 review should be filtered out)
+        spider.works_to_harvest[0]['last_harvest_date'] = datetime.date(1997, 8, 12)
         results = spider.parse_reviews(mock_from_file("mockobject/AZ_reviews_9036_asin0199537828.html",
                                                       url=spider.review_url % asin,
                                                       response_type="Html",
@@ -378,18 +413,20 @@ class TestAZReview(BaseTestReview):
                 self.assertEqual(item['work_refid'], 10)
                 self.assertEqual(item['work_uid'], asin)
                 self.assertEqual(item['review_lang'], u'eng')
-                if i == 0:
-                    self.assertEqual(item['username'], u'warhorse')
-                    self.assertEqual(item['user_uid'], u'A17OZNHU82VFAE')
-                    self.assertEqual(item['parsed_rating'], 10)
-                    self.assertEqual(item['review'], u"What can anyone say but excellent")
-                    self.assertEqual(item['parsed_review_date'], datetime.date(2016, 3, 29))
+                if i == 3:
+                    self.assertEqual(item['username'], u'life@micron.net')
+                    self.assertEqual(item['user_uid'], u'A2OOFX8HTKNDE8')
+                    self.assertEqual(item['parsed_rating'], 8)
+                    self.assertEqual(item['parsed_likes'], 6)
+                    self.assertEqual(item['review'][0:100], u"An in depth look at the nature of evil through the personal struggle of the great Augustine of Hippo")
+                    self.assertEqual(item['parsed_review_date'], datetime.date(1997, 8, 12))
                 i += 1
             else:
-                self.assertEqual(type(item), scrapy.Request)
-                self.assertEqual(item.url, "http://www.amazon.com/Confessions-Oxford-Worlds-Classics-Augustine/product-reviews/0199537828/ref=cm_cr_arp_d_paging_btm_2?ie=UTF8&pageNumber=2&sortBy=recent" )
+                self.fail("last page should not trigger a new request")
 
-        self.assertEqual(i, 10)
+        self.assertEqual(i, 4)
+
+
 
 
 

@@ -2,8 +2,8 @@
 import shutil
 
 import os
-
-__author__ = 'mouellet'
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
 import unittest
 import brd.elt as db

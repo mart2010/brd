@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
 import unittest
 from mockresponse import mock_from_file
@@ -8,7 +10,7 @@ import brd.scrapy.spiders.reference as spiderref
 class TestLtReference(unittest.TestCase):
 
     def test_parse_ref(self):
-        spider = spiderref.WorkReference(wids=None)
+        spider = spiderref.WorkReference(works_to_harvest=None, dump_filepath=None)
         meta = {'wid': '1'}
         # validate parse_work()
         ref_items = spider.parse_work(
@@ -28,11 +30,11 @@ class TestLtReference(unittest.TestCase):
         self.assertEqual(item['mds_code'], u'848')
         self.assertEqual(item['mds_text'], u'Literature-->French-->Authors, French and French miscellany')
         self.assertIsNone(item.get('lc_subjects'))
-        self.assertEqual(item['popularity'], 97109)
+        self.assertEqual(item['popularity'], u'97,109')
         self.assertEqual(item['other_lang_title'],
-                         u'French : Rien de grave|--|'
-                         u'German : Nicht so tragisch|--|'
-                         u'Italian : Niente di grave|--|'
+                         u'French : Rien de grave__&__'
+                         u'German : Nicht so tragisch__&__'
+                         u'Italian : Niente di grave__&__'
                          u'Swedish : Inget allvarligt')
         try:
             ref_items.next()
@@ -40,7 +42,7 @@ class TestLtReference(unittest.TestCase):
             self.assertTrue(e is not None)
 
     def test_parse_2authors_ref(self):
-        spider = spiderref.WorkReference(wids=None)
+        spider = spiderref.WorkReference(works_to_harvest=None, dump_filepath=None)
         meta = {'wid': '1'}
         # validate parse_work()
         ref_items = spider.parse_work(
@@ -57,13 +59,13 @@ class TestLtReference(unittest.TestCase):
         self.assertEqual(item['ori_lang_code'], u'ENG')
         self.assertEqual(item['mds_code'], u'813.6')
         self.assertEqual(item['mds_text'], u'Literature-->American And Canadian-->Fiction-->21st Century')
-        self.assertEqual(item['lc_subjects'], u'Love->Fiction|--|New York (N.Y.)->Fiction|--|Rock groups->Fiction')
-        self.assertEqual(item['popularity'], 2552)
+        self.assertEqual(item['lc_subjects'], u'Love->Fiction__&__New York (N.Y.)->Fiction__&__Rock groups->Fiction')
+        self.assertEqual(item['popularity'], u'2,552')
         self.assertEqual(item['other_lang_title'],
-                         u'Czech : Nick a Norah: až do ochraptění|--|'
-                         u'Dutch : Nick en Norah|--|'
-                         u'French : Une nuit a New York|--|'
-                         u'German : Nick & Norah - Soundtrack einer Nacht|--|'
+                         u'Czech : Nick a Norah: až do ochraptění__&__'
+                         u'Dutch : Nick en Norah__&__'
+                         u'French : Une nuit a New York__&__'
+                         u'German : Nick & Norah - Soundtrack einer Nacht__&__'
                          u'Swedish : Nick & Norahs oändliga låtlista')
 
 

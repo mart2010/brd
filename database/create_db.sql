@@ -1,3 +1,6 @@
+-- author = 'mart2010'
+-- copyright = "Copyright 2016, The BRD Project"
+
 
 /* As superuser, create role brd */
 	create role brd with login password 'brd';

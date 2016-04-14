@@ -8,9 +8,9 @@ import brd.elt as elt
 import brd.config as config
 import os
 import datetime
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
-
-__author__ = 'mouellet'
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,6 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
     Find work_refid and their isbns not yet harvested for site.
     For lt, simply return the ids using work_info ids to reduce the likelihood
     of harvesting duplicated work (still possible for work merged afterward).
-
     :return:
     """
     sql_other = \
@@ -65,7 +64,6 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
              join integration.site s on (m.site_id = s.id and s.logical_name = %(name)s)
             ) as mapped on (mapped.work_refid = ref.wid)
         where mapped.last_harvest_dts IS NULL
-        and ref.wid > 1007
         order by 1
         limit %(nb)s
         """
@@ -77,7 +75,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
         inner join integration.work w on (wi.work_refid = w.refid)
         where
         w.last_harvest_dts IS NULL
-        and wi.work_refid > 2000
+        order by 1
         limit %(nb)s
         """
     if site_logical_name == 'librarything':

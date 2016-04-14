@@ -1,0 +1,7 @@
+
+- Adjust the lang reference tsv file so that I no longer miss lookup (i.e. get work_info.ori_lang_code = '--')
+- Add a class to handle generically xpath extraction from selector
+- See if I can generalize harvest logic by adding composition class for harvest logic
+- Add interna AZ sites...
+-
+

@@ -8,8 +8,9 @@ from os.path import isfile, join
 import config
 import brd.taskref
 import brd.elt
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
-__author__ = 'mouellet'
 
 # module-level loggers use config file (otherwise, they get created with default values)
 # also done in Luigi.interface so probaby not needed when launching task from command-line

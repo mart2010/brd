@@ -4,7 +4,10 @@ import logging
 import scrapy
 from brd.scrapy.items import WorkRefItem
 import brd
-__author__ = 'mouellet'
+
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
+
 
 logger = logging.getLogger(__name__)
 

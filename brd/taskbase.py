@@ -1,6 +1,8 @@
 import brd
 import luigi
 from luigi import six
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
 # defined in Batch entry point Task (shared among all tasks)
 batch_name = "n.a."  # concurrent batch jobs should be launched in separate process

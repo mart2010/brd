@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
+
 
 DATABASE = {
     'host': 'localhost',

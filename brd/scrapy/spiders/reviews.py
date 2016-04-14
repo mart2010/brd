@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
+
+
 import logging
 
 import brd
@@ -59,9 +63,14 @@ class BaseReviewSpider(scrapy.Spider):
     def parse_review_date(self, raw_date):
         return datetime.datetime.strptime(raw_date, self.raw_date_format).date()
 
-    def is_withinperiod(self, item, last_harvest_date):
+    def compare_to_harvestperiod(self, item, last_harvest_date):
         """
-        Is review item created between last_harvest_date (inclusive) and self.to_date (exclusive)
+        Compare item.review_date with period to harvest, harvest when = 1.
+
+        return:
+         = -1 when item.review_date is older than last_harvest_date (exlusive)
+         =  0 when item.review_date within last_harvest_date (inclusive) and self.to_date (exclusive)
+         =  1 when item.review_date newer than self.to_date (inclusive)
         """
         if type(last_harvest_date) == datetime.date:
             from_date = last_harvest_date
@@ -69,9 +78,12 @@ class BaseReviewSpider(scrapy.Spider):
             from_date = last_harvest_date.date()
         else:
             raise ValueError('last_harvest_date must be either a date or datetime (%s)' % last_harvest_date)
-
-        return from_date <= item['parsed_review_date'] < self.to_date
-
+        if item['parsed_review_date'] < from_date:
+            return -1
+        elif from_date <= item['parsed_review_date'] < self.to_date:
+            return 0
+        else:
+            return 1
 
     def parse_rating(self, rating):
         raise NotImplementedError
@@ -89,6 +101,8 @@ class LibraryThing(BaseReviewSpider):
     """
     name = 'librarything'
     allowed_domains = ['www.librarything.com']
+    # Nov 22, 2012
+    raw_date_format = '%b %d, %Y'
     ###########################
     # Control setting
     ###########################
@@ -100,8 +114,6 @@ class LibraryThing(BaseReviewSpider):
     # 'showCount': 25 (i.e. show 25 reviews, show all is set to 10'000 in lt)
     # other formData not mandatory:  bookid: , optionalTitle:, uniqueID: , mode: profile
     ##########################
-    # Nov 22, 2012
-    raw_date_format = '%b %d, %Y'
 
     def start_requests(self):
         for i in range(len(self.works_to_harvest)):
@@ -135,6 +147,7 @@ class LibraryThing(BaseReviewSpider):
         nb_page_site = self.scrape_langs_nb(response)
         # there are no review
         if len(nb_page_site) == 0 or nb_page_site.get(u'all') == 0:
+            logger.info("No reviews found for work-refid= %s" % wid)
             yield item
         else:
             last_harvest_date = self.works_to_harvest[work_index].get('last_harvest_date')
@@ -159,6 +172,7 @@ class LibraryThing(BaseReviewSpider):
         widx = response.meta['work_index']
         last_harvest_date = self.works_to_harvest[widx]['last_harvest_date']
         passed_item = response.meta['passed_item']
+
         for review_sel in response.xpath('//div[@class="bookReview"]'):
             item = self.extract_onereview(passed_item, review_sel)
             if self.is_withinperiod(item, last_harvest_date):
@@ -241,11 +255,12 @@ class Amazon(BaseReviewSpider):
     done on a diff edition but with same rating (fine these must have very small # of reviews)
 
     TODO: make generic superclass and create subclass for different top-level domain
+    TODO: resolve issues with Robot check on search result..
+
     """
     name = 'amazon.com'
     # make international sites as subclass (.com.au, .ca, .fr, .in, .co.jp, .nl, .co.uk)
     allowed_domains = ['www.amazon.com']
-
     # on November 22, 2012
     raw_date_format = 'on %B %d, %Y'
 
@@ -280,10 +295,11 @@ class Amazon(BaseReviewSpider):
         no_result = int(response.xpath('boolean(//h1[@id="noResultsTitle"])').extract_first())
         if no_result == 1:
             logger.info("Nothing found for work-refid %s" % (work_refid))
-            yield self.build_review_item(work_refid=work_refid)
+            yield self.build_review_item(work_refid=work_refid, work_uid='-1')
         else:
+            # TODO: validate if robot check, and stop processing!
             # dic to hold: {(nb_rev, avg_rev): 'asin'}
-            nrev_avg = {}
+            n_dic = {}
             for res in response.xpath('//li[starts-with(@id,"result_")]'):
                 asin = res.xpath('./@data-asin').extract_first()
                 star_sel = res.xpath('.//div[@class="a-column a-span5 a-span-last"]')
@@ -294,17 +310,17 @@ class Amazon(BaseReviewSpider):
                     star_and_nrevs = star_sel.xpath('./div[@class="a-row a-spacing-mini"]/a[@class="a-size-small a-link-normal a-text-normal"]')
                     nb_reviews = int(star_and_nrevs.xpath('./text()').extract_first().replace(u',', u''))
                     # RULE: same (nb,avg) correspond to duplicates as editions may be merged
-                    if (nb_reviews, avg_stars) not in nrev_avg:
-                        nrev_avg[(nb_reviews, avg_stars)] = asin
-            if len(nrev_avg) > 0:
-                for tu in nrev_avg:
-                    yield scrapy.Request(self.review_url % nrev_avg[tu],
+                    if (nb_reviews, avg_stars) not in n_dic:
+                        n_dic[(nb_reviews, avg_stars)] = asin
+            if len(n_dic) > 0:
+                for tu in n_dic:
+                    yield scrapy.Request(self.review_url % n_dic[tu],
                                          meta={'work_index': widx},
                                          callback=self.parse_reviews)
             else:
                 logger.info("No reviews found for work-refid= %s" % work_refid)
-                # generate item to avoid re-sending sames isbns, but without tying to any 'asin'
-                yield self.build_review_item(work_refid=work_refid)
+                # generate item without tying to any 'asin' to avoid re-searching sames isbns
+                yield self.build_review_item(work_refid=work_refid, work_uid='-2')
 
 
     def parse_reviews(self, response):
@@ -343,10 +359,14 @@ class Amazon(BaseReviewSpider):
         new_item['parsed_rating'] = self.parse_rating(new_item['rating'])
         reviewer_sel = rev_sel.xpath('.//a[@class="a-size-base a-link-normal author"]')
         new_item['username'] = reviewer_sel.xpath('./text()').extract_first()
-        # /gp/pdp/profile/A17DPO2KZ0ADA/ref=cm_cr_arp_d_pdp?ie=UTF8 (may not be present)
-        r = reviewer_sel.xpath('./@href').extract_first()
-        if r:
+        if new_item['username']:
+            # /gp/pdp/profile/A17DPO2KZ0ADA/ref=cm_cr_arp_d_pdp?ie=UTF8
+            r = reviewer_sel.xpath('./@href').extract_first()
             new_item['user_uid'] = r[r.index(u'/profile/') + 9:r.index(u'/ref=')]
+        else:
+            # static 'A customer' having neither id nor username
+            new_item['username'] = u'A customer'
+            new_item['user_uid'] = u'A customer'
         # Get all text() and joining
         full_t = rev_sel.xpath('.//span[@class="a-size-base review-text"]//text()').extract()
         new_item['review'] = u"\n".join(full_t)
@@ -375,6 +395,151 @@ class Amazon(BaseReviewSpider):
         score = rating[:rating.index(u'out of') - 1]
         if rating:
             parsed_rating = float(score) * 2
+        return parsed_rating
+
+class Goodreads(BaseReviewSpider):
+    """
+    This requires isbns in self.works_to_harvest for those never harvested,
+    and relies only on last_harvest_date to filter needed reviews
+    TODO  ISSUES:
+            1- with max nb of review page is 100!!! whereas a lot more can exist: how to get missing ones?
+            2- review text may only be partial due to complexity
+    """
+    name = 'goodreads'
+    allowed_domains = ['www.goodreads.com']
+    raw_date_format = '%b %d, %Y'
+    ###########################
+    # Control setting
+    ###########################
+    url_search = 'https://www.goodreads.com/search?utf8=%E2%9C%93&query='
+    url_review = 'https://www.goodreads.com/book/show/%s?page=%d&sort=newest'
+
+    def start_requests(self):
+        for i in range(len(self.works_to_harvest)):
+            isbns = self.works_to_harvest[i].get('isbns')
+            # initial requires search by isbn to map gr work-uid
+            if isbns:
+                yield scrapy.Request(self.url_search + isbns[0],
+                                     meta={'work_index': i, 'nb_try': 1},
+                                     callback=self.parse_search_resp)
+            else:
+                gr_work_id = self.works_to_harvest[i].get('work_uid')
+                assert gr_work_id, 'Getting incremental reviews requires gr work id'
+                pass_item = self.build_review_item(work_refid=self.works_to_harvest[i]['work_refid'],
+                                                   work_uid=gr_work_id)
+                yield scrapy.Request(self.url_review % (gr_work_id, 1),
+                                     meta={'work_index': i, 'item': pass_item},
+                                     callback=self.parse_reviews)
+
+    def parse_search_resp(self, response):
+        widx = response.meta['work_index']
+        isbns = self.works_to_harvest[widx]['isbns']
+        nb_try = response.meta['nb_try']
+        # not found
+        if 'Looking for a book?' in response.body or 'No Result' in response.body:
+            if nb_try < len(isbns):
+                yield scrapy.Request(self.url_search + isbns[nb_try],
+                                     meta={'work_index': widx, 'nb_try': nb_try + 1},
+                                     callback=self.parse_search_resp)
+            else:
+                logger.info("Nothing found for wid: %s, isbns: %s" % (self.works_to_harvest[widx]['work_refid'], str(isbns)))
+                yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'], work_uid='-1')
+        # found, map its work_uid
+        else:
+            gr_work_id = response.url[response.url.index('/book/show/') + 11:]
+            # add title/authors (only done for initial QA checks)
+            title = response.xpath('//h1[@class="bookTitle"]/text()').extract_first().strip()
+            a_raw = response.xpath('//a[@class="authorName"]/child::*/text()').extract()
+            authors = ",".join(a_raw)
+            pass_item = self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'],
+                                               work_uid=gr_work_id,
+                                               authors=authors,
+                                               title=title)
+            nb_rev = response.xpath('//a[@class="actionLinkLite"]/span[@class="count"]/span[@class="value-title"]/text()').extract_first()
+            if int(nb_rev.replace(',', '')) == 0:
+                logger.info("No reviews found for work-refid=%s (uid=%s of site %s)"
+                            % (pass_item['work_refid'], pass_item['work_uid'], self.name))
+                yield pass_item
+            # map gr's id and trigger new Request to have reviews ordered correctly
+            else:
+                self.works_to_harvest[widx]['last_harvest_date'] = self.min_harvest_date
+                yield scrapy.Request(self.url_review % (gr_work_id, 1),
+                                     meta={'work_index': widx, 'item': pass_item},
+                                     callback=self.parse_reviews)
+
+    def parse_reviews(self, response):
+        widx = response.meta['work_index']
+        item = response.meta['item']
+        lastpage_no = response.meta.get('lastpage_no')
+        if not lastpage_no:
+            # get how many pages of reviews, last page is just before the "next page" link
+            pageno_before_next = response.xpath('//a[@class="next_page"]/preceding-sibling::*[1]/text()')
+            if len(pageno_before_next) > 0:
+                lastpage_no = int(pageno_before_next.extract()[0])
+            else:
+                lastpage_no = 1
+            # also harvest tag (i.e. Genres in GR)
+            tag_t = []
+            tag_n = []
+            for tline in response.xpath('//div[starts-with(@class,"bigBoxContent")]/div[starts-with(@class,"elementList ")]'):
+                ts = tline.xpath('./div[@class="left"]/a/text()').extract()
+                tag_t.append(u" > ".join(ts))
+                tag_n.append(tline.xpath('./div[@class="right"]/a/text()').extract_first().replace(u'users', u''))
+            if len(tag_t) > 0:
+                item['tags_t'] = u"__&__".join(tag_t)
+                item['tags_n'] = u";".join(tag_n)
+
+        current_page = int(response.url[response.url.index('?page=') + 6:response.url.index('&sort=')])
+        found_older = False
+
+        reviews_sel = response.xpath('//div[starts-with(@id,"review_")]')
+        for rev in reviews_sel:
+            new_item = self.extract_onereview(item, rev)
+            comp_flag = self.compare_to_harvestperiod(new_item, self.works_to_harvest[widx]['last_harvest_date'])
+            if comp_flag == 0:
+                yield new_item
+            elif comp_flag == -1:
+                found_older = True
+                break
+
+        if current_page <= lastpage_no and not found_older:
+            yield scrapy.Request(self.url_review % (item['work_uid'], current_page + 1),
+                                 meta={'work_index': widx, 'item': item, 'lastpage_no': lastpage_no},
+                                 callback=self.parse_reviews)
+
+    def extract_onereview(self, item, rev):
+        """
+        Process one review in rev selector
+        :return: new instance Item
+        """
+        new_item = dict(item)
+        new_item['review_date'] = rev.xpath('.//a[@itemprop="publishDate"]/text()').extract_first()  # u'Feb 14, 2016'
+        new_item['parsed_review_date'] = self.parse_review_date(new_item['review_date'])
+        # for gr, 0 star means No rating (however some user consider it as 0 rating!)
+        nb_star = len(rev.xpath('.//span[@class="staticStar p10"]'))
+        new_item['rating'] = str(nb_star) if nb_star > 0 else None
+        new_item['parsed_rating'] = self.parse_rating(new_item['rating'])
+        new_item['username'] = rev.xpath('.//a[@class="user"]/@title').extract_first()  # u'Jon Liu'
+        u_link = rev.xpath('.//a[@class="user"]/@href').extract_first()  # u'/user/show/52104079-jon-liu'
+        new_item['user_uid'] = u_link[u_link.index(u'/show/') + 6:]
+        # no logical rules: review text may or may not have style, and its attribute can have diff values ...
+        # for now, simply take the first /span (TODO: will need diff feed to get this right)
+        r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][1]//text()').extract()
+        new_item['review'] = "\n".join(r_texts)
+        new_item['review_lang'] = u'und'
+        likes_raw = rev.xpath('.//span[@class="likesCount"]/text()').extract_first()
+        if likes_raw:
+            new_item['likes'] = likes_raw
+            new_item['parsed_likes'] = int(likes_raw[:likes_raw.index(u'like')])
+        return new_item
+
+    def parse_rating(self, rating):
+        """
+        Normalize gr's rating (which are 5-based star) on a 10-based star
+        """
+        parsed_rating = None
+        if rating:
+            parsed_rating = 2 * int(rating)
         return parsed_rating
 
 
@@ -437,7 +602,7 @@ class Babelio(BaseReviewSpider):
                                          callback=self.parse_search_resp)
             else:
                 logger.info("Nothing found for work-refid %s, isbns:%s" % (self.works_to_harvest[widx]['work_refid'], isbns))
-                yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'])
+                yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'], work_uid='-1')
 
     def parse_reviews(self, response):
         meta = response.meta
@@ -454,6 +619,8 @@ class Babelio(BaseReviewSpider):
 
         #  TODO: I will need nb_in_db for 'FR' ... and adjust logic based on that
         if nb == 0:
+            logger.info("No reviews found for work-refid=%s (uid=%s of site %s)"
+                        % (item['work_refid'], item['work_uid'], self.name))
             yield item
             return
 
@@ -514,151 +681,6 @@ class Babelio(BaseReviewSpider):
         day = int(raw_date[:raw_date.index(" ")])
         year = int(raw_date[raw_date.rindex(" ") + 1:])
         return datetime.datetime(year, month_nb, day).date()
-
-
-class Goodreads(BaseReviewSpider):
-    """
-    This requires isbns in self.works_to_harvest for those never harvested,
-    and relies only on last_harvest_date to filter needed reviews
-    """
-    name = 'goodreads'
-    allowed_domains = ['www.goodreads.com']
-    ###########################
-    # Control setting
-    ###########################
-    url_search = 'https://www.goodreads.com/search?utf8=%E2%9C%93&query='
-    url_review = 'https://www.goodreads.com/book/show/%s?page=%d&sort=newest'
-
-    raw_date_format = '%b %d, %Y'
-
-    def start_requests(self):
-        for i in range(len(self.works_to_harvest)):
-            isbns = self.works_to_harvest[i].get('isbns')
-            # search by isbn is required first to map gr work-uid
-            if isbns:
-                yield scrapy.Request(self.url_search + str(isbns[0]),
-                                     meta={'work_index': i, 'nb_try': 0},
-                                     callback=self.parse_search_resp)
-            else:
-                gr_work_id = self.works_to_harvest[i].get('work_uid')
-                assert gr_work_id, 'Getting incremental reviews requires gr work id'
-                yield scrapy.Request(self.url_review % (gr_work_id, 1),
-                                     meta={'work_index': i},
-                                     callback=self.parse_reviews)
-
-    def parse_search_resp(self, response):
-        widx = response.meta['work_index']
-        isbns = self.works_to_harvest[widx]['isbns']
-        nb_try = response.meta['nb_try']
-        nb_try += 1
-        no_result = response.xpath('//h3[@class="searchSubNavContainer"]//text()').extract()
-        # not found
-        if u'No Results' in response.body_as_unicode() or \
-            (len(no_result) > 0 and no_result[0].startswith(u'No result')):
-            if nb_try < len(isbns):
-                yield scrapy.Request(self.url_search + str(isbns[nb_try]),
-                                     meta={'work_index': widx, 'nb_try': nb_try},
-                                     callback=self.parse_search_resp)
-            else:
-                logger.info("Search unsuccessful for work-refid: %s, isbns: %s" % (self.works_to_harvest[widx]['work_refid'], isbns))
-                yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'])
-        # found it, map gr's id and trigger new Request to have reviews ordered correctly
-        else:
-            url = response.url
-            gr_work_id = url[url.index('/book/show/') + 11:]
-            self.works_to_harvest[widx]['work_uid'] = gr_work_id
-            self.works_to_harvest[widx]['last_harvest_date'] = self.min_harvest_date
-            yield scrapy.Request(self.url_review % (gr_work_id, 1),
-                                 meta={'work_index': widx},
-                                 callback=self.parse_reviews)
-
-    def parse_reviews(self, response):
-        meta = response.meta
-        widx = meta['work_index']
-        last_page = meta.get('last_page')
-        tag_t = []
-        tag_n = []
-        if not last_page:
-            # get how many pages of reviews (TODO:  max is 100...: how to get missing ones?)
-            # last page is the text just before the "next page" link
-            pageno_before_next = response.xpath('//a[@class="next_page"]/preceding-sibling::*[1]/text()')
-            if len(pageno_before_next) > 0:
-                last_page = int(pageno_before_next.extract()[0])
-            else:
-                last_page = 1
-            # also harvest tag (i.e. Genres in GR)
-            for tline in response.xpath('//div[starts-with(@class,"bigBoxContent")]/div[starts-with(@class,"elementList")]'):
-                ts = tline.xpath('./div[@class="left"]/a/text()').extract()
-                tag_t.append(u" > ".join(ts))
-                tag_n.append(tline.xpath('./div[@class="right"]/a/text()').extract_first().replace(u'users', u''))
-
-        url = response.url
-        current_page = int(url[url.index('?page=') + 6:url.index('&sort=')])
-
-        if current_page <= last_page:
-            found_older = False
-            authors_raw = response.xpath('//a[@class="authorName"]/child::*/text()')
-            item = self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'],
-                                          work_uid=self.works_to_harvest[widx]['work_uid'],
-                                          authors=",".join(authors_raw.extract()),
-                                          title=response.xpath('//h1[@class="bookTitle"]/text()').extract()[0].strip())
-            if len(tag_t) > 0:
-                item['tags_t'] = u"__&__".join(tag_t)
-                item['tags_n'] = u";".join(tag_n)
-
-            reviews_sel = response.xpath('//div[starts-with(@id,"review_")]')
-            # no review yet
-            if len(reviews_sel) == 0:
-                yield item
-            else:
-                for rev in reviews_sel:
-                    new_item = self.extract_onereview(item, rev)
-                    if new_item['parsed_review_date'] < self.works_to_harvest[widx]['last_harvest_date']:
-                        found_older = True
-                        break
-                    else:
-                        if self.is_withinperiod(new_item, self.works_to_harvest[widx]['last_harvest_date']):
-                            yield new_item
-                if current_page != last_page and not found_older:
-                    gr_work_id = self.works_to_harvest[widx]['work_uid']
-                    yield scrapy.Request(self.url_review % (gr_work_id, current_page + 1),
-                                         meta={'work_index': widx, 'last_page': last_page},
-                                         callback=self.parse_reviews)
-
-    def extract_onereview(self, item, rev):
-        """
-        Process one review in rev selector
-        :return: new instance Item
-        """
-        new_item = dict(item)
-        new_item['review_date'] = rev.xpath('.//a[@itemprop="publishDate"]/text()').extract_first()  # u'Feb 14, 2016'
-        new_item['parsed_review_date'] = self.parse_review_date(new_item['review_date'])
-        # for gr, 0 star means No rating (however some user consider it as 0 rating!)
-        nb_star = len(rev.xpath('.//span[@class="staticStar p10"]'))
-        new_item['rating'] = str(nb_star) if nb_star > 0 else None
-        new_item['parsed_rating'] = self.parse_rating(new_item['rating'])
-        new_item['username'] = rev.xpath('.//a[@class="user"]/@title').extract_first()  # u'Jon Liu'
-        u_link = rev.xpath('.//a[@class="user"]/@href').extract_first()  # u'/user/show/52104079-jon-liu'
-        new_item['user_uid'] = u_link[u_link.index(u'/show/') + 6:]
-        # no logical rules: review text may or may not have style, and its attribute can have diff values ...
-        # for now, simply take the first /span (TODO: will need diff feed to get this right)
-        r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][1]//text()').extract()
-        new_item['review'] = "\n".join(r_texts)
-        new_item['review_lang'] = u'und'
-        likes_raw = rev.xpath('.//span[@class="likesCount"]/text()').extract()
-        if len(likes_raw) == 1:
-            new_item['likes'] = likes_raw[0]
-        return new_item
-
-    def parse_rating(self, rating):
-        """
-        Normalize gr's rating (which are 5-based star) on a 10-based star
-        """
-        parsed_rating = None
-        if rating:
-            parsed_rating = 2 * int(rating)
-        return parsed_rating
-
 
 class CritiquesLibres(BaseReviewSpider):
     """

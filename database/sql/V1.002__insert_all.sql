@@ -1,4 +1,5 @@
-
+-- author = 'mart2010'
+-- copyright = "Copyright 2016, The BRD Project"
 
 
 -------------------------------------- Data insertion -------------------------------------

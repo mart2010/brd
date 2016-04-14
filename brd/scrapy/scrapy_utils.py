@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import re
 
-__author__ = 'mouellet'
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
 
 # maybe use locale, but this simple solution works when exact 'mois' name is used!

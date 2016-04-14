@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-
-# Define here the models for your scraped items
-#
-# See documentation in:
-# http://doc.scrapy.org/en/latest/topics/items.html
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
 
 from scrapy import Item, Field
 

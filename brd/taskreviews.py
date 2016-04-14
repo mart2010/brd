@@ -7,6 +7,9 @@ import brd.service as service
 import luigi
 import os
 from brd.taskbase import BaseBulkLoadTask, BasePostgresTask, batch_name
+__author__ = 'mart2010'
+__copyright__ = "Copyright 2016, The BRD Project"
+
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,7 @@ class BulkLoadReviews(BaseBulkLoadTask):
     def requires(self):
         return HarvestReviews(self.site, self.n_work, self.harvest_dts)
 
-
+# TODO: need to add an update on username on user_ table satellite...
 class LoadUsers(BasePostgresTask):
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
@@ -88,16 +91,17 @@ class LoadUsers(BasePostgresTask):
         sql = \
             """
             with new_rows as (
-                select distinct integration.derive_userid(user_uid, %(site)s) as id
+                select integration.derive_userid(user_uid, %(site)s) as id
                     , user_uid
                     , (select id from integration.site where logical_name = %(site)s) as site_id
-                    , username
+                    , max(username) as username  --in AZ, same user_uid may have small variation in username
                     , now() as last_seen_date
                     , now() as create_dts
                     , %(audit_id)s as audit_id
                 from staging.review
                 where site_logical_name = %(site)s
                 and user_uid is not null
+                group by 1,2
             ),
             match_user as (
                 update integration.user u set last_seen_date = new_rows.last_seen_date
@@ -127,11 +131,14 @@ class LoadReviews(BasePostgresTask):
         sql = \
             """
             insert into integration.review
-                (work_refid, user_id, site_id, rating, review, review_date, review_lang, create_dts, load_audit_id)
+                (work_refid, user_id, site_id, rating, parsed_rating, likes, parsed_likes, review, review_date, review_lang, create_dts, load_audit_id)
                 select  r.work_refid
                     , integration.derive_userid(r.user_uid, %(site)s) as user_id
                     , s.id as site_id
                     , r.rating
+                    , cast(r.parsed_rating as int)
+                    , r.likes
+                    , cast(r.parsed_likes as int)
                     , r.review
                     , r.parsed_review_date
                     , r.review_lang
@@ -144,10 +151,11 @@ class LoadReviews(BasePostgresTask):
         cursor.execute(sql, {'audit_id': audit_id, 'site': self.site})
         return cursor.rowcount
 
+# TODO: add loading tags before harvesting from gr and lt...
 
 class LoadLtWorkSameAs(BasePostgresTask):
     """
-    Used with  lt.  This should not happen since this is also done during harvest of work-info.
+    Used with lt.  This should not happen since this is also done during harvest of work-info.
     However we leave as it could still happen that during work-info harvest duplicates still existed..
     """
     n_work = luigi.IntParameter()
@@ -170,6 +178,33 @@ class LoadLtWorkSameAs(BasePostgresTask):
         c = cursor.rowcount
         logger.warning("Found %s duplicates during lt harvest review (audit_id=%s)" %(str(c), str(audit_id)))
         return c
+
+class LoadTag(BasePostgresTask):
+    """
+    Used only for site having Tag, loaded during Reviews as to update these tags..
+    """
+    site = luigi.Parameter()
+    n_work = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter()
+    table = 'integration.TAG'
+
+    def requires(self):
+        return BulkLoadReviews(self.site, self.n_work, self.harvest_dts)
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            insert into integration.tag(id, tag, lang_code, tag_upper, create_dts, load_audit_id)
+            select distinct md5(tag), tag, tag_lang, upper(tag), now(), %(audit_id)s
+            from staging.review r
+            where site_logical_name = 'librarything'
+            and dup_refid is not null;
+            """
+        cursor.execute(sql, {'audit_id': audit_id})
+        c = cursor.rowcount
+        logger.warning("Found %s duplicates during lt harvest review (audit_id=%s)" %(str(c), str(audit_id)))
+        return c
+
 
 
 class UpdateLtLastHarvest(BasePostgresTask):
@@ -212,7 +247,7 @@ class UpdateLtLastHarvest(BasePostgresTask):
 
 class LoadWorkSiteMapping(BasePostgresTask):
     """
-    Required for site that maps work through reviews harvesting
+    Required for sites that map Work through reviews harvesting
     (this also updates last_harvest_dts).
     """
     site = luigi.Parameter()
@@ -224,14 +259,15 @@ class LoadWorkSiteMapping(BasePostgresTask):
     def requires(self):
         return [LoadReviews(self.site, self.n_work, self.harvest_dts)]
 
+    # TODO: add an update part to refresn lat_harvest_date for incremental load
     def exec_sql(self, cursor, audit_id):
-        # work_uid=-1 means no work could be found for isbns...
         sql = \
             """
             insert into integration.work_site_mapping(work_refid, work_uid, site_id, title, authors,
                 last_harvest_dts, create_dts, load_audit_id)
-            select  work_refid,
-                    coalesce(work_uid, '-1'),
+            select  distinct
+                    work_refid,
+                    work_uid,
                     (select id from integration.site where logical_name = %(logical_name)s),
                     title, authors,
                     %(harvest_dts)s, now(), %(audit_id)s
@@ -245,8 +281,7 @@ class LoadWorkSiteMapping(BasePostgresTask):
         return cursor.rowcount
 
 
-# python -m luigi --module brd.task BatchLoadReviews --site librarything
-# --n-work 2 --harvest-dts 2016-01-31T1907 --local-scheduler
+# python -m luigi --module brd.taskreviews BatchLoadReviews --site amazon.com --n-work 2 --harvest-dts 2016-01-31T1907 --local-scheduler
 
 class BatchLoadReviews(luigi.Task):
     site = luigi.Parameter()
