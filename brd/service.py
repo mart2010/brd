@@ -42,18 +42,17 @@ def fetch_workIds_no_info(nb_work):
 def fetch_workIds_not_harvested(site_logical_name, nb_work):
     """
     Find work_refid and their isbns not yet harvested for site.
-    For lt, simply return the ids using work_info ids to reduce the likelihood
-    of harvesting duplicated work (still possible for work merged afterward).
+    For lt, simply return the ids using work_info ids to avoid harvesting duplicated work
+    (still possible if the work was merged after Reference data was harvested).
     :return:
     """
     sql_other = \
         """
         with ref as (
-            select coalesce(same.master_refid, w.work_refid) as wid, array_agg(i.isbn10) as isbn_list
+            select coalesce(same.master_refid, w.work_refid) as wid, array_agg(wi.ean) as isbn_list
             from integration.work_info w
             left join integration.work_sameas same on (w.work_refid = same.work_refid)
             join integration.work_isbn wi on (wi.work_refid = w.work_refid)
-            join integration.isbn i on (i.ean = wi.ean)
             group by 1
         )
         select ref.wid as work_refid, ref.isbn_list as isbns
@@ -64,6 +63,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
              join integration.site s on (m.site_id = s.id and s.logical_name = %(name)s)
             ) as mapped on (mapped.work_refid = ref.wid)
         where mapped.last_harvest_dts IS NULL
+        -- here we could order by popularity
         order by 1
         limit %(nb)s
         """
@@ -134,19 +134,6 @@ def construct_dic(list_dic):
                 dic['nb_in_db'] = None
         res.append(dic)
     return res
-
-
-def fetch_ltwork_list(nb_work):
-    """
-    Fetch list of work but first looking at the ones not yet harvested, and if none is found then
-     fetch already harvested (with additional stat):
-    :return list of dict {'work_refid': x, 'last_harvest_dts': y, 'nb_in_db': {'ENG': n1, 'FRE': n2, ..}}
-    """
-    list_of_wids = fetch_workIds_not_harvested('librarything', nb_work)
-    if list_of_wids is None or len(list_of_wids) == 0:
-        list_of_wids = fetch_ltwids_stat_harvested(nb_work)
-        logger.info("All work harvested for 'librarything', will start fetching harvested work")
-    return construct_dic(list_of_wids)
 
 
 def _bulkload_file(filepath, schematable, archive_file=True):

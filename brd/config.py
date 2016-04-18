@@ -33,9 +33,8 @@ SOURCE_WEBSITES_FR = {
 SOURCE_WEBSITES = {
     'goodreads': 'http://www.goodreads.com',  # 10M reviews of 700k works
     'librarything': 'http://www.librarything.com',  # 2.5M reviews of 1M works
-    'critiqueslibres': 'http://www.critiqueslibres.com',  # 45K livres, 100K critics (in french only)
-    'babelio': 'http://www.babelio.com',
-
+    'critiqueslibres': 'http://www.critiqueslibres.com',  # 100K critics  out of 45K livres, (in french only)
+    'babelio': 'http://www.babelio.com' # ?? apparently 500 critiques/jour  (150K/an) !
 }
 
 

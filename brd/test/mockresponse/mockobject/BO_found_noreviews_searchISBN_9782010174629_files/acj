@@ -1,0 +1,25 @@
+OX_2678414941({
+  "ads":{
+    "medium":"w",
+    "record_tmpl":"http://uk-ads.openx.net/{medium}/1.0/{rtype}?ts={txn_state}",
+    "pixels":"http://eu-u.openx.net/w/1.0/pd?plm=1&ph=50ab0170-10fc-4aec-b816-8e01043433e7",
+    "adunits" : [
+      {
+        "auid":"537237578",
+        "chain":[
+          {
+            "is_fallback":1,
+            "ad_id":"0",
+            "width":"728",
+            "height":"90",
+            "html":"<script type=\"text/javascript\">\nif(window.sas_OX && sas_OX.hasOwnProperty(\"\")) {\n   sas_OX[\"\"] = 0;\n}\n</script>\n<script src=\"http://www.smartadserver.com/call/pubj//nortbplus=1?\"></script>",
+            "target":"_blank",
+            "ts":"1fHJpZD1hNmY4MGMwNC02MjQ5LTRlMDgtYWU3OC05ODU2ZjljZTdhODF8cnQ9MTQ2MDkxMjE3MHxhdWlkPTUzNzIzNzU3OHxhdW09RE1JRC5XRUJ8c2lkPTUzNzE0NTQ4MHxwdWI9MTMyMjg3fHBjPUVVUnxyYWlkPTRhZTJlNmM5LTIxNmItNDQxMS1iNWVjLTUwMjlhZmQ2ODg2YXx1cj00bm5lU1QyUTU0",
+            "type":"html",
+            "ad_url":"<script type=\"text/javascript\">\nif(window.sas_OX && sas_OX.hasOwnProperty(\"\")) {\n   sas_OX[\"\"] = 0;\n}\n</script>\n<script src=\"http://www.smartadserver.com/call/pubj//nortbplus=1?\"></script>"
+          }
+        ]
+      }
+    ]
+  }
+});

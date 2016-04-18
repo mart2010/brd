@@ -23,6 +23,7 @@ class ReviewItem(Item):
     authors             = Field()
     tags_t              = Field()
     tags_n              = Field()
+    tags_lang           = Field()
     parsed_review_date  = Field()
     parsed_rating       = Field()
     parsed_likes        = Field()

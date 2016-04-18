@@ -181,7 +181,7 @@ class LoadLtWorkSameAs(BasePostgresTask):
 
 class LoadTag(BasePostgresTask):
     """
-    Used only for site having Tag, loaded during Reviews as to update these tags..
+    Load Tag for site having them
     """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
@@ -194,17 +194,72 @@ class LoadTag(BasePostgresTask):
     def exec_sql(self, cursor, audit_id):
         sql = \
             """
-            insert into integration.tag(id, tag, lang_code, tag_upper, create_dts, load_audit_id)
-            select distinct md5(tag), tag, tag_lang, upper(tag), now(), %(audit_id)s
-            from staging.review r
-            where site_logical_name = 'librarything'
-            and dup_refid is not null;
+            with stage_tags as (
+                select cast(md5(tag) as uuid) as id
+                        , tag as tag
+                        , upper(tag) as tag_upper
+                        , max(tags_lang) as lang_code
+                from ( select unnest(string_to_array(tags_t, '__&__')) as tag
+                                , tags_lang
+                       from staging.review ) as foo
+                group by tag
+            )
+            insert into integration.tag(id, tag, tag_upper, ori_site_id, lang_code, create_dts, load_audit_id)
+            select s.id, s.tag, s.tag_upper
+                    , (select id from integration.site where logical_name = %(name)s) as ori_site_id
+                    , s.lang_code, now(), %(audit_id)s
+            from stage_tags s
+            left join integration.tag t on (t.id = s.id)
+            where t.id is null;
             """
-        cursor.execute(sql, {'audit_id': audit_id})
-        c = cursor.rowcount
-        logger.warning("Found %s duplicates during lt harvest review (audit_id=%s)" %(str(c), str(audit_id)))
-        return c
+        cursor.execute(sql, {'audit_id': audit_id, 'name': self.site})
+        return cursor.rowcount
 
+class LoadWorkTag(BasePostgresTask):
+    """
+    Load relationship work-tag or update frequency if relationship is present
+    """
+    site = luigi.Parameter()
+    n_work = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter()
+    table = 'integration.WORK_TAG'
+
+    def requires(self):
+        return [LoadTag(self.site, self.n_work, self.harvest_dts)]
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            with stage_tags as (
+                select cast(md5(tag_t) as uuid) as tag_id
+                        , cast(replace(tag_n,',','') as int) as tag_n
+                        , work_refid
+                from ( select unnest(string_to_array(tags_t, '__&__')) as tag_t
+                                , unnest(string_to_array(tags_n, ';')) as tag_n
+                                , work_refid
+                       from staging.review ) as foo
+                group by 1,2,3
+            ),
+            match_tags as (
+                update integration.work_tag wt
+                    set frequency = stage_tags.tag_n, update_dts = now()
+                from stage_tags
+                where wt.tag_id = stage_tags.tag_id
+                and wt.work_refid = stage_tags.work_refid
+                and wt.source_site_id = (select id from integration.site where logical_name = %(name)s)
+                returning wt.*
+            )
+            insert into integration.work_tag(work_refid, tag_id, frequency, source_site_id, create_dts, load_audit_id)
+            select work_refid, tag_id, tag_n
+                    , (select id from integration.site where logical_name = %(name)s)
+                    , now(), %(audit_id)s
+            from stage_tags
+            where not exists (select 1 from match_tags
+                              where match_tags.tag_id = stage_tags.tag_id
+                              and match_tags.work_refid = stage_tags.work_refid);
+            """
+        cursor.execute(sql, {'audit_id': audit_id, 'name': self.site})
+        return cursor.rowcount
 
 
 class UpdateLtLastHarvest(BasePostgresTask):
@@ -259,7 +314,7 @@ class LoadWorkSiteMapping(BasePostgresTask):
     def requires(self):
         return [LoadReviews(self.site, self.n_work, self.harvest_dts)]
 
-    # TODO: add an update part to refresn lat_harvest_date for incremental load
+    # TODO: add an update part to refresh lat_harvest_date for incremental load
     def exec_sql(self, cursor, audit_id):
         sql = \
             """
@@ -293,7 +348,7 @@ class BatchLoadReviews(luigi.Task):
     batch_name = "Reviews"  # for auditing
 
     def requires(self):
-        reqs = [LoadReviews(self.site, self.n_work, self.harvest_dts)]
+        reqs = [LoadReviews(self.site, self.n_work, self.harvest_dts), LoadWorkTag(self.site, self.n_work, self.harvest_dts)]
         if self.site == 'librarything':
             reqs.append(UpdateLtLastHarvest(self.n_work, self.harvest_dts))
         else:

@@ -1,0 +1,19 @@
+(function() {
+ var ox = {
+  auid: 537237578,
+  imp_beacon: '<img src="http://www.smartadserver.com/h/aip?visit=m&pubid=12&statid=6&ckid=415144562207809612&tmstp=1460911687612&usrtgt=&tgt=%3b%24dt%3d1t%3b%24hc&systgt=%24qc%3d1314164196%3b%24ql%3dmedium%3b%24qpc%3d1000%3b%24qpp%3d0%3b%24qt%3d73_450_542t%3b%24dma%3d0%3b%24b%3d16490%3b%24o%3d12100%3b%24sw%3d1280%3b%24sh%3d768&rfr=http%3a%2f%2fwww.babelio.com%2fresrecherche.php&capp=0&mcrdbt=1&insid=5231071&imgid=0&pgid=632920&fmtid=920&loguid=217112949383892215&logdate=1460912170674" width="1" height="1">',
+  fallback: ('<scr' + 'ipt src="http://www.smartadserver.com/call/pubj/95727/632920/920/S/1460911687612/%3b%24dt%3d1t%3Bnortbplus=1?"></scr' + 'ipt>')
+ };
+ if (!window.OX_ads) OX_ads = []; 
+ if ('undefined' != typeof sas_ajax && sas_ajax) {
+  ox.slot_id = 'sas_920';
+  OX_ads.push(ox);
+  var s = document.createElement('script');
+  s.src = 'https://uk-ads.openx.net/w/1.0/jstag';
+  var p = document.getElementsByTagName('script')[0];
+  p.parentNode.insertBefore(s, p);
+ } else {
+  OX_ads.push(ox);
+  document.write('<scr'+'ipt src="https://uk-ads.openx.net/w/1.0/jstag"></scr'+'ipt>');
+ }
+})();

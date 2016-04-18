@@ -68,6 +68,7 @@ create table staging.review (
     authors text,
     tags_t text,
     tags_n text,
+    tags_lang varchar(3),
     parsed_review_date date,
     parsed_rating text,
     parsed_likes int,
@@ -98,7 +99,7 @@ create table staging.work_info (
     dup_refid bigint,
     title text,
     original_lang text,
-    ori_lang_code varchar(3),
+    ori_lang_code char(3),
     authors text,
     authors_code text,  --used in lt for disambiguation
     mds_code text,
@@ -230,7 +231,7 @@ comment on column integration.isbn.ean is 'Ean used as primary-key is simply the
 create table integration.isbn_info (
     ean bigint primary key,
     book_title text,
-    lang_code char(2),
+    lang_code char(3),
     source_site_id int,
     load_audit_id int,
     foreign key (ean) references integration.isbn(ean),
@@ -327,15 +328,19 @@ comment on column integration.mds.code 'Code corrected (original code truncated 
 create table integration.tag (
     id uuid primary key,
     tag text unique,
-    lang_code char(2),
+    lang_code char(3),
     tag_upper text,
-    source_site_id int,
+    ori_site_id int,
     create_dts timestamp,
-    load_audit_id int
+    load_audit_id int,
+    foreign key(ori_site_id) references integration.site(id),
+    foreign key (load_audit_id) references staging.load_audit(id)
 );
 comment on column integration.tag.id is 'Tag unique id derived from md5 hashing of tag';
 comment on column integration.tag.tag is 'Tag text taken verbatim';
+comment on column integration.tag.ori_site_id is 'The site where tag was first harvested';
 comment on column integration.tag.tag_upper is 'Tag capitalized, useful for aggregating similar tag';
+
 
 create table integration.work_tag (
     work_refid bigint,
@@ -343,13 +348,14 @@ create table integration.work_tag (
     source_site_id int,
     frequency int,
     create_dts timestamp,
+    update_dts timestamp,
     load_audit_id int,
     primary key (work_refid, tag_id, source_site_id),
     foreign key (work_refid) references integration.work(refid),
     foreign key (tag_id) references integration.tag(id),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
-comment on table integration.work_tag is 'Tag assigned to Work (for now, use lt but could add source later on)';
+comment on table integration.work_tag is 'Tag-Work association identified by work, tag and site.  Site composes key in order to preserve relative frequency for site';
 comment on column integration.work_tag.frequency is 'Frequency indicating the importance of the tag for the associated work on the site';
 
 --The User Hub!

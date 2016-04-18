@@ -102,7 +102,6 @@ def get_column_headers(file_with_header, separator):
     return h
 
 
-
 # caching language lookup
 lang_cache = {}
 
@@ -112,6 +111,14 @@ def get_marc_code(input, capital=True):
     input can be either alpha-2, alpha-3 code, full english or french name (capitalized or not)
     :param input: text in UTF-8 encoding (otherwise SQL comparison will fail as PS uses UTF-8 encoding)
     :return: marc_code found or u'--' when None is found
+    >>> get_marc_code('English')
+    u'ENG'
+    >>> get_marc_code('En', False)
+    u'eng'
+    >>> get_marc_code('Greek (ancient)')
+    u'GRC'
+    >>> get_marc_code('funny')
+    u'--'
     """
     if input is None:
         return None
@@ -130,11 +137,10 @@ def get_marc_code(input, capital=True):
             """
         ret = brd.elt.get_ro_connection().fetch_one(select, (uinput,))
         if ret:
-            marc_code = ret[1]
+            marc_code = unicode(ret[1])
         else:
             marc_code = u'--'
-
-    lang_cache[uinput] = marc_code
+        lang_cache[uinput] = marc_code
     if capital:
         return marc_code
     else:
@@ -170,8 +176,6 @@ def convert_to_isbn13(isbn10):
 
     return isbn13_no_checkdigit + str(check)
 
-
-import luigi
 
 # trigger reference data load
 def load_static_ref():
