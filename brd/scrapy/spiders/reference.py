@@ -72,7 +72,7 @@ class WorkReference(scrapy.Spider):
             item['title'] = item['title'].replace('\t', '')
 
         item['original_lang'] = response.xpath(table_t + '/tr/td/a[starts-with(@href,"/language.php?")]/text()').extract_first()
-        item['ori_lang_code'] = brd.get_marc_code(item['original_lang'])
+        item['ori_lang_code'] = brd.get_marc_code(item['original_lang'], capital=False)
         other_langs = response.xpath(table_t + '//td[starts-with(text(),"Other language")]/following-sibling::*//text()').extract()
         item['other_lang_title'] = "__&__".join(other_langs)
 

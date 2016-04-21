@@ -14,6 +14,7 @@ from brd.scrapy.items import ReviewItem
 import brd.scrapy.scrapy_utils as scrapy_utils
 import datetime
 from langdetect import detect
+from langdetect.lang_detect_exception import LangDetectException
 
 __author__ = 'mouellet'
 
@@ -69,13 +70,17 @@ class BaseReviewSpider(scrapy.Spider):
         return datetime.datetime.strptime(raw_date, self.raw_date_format).date()
 
     def detect_review_lang(self, review):
+        lang_code = u'und'
         if not review:
             return None
         elif len(review) < 4:
-            return u'und'
+            return lang_code
         else:
-            code2 = detect(review)
-            return brd.get_marc_code(code2, capital=False)
+            try:
+                lang_code = detect(review)
+            except LangDetectException:
+                pass
+            return brd.get_marc_code(lang_code, capital=False)
 
     def within_harvestperiod(self, item, last_harvest_date):
         """
@@ -159,7 +164,7 @@ class LibraryThing(BaseReviewSpider):
             item['tags_t'] = u"__&__".join(tags_t)
             item['tags_n'] = u";".join(tags_n)
             # tag in eng (lt translates them, except for intl sites like lt.de...)
-            item['tags_lang'] = u'ENG'
+            item['tags_lang'] = u'eng'
         nb_page_site = self.scrape_langs_nb(response)
         # no review
         if len(nb_page_site) == 0 or nb_page_site.get(u'und') == 0:
@@ -221,8 +226,6 @@ class LibraryThing(BaseReviewSpider):
         # in case the review lang was not determined previously, detect automatically
         if new_item['review_lang'] == u'und':
             new_item['review_lang'] = self.detect_review_lang(new_item['review'])
-        # lang_code id in capital letter
-        new_item['review_lang'] = new_item['review_lang'].upper()
         return new_item
 
     def scrape_langs_nb(self, response):
@@ -395,9 +398,9 @@ class Amazon(BaseReviewSpider):
         # Get all text() and joining
         full_t = rev_sel.xpath('.//span[@class="a-size-base review-text"]//text()').extract()
         new_item['review'] = u"\n".join(full_t)
-        # assume language english (true 99.? % of the time!) or should I indicate unknown??
+        # assume language english (true 99.? % of the time!)
         # TODO: could use langdetect..instead
-        new_item['review_lang'] = u'ENG'
+        new_item['review_lang'] = u'eng'
 
         # 'on November 30, 2015'
         new_item['review_date'] = rev_sel.xpath('.//span[@class="a-size-base a-color-secondary review-date"]/text()').extract_first()
@@ -424,6 +427,8 @@ class Amazon(BaseReviewSpider):
             parsed_rating = float(score) * 2
         return parsed_rating
 
+# stats:  For 500 works, took 25min at 250page/min
+
 class Goodreads(BaseReviewSpider):
     """
     This requires isbns in self.works_to_harvest for those never harvested,
@@ -446,7 +451,7 @@ class Goodreads(BaseReviewSpider):
             isbns = self.works_to_harvest[i].get('isbns')
             # initial requires search by isbn to map gr work-uid
             if isbns:
-                yield scrapy.Request(self.url_search + isbns[0],
+                yield scrapy.Request(self.url_search + str(isbns[0]),
                                      meta={'work_index': i, 'nb_try': 1},
                                      callback=self.parse_search_resp)
             # incremental loading
@@ -484,7 +489,7 @@ class Goodreads(BaseReviewSpider):
         # not found page
         elif 'Looking for a book?' in response.body:
             if nb_try < len(isbns):
-                yield scrapy.Request(self.url_search + isbns[nb_try],
+                yield scrapy.Request(self.url_search + str(isbns[nb_try]),
                                      meta={'work_index': widx, 'nb_try': nb_try + 1},
                                      callback=self.parse_search_resp)
             else:
@@ -517,7 +522,7 @@ class Goodreads(BaseReviewSpider):
             if len(tag_t) > 0:
                 item['tags_t'] = u"__&__".join(tag_t)
                 item['tags_n'] = u";".join(tag_n)
-                item['tags_lang'] = u'ENG'
+                item['tags_lang'] = u'eng'
 
         current_page = int(response.url[response.url.index('?page=') + 6:response.url.index('&sort=')])
         found_older = False
@@ -552,14 +557,12 @@ class Goodreads(BaseReviewSpider):
         new_item['username'] = rev.xpath('.//a[@class="user"]/@title').extract_first()  # u'Jon Liu'
         u_link = rev.xpath('.//a[@class="user"]/@href').extract_first()  # u'/user/show/52104079-jon-liu'
         new_item['user_uid'] = u_link[u_link.index(u'/show/') + 6:]
-        # no logical rules: review text may or may not have style, and its attribute can have diff values ...
-        # for now, simply take the first /span (TODO: will need diff feed to get this right)
-        r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][1]//text()').extract()
+        # no clear logical rules: finally it seems the complete text is inside the last span element...
+        # r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][1]//text()').extract()
+        r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][last()]//text()').extract()
         new_item['review'] = "\n".join(r_texts)
-        # for gr, we use automatic lang detection as reviews are mixed
+        # for gr, we use automatic lang detection
         new_item['review_lang'] = self.detect_review_lang(new_item['review'])
-        # lang_code id in capital letter
-        new_item['review_lang'] = new_item['review_lang'].upper()
 
         likes_raw = rev.xpath('.//span[@class="likesCount"]/text()').extract_first()
         if likes_raw:
@@ -664,7 +667,7 @@ class Babelio(BaseReviewSpider):
             for tag_s in tags_sel:
                 tags_t.append(tag_s.xpath('./text()').extract_first().strip())
             item['tags_t'] = u"__&__".join(tags_t)
-            item['tags_lang'] = u'FRE'
+            item['tags_lang'] = u'fre'
             # request first review page
             yield scrapy.Request((self.url_main + self.param_review) % (item['work_uid'], 1),
                                  meta={'work_index': widx, 'pass_item': item},
@@ -711,7 +714,7 @@ class Babelio(BaseReviewSpider):
         star = rev.xpath('.//li[@class="current-rating"]/text()').extract_first()  # u'Livres 4.00/5'
         item['rating'] = star[star.index(u"Livres ") + 7:star.index(u"/")]
         item['parsed_rating'] = float(item['rating']) * 2
-        item['review_lang'] = u'FRE'
+        item['review_lang'] = u'fre'
         lines = rev.xpath('.//div[@class="text row"]/div/text()').extract()
         item['review'] = u"\n".join(lines).strip()
         item['likes'] = rev.xpath('.//span[@class="post_items_like "]/span[@id]/text()').extract_first()

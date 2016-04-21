@@ -41,9 +41,11 @@ def fetch_workIds_no_info(nb_work):
 
 def fetch_workIds_not_harvested(site_logical_name, nb_work):
     """
-    Find work_refid and their isbns not yet harvested for site.
-    For lt, simply return the ids using work_info ids to avoid harvesting duplicated work
+    Find work_refid and their isbns not yet harvested for site while avoiding duplicated work-id.
+    For lt, simply return the ids using work_info ids and also avoid duplicated
     (still possible if the work was merged after Reference data was harvested).
+
+    For other, also avoid using deleted (ean,work_id) couple
     :return:
     """
     sql_other = \
@@ -52,7 +54,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
             select coalesce(same.master_refid, w.work_refid) as wid, array_agg(wi.ean) as isbn_list
             from integration.work_info w
             left join integration.work_sameas same on (w.work_refid = same.work_refid)
-            join integration.work_isbn wi on (wi.work_refid = w.work_refid)
+            join integration.work_isbn wi on (wi.work_refid = w.work_refid and wi.deletion_date IS NULL)
             group by 1
         )
         select ref.wid as work_refid, ref.isbn_list as isbns
@@ -63,7 +65,6 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
              join integration.site s on (m.site_id = s.id and s.logical_name = %(name)s)
             ) as mapped on (mapped.work_refid = ref.wid)
         where mapped.last_harvest_dts IS NULL
-        -- here we could order by popularity
         order by 1
         limit %(nb)s
         """

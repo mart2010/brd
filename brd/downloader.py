@@ -21,7 +21,7 @@ def download_convert_thingISBN(url="http://www.librarything.com/feeds/thingISBN.
     Download/uncompress a copy of thingISBN.xml.gz from lt (or locally), and convert into csv while adding
     log-audit_id metadata.
 
-    To be done sparingly with respect to licensing agreement (the file is roughly 50M compressed).
+    To be done sparingly with respect to licensing agreement (zip file larger than 50M).
     :return: uncompressed filepath with date of download as suffix: "../thingISBN_1-31-2015.xml
     Can be tested using 'http://www.librarything.com/feeds/thingISBN_small.xml'
     """

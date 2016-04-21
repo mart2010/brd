@@ -13,6 +13,7 @@ __copyright__ = "Copyright 2016, The BRD Project"
 
 logger = logging.getLogger(__name__)
 
+
 class FetchNewWorkIds(luigi.Task):
     """
     Fetch n_work NOT yet harvested for site and their associated isbns

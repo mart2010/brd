@@ -66,7 +66,7 @@ class TestLtReview(BaseTestReview):
         self.assertEqual(item['tags_n'], u'1;1;1;1;1;1;1;1')
         self.assertEqual(item['tags_t'],
             u'21st century__&__biography__&__fiction__&__FRA 848 LAF 2001__&__French__&__Haiti__&__littérature québécoise__&__Quebec')
-        self.assertEqual(item['tags_lang'], u'ENG')
+        self.assertEqual(item['tags_lang'], u'eng')
         try:
             item_gen.next()
             self.fail("no more item expected")
@@ -202,7 +202,7 @@ class TestLtReview(BaseTestReview):
             else:
                 self.assertIsNone(item.get('parsed_likes'))
             # language is detected automatically
-            self.assertEqual(item['review_lang'], u'FRE')
+            self.assertEqual(item['review_lang'], u'fre')
 
 
         all_users = u"yermat==soniaandree==grimm==briconcella==Cecilturtle"
@@ -245,7 +245,7 @@ class TestLtReview(BaseTestReview):
             nb += 1
             self.assert_not_none(item)
             # validate automatic review lang detection
-            self.assertEqual(item['review_lang'], u'ENG')
+            self.assertEqual(item['review_lang'], u'eng')
 
         self.assertEqual(127, nb)
 
@@ -285,6 +285,8 @@ class TestGrReview(BaseTestReview):
             pass
 
     def test_parse_reviews(self):
+        # instruct not to truncate long text with assertionError diagnose
+        self.maxDiff = None
         wid = 1000
         wuid = "2776527-traffic"
         spider = self.mock_spider(spiderreviews.Goodreads, [wid], [['9780590406406']])
@@ -306,15 +308,27 @@ class TestGrReview(BaseTestReview):
                 self.assertEqual(item['work_refid'], 1000)
                 self.assertEqual(item['work_uid'], wuid)
                 if i != 4:
-                    self.assertEqual(item['review_lang'], u'ENG')
+                    self.assertEqual(item['review_lang'], u'eng')
                 # check the tags (genre)
                 self.assertEqual(item['tags_n'], u'386 ;92 ;83 ;52 ;20 ;20 ;17 ;13 ;9 ;7 ')
                 self.assertEqual(item['tags_t'], u'Non Fiction__&__Psychology__&__Science__&__Sociology__&__Cities > Urban Planning__&__Culture__&__Social Science__&__History__&__Adult__&__Business')
-                if i == 3:
+                # these tow validate the long text shown partially
+                if i == 0:
+                    self.assertEqual(len(item['review']), 1624)
+                if i == 1:
+
+                    self.assertEqual(item['review'], u"As I said in an update to this book yesterday:\nUgh. Seriously, p. 8 and I'm about to give up. "
+                                                     u"In a book that I hoped to provide, well, science about traffic, he starts out repeating answers he "
+                                                     u"got about traffic from asking on an internet forum. It really looks bleak right now that he's going to "
+                                                     u"turn this ship around....\nI read a few more pages and it was clear that it was going to go down hill. "
+                                                     u"What I wanted was a book about traffic science, highway design, round-a-bout theory, etc. "
+                                                     u"This is just a guy talking about \"doesn't it always seem like when you driving X happens? Well I asked "
+                                                     u"some people on the internet. Some of them said X, but some of them said Y.\"")
+                elif i == 3:
                     self.assertEqual(item['username'], u'Rebecca')
                     self.assertEqual(item['likes'], u'1 like')
                     self.assertEqual(item['parsed_likes'], 1)
-                if i == 5:
+                elif i == 5:
                     self.assertEqual(item['username'], u'Rayfes Mondal')
                     self.assertEqual(item['user_uid'], u'35461072-rayfes-mondal')
                     self.assertEqual(item['parsed_rating'], 8)
@@ -398,7 +412,7 @@ class TestAZReview(BaseTestReview):
                 self.assertEqual(item['title'], u"Harry Potter And The Order Of The Phoenix")
                 self.assertEqual(item['work_refid'], 10)
                 self.assertEqual(item['work_uid'], asin)
-                self.assertEqual(item['review_lang'], u'ENG')
+                self.assertEqual(item['review_lang'], u'eng')
                 if i == 0:
                     self.assertEqual(item['username'], u'Amazon Customer')
                     self.assertEqual(item['user_uid'], u'A3FVDEFHGRLLYH')
@@ -428,7 +442,7 @@ class TestAZReview(BaseTestReview):
                 self.assertEqual(item['title'], u"Confessions (Oxford World's Classics)")
                 self.assertEqual(item['work_refid'], 10)
                 self.assertEqual(item['work_uid'], asin)
-                self.assertEqual(item['review_lang'], u'ENG')
+                self.assertEqual(item['review_lang'], u'eng')
                 if i == 3:
                     self.assertEqual(item['username'], u'life@micron.net')
                     self.assertEqual(item['user_uid'], u'A2OOFX8HTKNDE8')
@@ -527,7 +541,7 @@ class TestBOReview(BaseTestReview):
         self.assertEqual(page_rev_req.meta['work_index'], 0)
         self.assertIsNone(page_rev_req.meta.get('main_page'))
         self.assertTrue(page_rev_req.meta['pass_item'] != e_item)
-        self.assertEquals(page_rev_req.meta['pass_item']['tags_lang'], u'FRE')
+        self.assertEquals(page_rev_req.meta['pass_item']['tags_lang'], u'fre')
         self.assertEquals(page_rev_req.meta['pass_item']['tags_t'],
                           u"adapté au cinéma__&__roman__&__littérature jeunesse__&__jeune adulte__&__littérature pour adolescents__&__jeunesse__&__roman d'amour__&__deuil__&__drame__&__amitié__&__triste__&__adolescence__&__maladie__&__mort__&__espoir__&__cancer__&__humour__&__romance__&__amour__&__littérature américaine")
         try:
@@ -552,7 +566,7 @@ class TestBOReview(BaseTestReview):
         #         self.assertEqual(item['title'], u"Nos étoiles contraires")
         #         self.assertEqual(item['work_refid'], wid)
         #         self.assertEqual(item['work_uid'], wuid)
-        #         self.assertEqual(item['review_lang'], u'FRE')
+        #         self.assertEqual(item['review_lang'], u'fre')
         #         if i == 0:
         #             self.assertEqual(item['username'], u'AkiBook')
         #             self.assertEqual(item['user_uid'], u'319795')

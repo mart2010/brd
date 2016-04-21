@@ -139,9 +139,6 @@ comment on table staging.work_update is 'Staging for evolving features harvested
 --
 --------------------------------------------------------------------------------------------------------
 
-
-
-
 ------------------------------------------------------------------------------------------
 -------------------------------------- Raw Sub-layer -------------------------------------
 ------------------------------------------------------------------------------------------
@@ -190,12 +187,14 @@ comment on column integration.language.code2 is 'The ISO 639-1 alpha-2 code (sub
 create table integration.work (
     refid bigint primary key,
     last_harvest_dts timestamp,
+    last_seen_date date,
     create_dts timestamp,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 comment on table integration.work is 'Book as a single piece of work irrespective of translations, editions and title sourced from lt (taken as refernece master data)';
 comment on column integration.work.refid is 'Work identifer created, curated and managed by lt';
+comment on column integration.work.last_seen_date is 'Last time this work was seen during a thingisbn bulkload';
 
 create table integration.work_info (
     work_refid bigint primary key,
@@ -221,6 +220,7 @@ create table integration.isbn (
     ean bigint primary key,
     isbn13 char(13) not null,
     isbn10 char(10),
+    last_seen_date date,
     create_dts timestamp,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
@@ -239,15 +239,16 @@ create table integration.isbn_info (
 );
 comment on table integration.isbn_info is 'Attribute data related to ISBN (un-historized Satellite-type, could add history if need be)';
 
+-- TODO: change PK to be based on ean only! (will make sure not to load ean associated to more than 1 work)
 create table integration.work_isbn (
+    ean bigint primary key,
     work_refid bigint,
-    ean bigint,
-    source_site_id int,
+    last_seen_date date,
+    deletion_date date,
     create_dts timestamp,
     load_audit_id int,
-    primary key (work_refid, ean),
-    foreign key(work_refid) references integration.work(refid),
     foreign key(ean) references integration.isbn(ean),
+    foreign key(work_refid) references integration.work(refid),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 comment on table integration.work_isbn is 'Association of work and ISBN (sourced from lt)';
@@ -456,7 +457,6 @@ comment on column integration.review.user_id is 'User identifier derived from MD
 
 
 
-
 -----------------------------------------------------------------------------------------------
 -------------------------------------- Business Sub-layer -------------------------------------
 -----------------------------------------------------------------------------------------------
@@ -465,7 +465,7 @@ create table integration.work_sameas (
     master_refid bigint,
     create_dts timestamp,
     load_audit_id int,
-    primary key (work_refid, master_refid),
+    primary key (work_refid),
     foreign key (work_refid) references integration.work(refid),
     foreign key (master_refid) references integration.work(refid),
     foreign key (load_audit_id) references staging.load_audit(id)

@@ -115,6 +115,8 @@ def get_marc_code(input, capital=True):
     u'ENG'
     >>> get_marc_code('En', False)
     u'eng'
+    >>> get_marc_code('und', False)
+    u'und'
     >>> get_marc_code('Greek (ancient)')
     u'GRC'
     >>> get_marc_code('funny')
