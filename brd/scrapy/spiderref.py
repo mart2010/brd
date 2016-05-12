@@ -3,6 +3,7 @@ import logging
 
 import scrapy
 from brd.scrapy.items import WorkRefItem
+from brd.scrapy.items import IsbnLangItem
 import brd
 
 __author__ = 'mart2010'
@@ -33,7 +34,12 @@ logger = logging.getLogger(__name__)
 class WorkReference(scrapy.Spider):
     """
     Spider fetching reference info related to all work-id found in
-    self.works_to_harvest
+    self.works_to_harvest.
+
+    Issue: The duplicate work-ids may cause issue if during load, there are many
+    work-ids that get redirected to the master-id, then Scrapy filter out identical page,
+    and only one response will be harvested.
+
     """
     name = 'workreference'
     allowed_domains = ['www.librarything.com']
@@ -60,10 +66,10 @@ class WorkReference(scrapy.Spider):
     def parse_work(self, response):
         wid = response.url[response.url.index('/work/') + 6: response.url.index('/workdetails')]
         item = WorkRefItem(work_refid=wid)
-        logger.debug("Harvesting work detail of %s " % wid)
         # when work has duplicate, link it to "master" (ex. 13001031 is dup of 17829)
         if wid != response.meta['wid']:
             item['dup_refid'] = response.meta['wid']
+        logger.debug("Harvesting work detail of %s (requested id=%s)" % (wid, item['dup_refid']))
         table_t = '//table[@id="book_bookInformationTable"]'
         item['title'] = response.xpath(table_t + '/tr[1]/td[2]/b/text()').extract_first()
         # Postgres copy_from chokes on occasional 'tab'
@@ -121,4 +127,42 @@ class WorkReference(scrapy.Spider):
 
     def get_dump_filepath(self):
         return self.dump_filepath
+
+
+class IsbnLanguage(scrapy.Spider):
+    """
+    Use to fetch language associated to each ISBNs provided
+    """
+    name = 'isbnlanguage'
+    allowed_domains = ['www.librarything.com']
+    url_isbnlang = 'http://www.librarything.com/api/thingLang.php?isbn=%s'
+
+    def __init__(self, **kwargs):
+        """
+        param wids : list of isbns
+        """
+        super(IsbnLanguage, self).__init__(**kwargs)
+        self.isbns = kwargs['isbns_to_fetch']
+        self.dump_filepath = kwargs['dump_filepath']
+
+    def start_requests(self):
+        for i in xrange(len(self.isbns)):
+            if i % 1000 == 0:
+                logger.debug("Requested the %d-th isbn (out of %d)" % (i, len(self.isbns)))
+            yield scrapy.Request(self.url_isbnlang % self.isbns[i], callback=self.parse_resp, meta={'isbn': self.isbns[i]})
+
+    def parse_resp(self, response):
+        lang = response.body
+        if len(lang) != 3:
+            lang = 'und'
+        yield(IsbnLangItem(ean=response.meta['isbn'], lang_code=lang))
+
+    def get_dump_filepath(self):
+        return self.dump_filepath
+
+
+
+
+
+
 

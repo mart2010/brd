@@ -237,7 +237,7 @@ class EltError(Exception):
 
 class CTAStage(object):
     """
-    Tentative for defining CTAS chained-steps, possible usage:
+    Use for defining CTAS chained-steps, possible usage:
         stmt1 = "sssss"
         stmt2 = "dddd"
         ctas = CTAStage(get_conn_param()).stage(stmt1, {'datemin' : '12-03-2011'})\

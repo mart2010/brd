@@ -6,13 +6,12 @@ __copyright__ = "Copyright 2016, The BRD Project"
 import unittest
 from datetime import datetime
 
-import brd.elt as db
+import brd.config as config
 import brd.scrapy.items as items
 import brd.scrapy.pipelines as pipelines
-import brd.scrapy.spiders.reviews as reviewspiders
-from scrapy.exceptions import DropItem
+import brd.scrapy.spiderreviews as reviewspiders
 import psycopg2
-import brd.config as config
+from scrapy.exceptions import DropItem
 
 
 class TestPipeline(unittest.TestCase):

@@ -19,6 +19,16 @@ logging.config.fileConfig('/Users/mart/dev/brd/logging.cfg', disable_existing_lo
 
 logger = logging.getLogger(__name__)
 
+
+class WorkflowError(Exception):
+    def __init__(self, message, cause=None):
+        self.message = message
+        self.cause = cause
+
+    def __str__(self):
+        return self.message
+
+
 def get_period_text(begin_period, end_period):
     """
     :param begin_period:

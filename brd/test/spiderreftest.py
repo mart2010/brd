@@ -3,8 +3,9 @@ __author__ = 'mart2010'
 __copyright__ = "Copyright 2016, The BRD Project"
 
 import unittest
+
+import brd.scrapy.spiderref as spiderref
 from mockresponse import mock_from_file
-import brd.scrapy.spiders.reference as spiderref
 
 
 class TestLtReference(unittest.TestCase):

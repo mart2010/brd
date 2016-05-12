@@ -30,7 +30,17 @@ class FetchNewWorkIds(luigi.Task):
 
     def run(self):
         f = self.output().open('w')
-        res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work)
+        # by default, filter isbns in english only
+        lang = 'eng'
+        if self.site in ('babelio'):
+            lang = 'fre'
+
+        res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work, lang_code=lang)
+        if len(res_dic) == 0:
+            raise brd.WorkflowError("No more work available to harvest for site %s, STOP PROCESSING!" % self.site)
+        elif len(res_dic) < self.n_work:
+            logger.warning("Requested %d work but only %d are available for site %s"
+                           % (self.n_work, len(res_dic), self.site))
         json.dump(res_dic, f, indent=2)
         f.close()
 
@@ -62,7 +72,7 @@ class HarvestReviews(luigi.Task):
                                                     to_date=self.harvest_dts)
         spider_process.start_process()
         logger.info("Harvest of %d works/review completed with spider %s (dump file: '%s')"
-                     % (len(workids_list), self.site, self.dump_filepath))
+                    % (len(workids_list), self.site, self.dump_filepath))
 
 
 class BulkLoadReviews(BaseBulkLoadTask):
@@ -152,8 +162,6 @@ class LoadReviews(BasePostgresTask):
         cursor.execute(sql, {'audit_id': audit_id, 'site': self.site})
         return cursor.rowcount
 
-# TODO: add loading tags before harvesting from gr and lt...
-
 class LoadLtWorkSameAs(BasePostgresTask):
     """
     Used with lt.  This should not happen since this is also done during harvest of work-info.
@@ -182,7 +190,7 @@ class LoadLtWorkSameAs(BasePostgresTask):
 
 class LoadTag(BasePostgresTask):
     """
-    Load Tag for site having them
+    Load Tag for site having them (for gr and lt...?)
     """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
@@ -202,7 +210,8 @@ class LoadTag(BasePostgresTask):
                         , max(tags_lang) as lang_code
                 from ( select unnest(string_to_array(tags_t, '__&__')) as tag
                                 , tags_lang
-                       from staging.review ) as foo
+                       from staging.review
+                       where tags_t IS NOT NULL) as foo
                 group by tag
             )
             insert into integration.tag(id, tag, tag_upper, ori_site_id, lang_code, create_dts, load_audit_id)

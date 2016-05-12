@@ -2,12 +2,13 @@
 __author__ = 'mart2010'
 __copyright__ = "Copyright 2016, The BRD Project"
 
-from brd.scrapy.items import ReviewItem
-import unittest
-from mockresponse import mock_from_file
-import brd.scrapy.spiders.reviews as spiderreviews
 import datetime
+import unittest
+
+import brd.scrapy.spiderreviews as spiderreviews
 import scrapy
+from brd.scrapy.items import ReviewItem
+from mockresponse import mock_from_file
 
 
 class BaseTestReview(unittest.TestCase):
@@ -317,10 +318,10 @@ class TestGrReview(BaseTestReview):
                     self.assertEqual(len(item['review']), 1624)
                 if i == 1:
 
-                    self.assertEqual(item['review'], u"As I said in an update to this book yesterday:\nUgh. Seriously, p. 8 and I'm about to give up. "
+                    self.assertEqual(item['review'], u"As I said in an update to this book yesterday: Ugh. Seriously, p. 8 and I'm about to give up. "
                                                      u"In a book that I hoped to provide, well, science about traffic, he starts out repeating answers he "
                                                      u"got about traffic from asking on an internet forum. It really looks bleak right now that he's going to "
-                                                     u"turn this ship around....\nI read a few more pages and it was clear that it was going to go down hill. "
+                                                     u"turn this ship around.... I read a few more pages and it was clear that it was going to go down hill. "
                                                      u"What I wanted was a book about traffic science, highway design, round-a-bout theory, etc. "
                                                      u"This is just a guy talking about \"doesn't it always seem like when you driving X happens? Well I asked "
                                                      u"some people on the internet. Some of them said X, but some of them said Y.\"")
@@ -418,7 +419,7 @@ class TestAZReview(BaseTestReview):
                     self.assertEqual(item['user_uid'], u'A3FVDEFHGRLLYH')
                     self.assertEqual(item['parsed_rating'], 10)
                     self.assertEqual(item['parsed_likes'], 2)
-                    self.assertEqual(item['review'], u"This book is simply amazing. You will never guess who dies :(\nCan't wait for book 6!!")
+                    self.assertEqual(item['review'], u"This book is simply amazing. You will never guess who dies :( Can't wait for book 6!!")
                     self.assertEqual(item['parsed_review_date'], datetime.date(2003, 6, 21))
                 i += 1
             else:

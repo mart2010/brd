@@ -4,5 +4,10 @@
 - Add a class to handle generically xpath extraction from selector
 - See if I can generalize harvest logic by adding composition class for harvest logic
 - Add interna AZ sites...
--
+
+
+- Particularity of Data loading for Goodreads:
+    - initial harvest review done time DESCENDING (newest first) for work_id from 17 to 4194
+    - after that, initial harvest review done time ASCENDING (to avoid issues of missing reviews), but:
+            --> TODO: reset the last_harvest_dts in mapping (= max(review_date) + 1 ) before incremental load
 

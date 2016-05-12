@@ -1,7 +1,6 @@
 # my stuff 
 .idea
 .DS_Store
-**/*.DS_Store
 errors_fix.txt
 comments.txt
 data_static/

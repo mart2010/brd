@@ -4,7 +4,6 @@ __copyright__ = "Copyright 2016, The BRD Project"
 
 from scrapy import Item, Field
 
-
 class ReviewItem(Item):
     """Item names must match staging.review column names
     """
@@ -29,7 +28,6 @@ class ReviewItem(Item):
     parsed_likes        = Field()
     parsed_dislikes     = Field()
 
-
 class WorkRefItem(Item):
     work_refid          = Field()
     dup_refid           = Field()
@@ -45,7 +43,6 @@ class WorkRefItem(Item):
     popularity          = Field()
     other_lang_title    = Field()
 
-
 class ReviewerItem(Item):
     username            = Field()
     user_uid            = Field()
@@ -60,4 +57,8 @@ class ReviewerItem(Item):
     birth_text          = Field()
     parsed_birthyear    = Field()
     tags                = Field()
+
+class IsbnLangItem(Item):
+    ean                 = Field()
+    lang_code           = Field()
 

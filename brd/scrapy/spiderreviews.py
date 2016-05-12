@@ -200,7 +200,7 @@ class LibraryThing(BaseReviewSpider):
         new_item = dict(passed_item)
         sel1 = rev_sel.xpath('./div[@class="commentText"]')
         all_text = sel1.xpath('.//text()').extract()
-        new_item['review'] = u'\n'.join(all_text)
+        new_item['review'] = u' '.join(all_text).strip()
         # http://pics..../ss6.gif
         r = sel1.xpath('./span[@class="rating"]/img/@src').extract_first()
         if r:
@@ -397,7 +397,7 @@ class Amazon(BaseReviewSpider):
             new_item['user_uid'] = u'A customer'
         # Get all text() and joining
         full_t = rev_sel.xpath('.//span[@class="a-size-base review-text"]//text()').extract()
-        new_item['review'] = u"\n".join(full_t)
+        new_item['review'] = u" ".join(full_t).strip()
         # assume language english (true 99.? % of the time!)
         # TODO: could use langdetect..instead
         new_item['review_lang'] = u'eng'
@@ -427,7 +427,6 @@ class Amazon(BaseReviewSpider):
             parsed_rating = float(score) * 2
         return parsed_rating
 
-# stats:  For 500 works, took 25min at 250page/min
 
 class Goodreads(BaseReviewSpider):
     """
@@ -444,7 +443,8 @@ class Goodreads(BaseReviewSpider):
     # Control setting
     ###########################
     url_search = 'https://www.goodreads.com/search?utf8=%E2%9C%93&query='
-    url_review = 'https://www.goodreads.com/book/show/%s?page=%d&sort=newest'
+    # sort=newest or oldest
+    url_review = 'https://www.goodreads.com/book/show/%s?page=%d&sort=%s'
 
     def start_requests(self):
         for i in range(len(self.works_to_harvest)):
@@ -483,7 +483,8 @@ class Goodreads(BaseReviewSpider):
             # map gr's id and trigger new Request to have reviews ordered correctly
             else:
                 self.works_to_harvest[widx]['last_harvest_date'] = self.min_harvest_date
-                yield scrapy.Request(self.url_review % (gr_work_id, 1),
+                # For popular review, GR has partial list, so must order by oldest
+                yield scrapy.Request(self.url_review % (gr_work_id, 1, 'oldest'),
                                      meta={'work_index': widx, 'item': pass_item},
                                      callback=self.parse_reviews)
         # not found page
@@ -518,7 +519,13 @@ class Goodreads(BaseReviewSpider):
             for tline in response.xpath('//div[starts-with(@class,"bigBoxContent")]/div[starts-with(@class,"elementList ")]'):
                 ts = tline.xpath('./div[@class="left"]/a/text()').extract()
                 tag_t.append(u" > ".join(ts))
-                tag_n.append(tline.xpath('./div[@class="right"]/a/text()').extract_first().replace(u'users', u''))
+                # u'2 users'
+                nu = tline.xpath('./div[@class="right"]/a/text()').extract_first()
+                # Data issues: Tag without nb exist (ex. 'Business Amazon' !!)
+                if nu:
+                    tag_n.append(nu[:nu.index(u'user')])
+                else:
+                    tag_n.append(u'0')
             if len(tag_t) > 0:
                 item['tags_t'] = u"__&__".join(tag_t)
                 item['tags_n'] = u";".join(tag_n)
@@ -538,7 +545,8 @@ class Goodreads(BaseReviewSpider):
                 break
 
         if current_page <= lastpage_no and not found_older:
-            yield scrapy.Request(self.url_review % (item['work_uid'], current_page + 1),
+            # TODO: arrange the ordering for incremental loading
+            yield scrapy.Request(self.url_review % (item['work_uid'], current_page + 1, 'oldest'),
                                  meta={'work_index': widx, 'item': item, 'lastpage_no': lastpage_no},
                                  callback=self.parse_reviews)
 
@@ -557,10 +565,9 @@ class Goodreads(BaseReviewSpider):
         new_item['username'] = rev.xpath('.//a[@class="user"]/@title').extract_first()  # u'Jon Liu'
         u_link = rev.xpath('.//a[@class="user"]/@href').extract_first()  # u'/user/show/52104079-jon-liu'
         new_item['user_uid'] = u_link[u_link.index(u'/show/') + 6:]
-        # no clear logical rules: finally it seems the complete text is inside the last span element...
-        # r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][1]//text()').extract()
+        # no clear logical rules: finally it seems complete text is at the last span element...
         r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][last()]//text()').extract()
-        new_item['review'] = "\n".join(r_texts)
+        new_item['review'] = u" ".join(r_texts).strip()
         # for gr, we use automatic lang detection
         new_item['review_lang'] = self.detect_review_lang(new_item['review'])
 
@@ -631,8 +638,8 @@ class Babelio(BaseReviewSpider):
                                                authors=author)
             nb_t = response.xpath(titre_xp + '/a[contains(@href,"#critiques")]/span/text()').extract_first()
             if not nb_t or int(nb_t) == 0:
-                logger.info("No reviews found for work-refid=%s (uid=%s of site %s)"
-                        % (pass_item['work_refid'], pass_item['work_uid'], self.name))
+                logger.info("No reviews found for work-refid=%s in site %s (uid=%s)"
+                        % (pass_item['work_refid'], self.name, pass_item['work_uid']))
                 yield pass_item
             else:
                 yield scrapy.Request(self.url_main % uid,
@@ -648,7 +655,7 @@ class Babelio(BaseReviewSpider):
                                              meta={'work_index': widx, 'nb_try': nb_try + 1},
                                              callback=self.parse_search_resp)
                 else:
-                    logger.info("Nothing found for isbn=%s" % isbns[nb_try - 1])
+                    logger.info("Nothing found for isbn=%s in site %s" % (isbns[nb_try - 1], self.name))
                     yield self.build_review_item(work_refid=self.works_to_harvest[widx]['work_refid'], work_uid='-1')
             else:
                 logger.error("Unexpected result page after %d try (search isbn=%s)" % (nb_try, isbns[nb_try - 1]))
@@ -716,7 +723,7 @@ class Babelio(BaseReviewSpider):
         item['parsed_rating'] = float(item['rating']) * 2
         item['review_lang'] = u'fre'
         lines = rev.xpath('.//div[@class="text row"]/div/text()').extract()
-        item['review'] = u"\n".join(lines).strip()
+        item['review'] = u" ".join(lines).strip()
         item['likes'] = rev.xpath('.//span[@class="post_items_like "]/span[@id]/text()').extract_first()
         item['parsed_likes'] = int(item['likes'])
 

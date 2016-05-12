@@ -39,22 +39,27 @@ def fetch_workIds_no_info(nb_work):
     return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work}, as_dict=True)
 
 
-def fetch_workIds_not_harvested(site_logical_name, nb_work):
+def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng'):
     """
-    Find work_refid and their isbns not yet harvested for site while avoiding duplicated work-id.
-    For lt, simply return the ids using work_info ids and also avoid duplicated
-    (still possible if the work was merged after Reference data was harvested).
+    Fetch work_refid/isbns not yet harvested (mapping not present)
+    using a source work_info and isbn_info (for lang)
 
-    For other, also avoid using deleted (ean,work_id) couple
+    For lt, return ids for work that had their reference harvested.
+
+    :param nb_work: number of work-ids to fetch
+    :param lang_code: filter isbn on lang_code (ex. to limit isbn for lang-specific site).
+    (not used for lt)
     :return:
     """
     sql_other = \
         """
         with ref as (
-            select coalesce(same.master_refid, w.work_refid) as wid, array_agg(wi.ean) as isbn_list
+            select  coalesce(same.master_refid, w.work_refid) as wid
+                    , array_agg(wi.ean) as isbn_list
             from integration.work_info w
             left join integration.work_sameas same on (w.work_refid = same.work_refid)
-            join integration.work_isbn wi on (wi.work_refid = w.work_refid and wi.deletion_date IS NULL)
+            join integration.work_isbn wi on (wi.work_refid = w.work_refid and wi.deletion_date IS NULL )
+            join integration.isbn_info ii on (wi.ean = ii.ean and ii.lang_code = %(lang)s)
             group by 1
         )
         select ref.wid as work_refid, ref.isbn_list as isbns
@@ -82,7 +87,9 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work):
     if site_logical_name == 'librarything':
         return elt.get_ro_connection().fetch_all(sql_lt, {'nb': nb_work}, as_dict=True)
     else:
-        return elt.get_ro_connection().fetch_all(sql_other, {'nb': nb_work, 'name': site_logical_name}, as_dict=True)
+        return elt.get_ro_connection().fetch_all(sql_other, {'nb': nb_work,
+                                                             'name': site_logical_name,
+                                                             'lang': lang_code}, as_dict=True)
 
 
 def fetch_ltwids_stat_harvested(nb_work):

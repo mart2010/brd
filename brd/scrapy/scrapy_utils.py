@@ -54,3 +54,45 @@ def resolve_value(selector, xpath, expected=1):
             raise ValueError("Expected %d elements, but got: '%s' with selector '%s', xpath '%s' " % (expected, val, selector, xpath))
     return val
 
+
+class SelectorParser(object):
+
+    def __init__(self, selector):
+        self.selector = selector
+
+    def parse_int_value(self, mandatory=True):
+        """
+        Parse an integer value from selector.  Raise exception when mandatory
+        and no integer can be parsed.
+        :param mandatory:
+        :return: integer value
+        """
+        val = self.selector.extract_first()
+        if not val:
+            if mandatory:
+                self._raise_none_exception()
+            else:
+                return None
+        try:
+            nval = int(val)
+            return nval
+        except ValueError:
+            if mandatory:
+                raise ValueError('The extracted element %s is not an int' % val)
+            else:
+                return None
+
+    def parse_string_value(self):
+        """
+        Use when requiring a string value from selector
+        :return: string, otherwise raise ValueError
+        """
+        val = self.selector.extract_first()
+        if not val:
+            self._raise_none_exception()
+        if type(val) not in (str, unicode):
+            raise ValueError('The extracted element %s is not a string' % val)
+        return val
+
+    def _raise_none_exception(self):
+        raise ValueError('The selector %s returned None' % str(self.selector))

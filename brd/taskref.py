@@ -6,6 +6,7 @@ import datetime
 import brd
 import brd.config
 import brd.scrapy
+import brd.elt as elt
 import brd.service as service
 import luigi
 import luigi.postgres
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------------------- #
 # ----------------------------------  LOAD THINGISBN ------------------------------------------ #
 # file 'thingISBN.xml.gz' located at http://www.librarything.com/feeds/
+# --------------------------------------------------------------------------------------------- #
 
 class DownLoadThingISBN(luigi.Task):
     filepath = luigi.Parameter()
@@ -101,12 +103,11 @@ class LoadIsbnRef(BasePostgresTask):
         return cursor.rowcount
 
 
-#------------------------------------------------------------------------------------------------
+
 # Thingisbn has a few data issues:
 # - full duplicate in work-id, isbn
 # - some isbn/ean are associated with more than 1 work!
 # These associations cannot be loaded.
-
 #brd=> select cnt, count(1) from (select ean, count(1) as cnt from work_isbn group by 1) as foo group by 1;
 # cnt |  count
 #-----+---------
@@ -178,7 +179,7 @@ class BatchLoadWorkRef(luigi.Task):
 
 # --------------------------------------------------------------------------------------------- #
 # ----------------------------------  LOAD WORK_INFO  ----------------------------------------- #
-
+# --------------------------------------------------------------------------------------------- #
 class FetchWorkIdsWithoutInfo(luigi.Task):
     """
     This fetches n_work having NO work_info harvested, while avoiding duplicate
@@ -197,8 +198,8 @@ class FetchWorkIdsWithoutInfo(luigi.Task):
         res_dic = service.fetch_workIds_no_info(self.n_work)
         nb_av = len(res_dic)
         if nb_av == 0:
-            raise Exception("No more work without info found, STOP PROCESSING!")
-        elif nb_av < self.n_work:
+            raise brd.WorkflowError("No more work without info available, STOP PROCESSING!")
+        elif nb_av < int(self.n_work):
             logger.info("Only %d ids found without info (out of %s requested)" % (nb_av, self.n_work))
         json.dump(res_dic, f, indent=2)
         f.close()
@@ -385,7 +386,7 @@ class LoadWorkSameAs(BasePostgresTask):
             insert into integration.work_sameas(work_refid, master_refid, create_dts, load_audit_id)
             select distinct wi.dup_refid, wi.work_refid, now(), %(audit_id)s
             from staging.work_info wi
-            join integration.work_sameas ws on (wi.dup_refid = ws.work_refid and wi.work_refid = ws.master_refid)
+            left join integration.work_sameas ws on (wi.dup_refid = ws.work_refid and wi.work_refid = ws.master_refid)
             where wi.dup_refid IS NOT NULL
             and ws.work_refid IS NULL
             ;
@@ -393,7 +394,7 @@ class LoadWorkSameAs(BasePostgresTask):
         cursor.execute(sql, {'audit_id': audit_id})
         return cursor.rowcount
 
-# Almost 50% of LC subjects are NULL!!! not worth integrating
+# Almost 50% of LC subjects are NULL!!! not integrated for now
 class LoadLcSubjects(BaseBulkLoadTask):
     pass
 
@@ -478,3 +479,120 @@ class BatchLoadWorkInfo(luigi.Task):
                 LoadWorkLangTitle(self.n_work, self.harvest_dts),
                 LoadMDS(self.n_work, self.harvest_dts)]
 
+
+# --------------------------------------------------------------------------------------------- #
+# -------------------------------------  ISBN LANG  ------------------------------------------- #
+# request:  http://www.librarything.com/api/thingLang.php?isbn=
+# --------------------------------------------------------------------------------------------- #
+
+class FetchIsbnList(luigi.Task):
+    n_isbn = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
+
+    def output(self):
+        filepath = '/tmp/isbns_lang_%s.txt' % self.harvest_dts.strftime(luigi.DateMinuteParameter.date_format)
+        return luigi.LocalTarget(filepath)
+
+    def run(self):
+        # order by work_refid to align with review harvesting execution
+        sql = \
+            """
+            select w.ean::text
+            from integration.work_isbn w
+            left join integration.isbn_info i on (w.ean = i.ean)
+            where i.lang_code IS NULL
+            order by w.work_refid
+            limit %(nb)s
+            """
+        conn = elt.get_ro_connection()
+        tup_list = conn.fetch_all(sql, params={'nb': self.n_isbn})
+        f = self.output().open('w')
+        f.write(";".join([tup[0] for tup in tup_list]))
+        f.close()
+
+class HarvestIsbnLang(luigi.Task):
+    n_isbn = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
+
+    def __init__(self, *args, **kwargs):
+        super(HarvestIsbnLang, self).__init__(*args, **kwargs)
+        filename = 'ISBN_Lang_%s.csv' % self.harvest_dts.strftime(luigi.DateMinuteParameter.date_format)
+        self.dump_filepath = os.path.join(brd.config.REF_DATA_DIR, filename)
+
+    def requires(self):
+        return FetchIsbnList(self.n_isbn, self.harvest_dts)
+
+    def output(self):
+        return luigi.LocalTarget(self.dump_filepath)
+
+    def run(self):
+        with self.input().open('r') as f:
+            ean_list = f.readline().rstrip('\n').split(';')
+
+        spider_process = brd.scrapy.SpiderProcessor('isbnlanguage',
+                                                    dump_filepath=self.dump_filepath,
+                                                    isbns_to_fetch=ean_list)
+        spider_process.start_process()
+        logger.info("Harvest of %d isbn-lang completed (dump file: '%s')"
+                    % (len(ean_list), self.dump_filepath))
+
+
+class BulkLoadIsbnLang(BaseBulkLoadTask):
+    n_isbn = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
+
+    input_has_headers = True
+    table = 'staging.ISBN_LANG'
+    clear_table_before = True
+
+    def requires(self):
+        return HarvestIsbnLang(self.n_isbn, self.harvest_dts)
+
+
+class LoadIsbnLang(BasePostgresTask):
+    """
+    Load isbn_info with language only.
+    """
+    n_isbn = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
+    table = 'integration.ISBN_INFO'
+
+    def requires(self):
+        return BulkLoadIsbnLang(self.n_isbn, self.harvest_dts)
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            with stage as (
+                select distinct ean::bigint as ean, lang_code
+                from staging.isbn_lang
+            ), match as (
+                update integration.isbn_info i set lang_code = stage.lang_code, update_dts = now()
+                from stage
+                where i.ean = stage.ean
+                returning i.*
+            )
+            insert into integration.isbn_info(ean, lang_code, create_dts, load_audit_id)
+            select s.ean, s.lang_code, now(), %(audit_id)s
+            from stage s
+            left join match on (s.ean = match.ean)
+            where match.ean IS NULL
+            ;
+            """
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
+
+
+# python -m luigi --module brd.taskref BatchLoadIsbnLang --n-isbn 10 --local-scheduler
+class BatchLoadIsbnLang(luigi.Task):
+    """
+    Entry point to launch isbn-lang harvest loads
+    """
+    n_isbn = luigi.Parameter(default=100)
+    harvest_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
+
+    global batch_name
+    batch_name = "Load Isbn-lang"
+
+    def requires(self):
+        return [LoadIsbnLang(self.n_isbn, self.harvest_dts)]

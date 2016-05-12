@@ -48,8 +48,7 @@ create table staging.thingisbn (
     loading_dts timestamp
 );
 
-comment on table staging.thingisbn is 'Data from thingISBN.xml to load occasionally to refresh reference work/isbn data';
-
+comment on table staging.thingisbn is 'Data from thingISBN.xml to refresh reference work/isbn data (duplicates for couple (work_id,isbn) exist in source)'
 
 create table staging.review (
     id bigserial primary key,
@@ -79,11 +78,11 @@ create table staging.review (
 );
 
 comment on table staging.review is 'Review and/or Rating harvested from site';
-comment on column staging.review.work_refid is 'Unique identifier of the book (a piece of work) as referenced in lt';
+comment on column staging.review.work_refid is 'Unique identifier of the book as a piece of work (ref to lt)';
 comment on column staging.review.dup_refid is 'Duplicate id associated to a unique "master" work_refid (duplicates exist in lt)';
 comment on column staging.review.work_uid is 'Work id used in other site; to map with lt''s work_refid during harvest';
-comment on column staging.review.parsed_review_date is 'Spider knows how to parse date from raw string';
-comment on column staging.review.likes is 'Nb of users having appreciated the review (concetp likes, or green flag). Implies incremental-update the review';
+comment on column staging.review.parsed_review_date is 'The parse date from raw string';
+comment on column staging.review.likes is 'Nb of users liking the review (concetp likes, green flag)';
 
 
 create or replace view staging.handy_review as
@@ -113,6 +112,14 @@ create table staging.work_info (
 );
 
 comment on table staging.work_info is 'Staging for reference features harvested from work';
+
+
+create table staging.isbn_lang (
+    ean bigint unique,
+    lang_code char(3),
+    load_audit_id int,
+    foreign key (load_audit_id) references staging.load_audit(id)
+);
 
 
 -- these should be harvested/refreshed during incremental reviews...(so could add these into staging.review)
@@ -233,6 +240,8 @@ create table integration.isbn_info (
     book_title text,
     lang_code char(3),
     source_site_id int,
+    create_dts timestamp,
+    update_dts timestamp,
     load_audit_id int,
     foreign key (ean) references integration.isbn(ean),
     foreign key (load_audit_id) references staging.load_audit(id)

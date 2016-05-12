@@ -29,7 +29,8 @@ class DumpToFile(object):
         filename = spider.get_dump_filepath()
         f = open(filename, 'w')
         self.files[spider.name] = f
-        self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|')
+        # by default csv module uses Windows-style line terminators (\r\n)
+        self.exporter = CsvItemExporter(f, include_headers_line=True, delimiter='|', lineterminator='\n')
         self.exporter.start_exporting()
 
     def spider_closed(self, spider):
@@ -42,6 +43,4 @@ class DumpToFile(object):
         # for counter, could set att in spider at closing
         self.counter += 1
         return item
-
-
 

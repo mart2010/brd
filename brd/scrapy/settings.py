@@ -9,7 +9,7 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-SPIDER_MODULES = ['brd.scrapy.spiders']
+SPIDER_MODULES = ['brd.scrapy']
 
 # Disable cookies (some sites use cookies to spot bot)
 COOKIES_ENABLED = False

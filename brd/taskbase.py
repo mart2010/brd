@@ -63,6 +63,8 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
 
     Subclass must provide target table, columns, column_separator and
     implements requires() logic.
+
+    Should create a simple/clean implementation to avoid luigi's issue
     """
     # (cannot use postgre_target() as attributes set as abstractproperty in rdbms.CopyToTable)
     host = brd.config.DATABASE['host']
@@ -73,8 +75,6 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
     clear_table_before = False
     # default separator
     column_separator = '|'
-    # container of values inserted as NULL values (MO: added empty string)
-    null_values = (None, "")
     # added to manage col headers
     input_has_headers = False
 
@@ -90,6 +90,14 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
     def init_copy(self, connection):
         if self.clear_table_before:
             connection.cursor().execute('truncate table %s;' % self.table)
+
+    def rows(self):
+        """
+        MUST overwrite this as it splits by tab instead of by self.column_seperator!
+        """
+        with self.input().open('r') as fobj:
+            for line in fobj:
+                yield line.strip('\n').split(self.column_separator)
 
     def run(self):
 
@@ -131,12 +139,11 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
         Execute copy_expert
         :return rowcount impacted
         """
-        # removed: "NULL '%s'"  and use default NULL (empty and \N) since luigi generated tmp file
-        # does not produce the \\N correctly)
+        # Now use default NULL (empty and \N) since luigi generated tmp file is ok (following the ovewrite of rows()
         sql = \
             """
             copy %s( %s )
-            from STDIN with csv HEADER DELIMITER '%s'; """ \
+            from STDIN with csv HEADER DELIMITER '%s';""" \
             % (self.table, ",".join(self.columns), self.column_separator)
 
         cursor.copy_expert(sql, infile, size=8192)
