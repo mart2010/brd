@@ -15,41 +15,6 @@
 --            integration steps done by DB-engine (ELT).
 --
 --------------------------------------------------------------------------------------------------------
-
-
-create table staging.load_audit (
-    id serial primary key,
-    batch_job text,
-    step_name text,
-    step_no int,
-    status text,
-    run_dts timestamp,
-    elapse_sec int,
-    rows_impacted int,
-    output text
-);
-
-comment on table staging.load_audit is 'Metadata to report on running batch_job/steps';
-comment on column staging.load_audit.status is 'Status of step';
-comment on column staging.load_audit.run_dts is 'Timestamp when step run (useful for things like limiting harvest period)';
-comment on column staging.load_audit.output is 'Output produced by a step like error msg when failure or additional info';
-
-
-create or replace view staging.handy_load_audit as
-    select id, batch_job, step_name, status, run_dts, rows_impacted
-    from staging.load_audit order by 1;
-
--- no primary key constraint since there are duplicates <work-id,isbn> in xml feed!
-create table staging.thingisbn (
-    work_refid bigint,
-    isbn_ori text,
-    isbn13 char(13),
-    isbn10 char(10),
-    loading_dts timestamp
-);
-
-comment on table staging.thingisbn is 'Data from thingISBN.xml to refresh reference work/isbn data (duplicates for couple (work_id,isbn) exist in source)'
-
 create table staging.review (
     id bigserial primary key,
     site_logical_name text not null,
@@ -76,22 +41,21 @@ create table staging.review (
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
-
 comment on table staging.review is 'Review and/or Rating harvested from site';
-comment on column staging.review.work_refid is 'Unique identifier of the book as a piece of work (ref to lt)';
-comment on column staging.review.dup_refid is 'Duplicate id associated to a unique "master" work_refid (duplicates exist in lt)';
-comment on column staging.review.work_uid is 'Work id used in other site; to map with lt''s work_refid during harvest';
-comment on column staging.review.parsed_review_date is 'The parse date from raw string';
-comment on column staging.review.likes is 'Nb of users liking the review (concetp likes, green flag)';
+comment on column staging.review.work_refid is 'Unique identifier of book (piece of work as ref to lt)';
+comment on column staging.review.dup_refid is 'Duplicate id associated to a "master" work_refid (duplicates exist in lt)';
+comment on column staging.review.work_uid is 'Work id used iby other site; to map with lt''s work_refid during harvest';
+comment on column staging.review.parsed_review_date is 'Parsed date from raw string';
+comment on column staging.review.likes is 'Nb of users liking the review (concept such as likes, green flag)';
 
-
-create or replace view staging.handy_review as
-    select id, work_refid, dup_refid, work_uid, site_logical_name, username, user_uid, rating,  load_audit_id
-    from staging.review order by 1;
-
-
-
--- taken from .../work/####/details (to get correct title) and ok since only 1 ISBN taken here: from <meta property="books.isbn" content="xxxxxxxx">
+create table staging.thingisbn (
+    work_refid bigint,
+    isbn_ori text,
+    isbn13 char(13),
+    isbn10 char(10),
+    loading_dts timestamp
+);
+comment on table staging.thingisbn is 'Data from thingISBN.xml to refresh reference work/isbn data (No PK, as duplicates of <work_id,isbn> exist in source)'
 
 create table staging.work_info (
     work_refid bigint unique,
@@ -110,8 +74,33 @@ create table staging.work_info (
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
+comment on table staging.work_info is 'Staging for reference data harvested from work';
 
-comment on table staging.work_info is 'Staging for reference features harvested from work';
+
+create table staging.load_audit (
+    id serial primary key,
+    batch_job text,
+    step_name text,
+    step_no int,
+    status text,
+    run_dts timestamp,
+    elapse_sec int,
+    rows_impacted int,
+    output text
+);
+comment on table staging.load_audit is 'Metadata to report on running batch_job/steps';
+comment on column staging.load_audit.status is 'Status of step';
+comment on column staging.load_audit.run_dts is 'Timestamp when step run (useful for things like limiting harvest period)';
+comment on column staging.load_audit.output is 'Output produced by a step like error msg when failure or additional info';
+
+
+create or replace view staging.handy_load_audit as
+    select id, batch_job, step_name, status, run_dts, rows_impacted
+    from staging.load_audit order by 1;
+
+create or replace view staging.handy_review as
+    select id, work_refid, dup_refid, work_uid, site_logical_name, username, user_uid, rating,  load_audit_id
+    from staging.review order by 1;
 
 
 create table staging.isbn_lang (
@@ -139,8 +128,9 @@ comment on table staging.work_update is 'Staging for evolving features harvested
 
 ------------------------------------------ Integration layer -------------------------------------------
 --------------------------------------------------------------------------------------------------------
--- Goals:  - 1) Raw sub-layer: untransformed data from source without applying any business rules
---         - 2) Business sub-layer: apply any transformation that will help for presentation layer
+-- Two sub-layers:
+--          - 1) Raw sub-layer: untransformed data from source without applying business rules
+--          - 2) Business sub-layer: apply some transformation to help preparing for presentation layer
 --                    2.1) de-duplication (same_as for work, user, review, etc...)
 --                    2.2) any sort of standardization/harmonization...
 --
@@ -174,7 +164,7 @@ comment on table integration.site_identifier is 'Natural key, hostname, is decou
 comment on column integration.site_identifier.hostname is 'Hostname such as www.amazon.fr, www.amazon.com, www.thelibrary.fr';
 
 create table integration.language (
-    code char(3) primary key,  --MARC code
+    code char(3) primary key,
     code3 char(3) unique,
     code3_term char(3) unique,
     code2 char(2) unique,
@@ -190,7 +180,6 @@ comment on column integration.language.code3 is 'The ISO 639-2 alpha-3 bibliogra
 comment on column integration.language.code3_term is 'The ISO 639-2 alpha-3 terminology code';
 comment on column integration.language.code2 is 'The ISO 639-1 alpha-2 code (subset of alpha-3)';
 
---Batch loaded from ISBNthing source
 create table integration.work (
     refid bigint primary key,
     last_harvest_dts timestamp,
@@ -217,7 +206,6 @@ create table integration.work_info (
     foreign key (work_refid) references integration.work(refid),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
-
 comment on table integration.work_info is 'Attribute data related to a Work (unhistorized Satellite-type, could add history if need be)';
 comment on column integration.work_info.mds_code is 'mds code without dot and truncated to align with mds_text, same as integration.mds(code)';
 comment on column integration.work_info.mds_code_ori is 'The mds original code as found from lt';
@@ -248,7 +236,6 @@ create table integration.isbn_info (
 );
 comment on table integration.isbn_info is 'Attribute data related to ISBN (un-historized Satellite-type, could add history if need be)';
 
--- TODO: change PK to be based on ean only! (will make sure not to load ean associated to more than 1 work)
 create table integration.work_isbn (
     ean bigint primary key,
     work_refid bigint,
@@ -261,6 +248,7 @@ create table integration.work_isbn (
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 comment on table integration.work_isbn is 'Association of work and ISBN (sourced from lt)';
+comment on column integration.work_isbn.ean is 'The ISBN13 code in numerical, defined as PK so one ean only associated to 1 work';
 
 create table integration.author (
     id uuid primary key,
@@ -325,15 +313,16 @@ create table integration.mds (
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
-comment on table integration.mds is 'Melvil decimal system as of lt (ie. "based on classification work whose assignments are not copyrightable")';
+comment on table integration.mds is 'Melvil decimal system as of lt, but has some issues with Not-Set level';
 comment on column integration.mds.code 'Code corrected (original code truncated based on levels found in text)';
+comment on column integration.mds.code 'Code corrected (original code truncated based on levels found in text)';
+
 
 --Still to do...
 --create table integration.lc_subject (
 --    subject text primary key,
 --);
 --comment on table integration.lc_subject is 'Library of congress subjects def';
-
 
 create table integration.tag (
     id uuid primary key,
@@ -368,7 +357,6 @@ create table integration.work_tag (
 comment on table integration.work_tag is 'Tag-Work association identified by work, tag and site.  Site composes key in order to preserve relative frequency for site';
 comment on column integration.work_tag.frequency is 'Frequency indicating the importance of the tag for the associated work on the site';
 
---The User Hub!
 create table integration.user (
     id uuid primary key,
     user_uid text,
@@ -386,8 +374,6 @@ comment on column integration.user.id is 'Primary-key generated by MD5 hashing o
 comment on column integration.user.user_uid is 'Site system-generated id to identify the user if present,(more stable than username), otherwise same as username)';
 comment on column integration.user.username is 'Username or pseudo associated to the user';
 
-
---The no history-preserved Sat! (update simply to the latest value)
 create table integration.user_info (
     user_id uuid primary key,
     full_name text,
@@ -400,6 +386,7 @@ create table integration.user_info (
     foreign key (user_id) references integration.user(id) on delete cascade,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
+comment on table integration.user_info is 'User attributes with no historical-tracking, simply keep latest value';
 
 --The slowly changing Sat!
 create table integration.user_geo (
@@ -417,6 +404,8 @@ create table integration.user_geo (
     foreign key (user_id) references integration.user(id) on delete cascade,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
+comment on table integration.user_geo is 'User geo attributes with historical-tracking, preserving changes in time';
+
 
 --The rapidly changing Sat!
 create table integration.user_perso (
@@ -436,7 +425,7 @@ create table integration.user_perso (
     foreign key (user_id) references integration.user(id) on delete cascade,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
-
+comment on table integration.user_perso is 'User perso attributes with historical-tracking';
 
 
 --Some sites does not restrict users reviewing many times same book
