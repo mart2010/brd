@@ -28,6 +28,8 @@ ITEM_PIPELINES = {
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
 # DOWNLOAD_DELAY = 0.25  # 0.25 = 250 ms
+# be a good citizen with clear identification:
+# 'dataPFranc/1.0 (http://datapfranc.github.io)
 USER_AGENT = 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)'
 
 

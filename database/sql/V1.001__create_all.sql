@@ -145,8 +145,8 @@ create table integration.site (
     status text,
     create_dts timestamp not null
 );
-comment on table integration.site is 'Website with book reviews scraped model as hub for greater flexibility';
-comment on column integration.site.logical_name is 'Name for lookup site_id and defined independently from evolving domain/url';
+comment on table integration.site is 'Website of book reviews';
+comment on column integration.site.logical_name is 'Name used as business key independent of evolving domain/url';
 comment on column integration.site.status is 'Flag used to get status for sites';
 
 create table integration.site_identifier (
@@ -450,9 +450,8 @@ create table integration.review(
     foreign key (site_id) references integration.site(id),
     foreign key (load_audit_id) references staging.load_audit(id)
 );
-comment on table integration.review is 'Review and/or rating done for a Work in a specific language by a user ';
+comment on table integration.review is 'Review and/or rating done for a Work in a specific language by a user, with no PK since most sites do not restrict users from reviewing same book multiple times';
 comment on column integration.review.user_id is 'User identifier derived from MD5 hashing of username, site (ref. integration.derive_userid)';
-
 
 
 -----------------------------------------------------------------------------------------------
@@ -470,7 +469,6 @@ create table integration.work_sameas (
 );
 comment on table integration.work_sameas is 'Different work_refid may exist in lt for same "master" Work';
 comment on column integration.work_sameas.master_refid is 'The "master" work that work_refid refers to';
-
 
 
 -- .. parent-child hierarchical relation
@@ -552,8 +550,6 @@ create table integration.user_sameas (
 comment on table integration.user_sameas as 'Store "same-as" user across sites spotted when multiple reviews have very similar text (exact rules TBD)';
 comment on column integration.user_sameas.user_id as 'All user_id in diff sites recognized as same user';
 comment on column integration.user_sameas.same_user_id as 'Flag to identify same user_id (taken arbitrarily)';
-
-
 
 
 
