@@ -611,7 +611,7 @@ class Babelio(BaseReviewSpider):
             if isbns:
                 self.works_to_harvest[i]['last_harvest_date'] = self.min_harvest_date
                 yield scrapy.FormRequest(self.form_search,
-                                         formdata={'Recherche': isbns[0], 'item_recherche': 'isbn'},
+                                         formdata={'Recherche': str(isbns[0]), 'item_recherche': 'isbn'},
                                          meta={'work_index': i, 'nb_try': 1},
                                          callback=self.parse_search_resp)
             # incremental harvest
@@ -651,7 +651,7 @@ class Babelio(BaseReviewSpider):
             if n_found and n_found.find(u'(0)') != -1:
                 if nb_try < len(isbns):
                     yield scrapy.FormRequest(self.form_search,
-                                             formdata={'Recherche': isbns[nb_try], 'item_recherche': 'isbn'},
+                                             formdata={'Recherche': str(isbns[nb_try]), 'item_recherche': 'isbn'},
                                              meta={'work_index': widx, 'nb_try': nb_try + 1},
                                              callback=self.parse_search_resp)
                 else:
@@ -666,15 +666,27 @@ class Babelio(BaseReviewSpider):
     def parse_reviews(self, response):
         widx = response.meta['work_index']
         item = response.meta['pass_item']
-        # fetch tags from main page
+
         if response.meta.get('main_page'):
+            # it may happen that uid taken from search result is different (request was redirected)
+            if response.meta.get('redirect_urls'):
+                item['work_uid'] = response.url[response.url.index('/livres/')+8:]
+            # fetch tags from main page
             tags_sel = response.xpath('//p[@class="tags"]/a[@rel="tag"]')
             tags_t = []
-            # seems no way to get info on frequency (although tags text have diff size..)
+            tags_n = []
+            # only way to get approx. frequency ia through font-size
             for tag_s in tags_sel:
                 tags_t.append(tag_s.xpath('./text()').extract_first().strip())
+                # "tag_t17 tc0 ..."
+                tag_n_c = tag_s.xpath('./@class').extract_first()
+                tags_n.append(tag_n_c[5:tag_n_c.index(u' ')])
+
             item['tags_t'] = u"__&__".join(tags_t)
+            item['tags_n'] = u";".join(tags_n)
+
             item['tags_lang'] = u'fre'
+
             # request first review page
             yield scrapy.Request((self.url_main + self.param_review) % (item['work_uid'], 1),
                                  meta={'work_index': widx, 'pass_item': item},
@@ -688,6 +700,11 @@ class Babelio(BaseReviewSpider):
                     last_page = 1
                 else:
                     last_page = int(page_row.xpath('./a[last()-1]/text()').extract_first())
+            # used for debugging... could be removed
+            if response.url.find('?pageN=') == -1 or response.url.find('&tri=') == -1:
+                from scrapy.shell import inspect_response
+                inspect_response(response, self)
+
             cur_page = int(response.url[response.url.index('?pageN=') + 7:response.url.index('&tri=')])
             found_older = False
             reviews_sel = response.xpath('//div[@class="post_con"]')
@@ -719,8 +736,12 @@ class Babelio(BaseReviewSpider):
         item['parsed_review_date'] = self.parse_review_date(d)
         # babelio has 0 to 5 stars with no half-star
         star = rev.xpath('.//li[@class="current-rating"]/text()').extract_first()  # u'Livres 4.00/5'
-        item['rating'] = star[star.index(u"Livres ") + 7:star.index(u"/")]
-        item['parsed_rating'] = float(item['rating']) * 2
+        # it seems no star really mean rating = 0
+        if star:
+            item['rating'] = star[star.index(u"Livres ") + 7:star.index(u"/")]
+            item['parsed_rating'] = int(float(item['rating'])) * 2
+        else:
+            item['parsed_rating'] = 0
         item['review_lang'] = u'fre'
         lines = rev.xpath('.//div[@class="text row"]/div/text()').extract()
         item['review'] = u" ".join(lines).strip()

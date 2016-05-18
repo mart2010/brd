@@ -454,6 +454,11 @@ comment on table integration.review is 'Review and/or rating done for a Work in 
 comment on column integration.review.user_id is 'User identifier derived from MD5 hashing of username, site (ref. integration.derive_userid)';
 
 
+create or replace view integration.handy_review as
+    select id, work_refid, user_id, site_id, parsed_rating, review_date, load_audit_id
+    from integration.review;
+
+
 -----------------------------------------------------------------------------------------------
 -------------------------------------- Business Sub-layer -------------------------------------
 -----------------------------------------------------------------------------------------------
