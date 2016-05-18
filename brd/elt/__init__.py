@@ -78,7 +78,7 @@ class DbConnection(object):
     def fetch_all(self, query, params=None, in_trans=False, as_dict=False):
         """
         Execute query, return all records as a list of tuple (or as dictionary)
-        leaving open the transaction if in_trans=True or commit otherwise.
+        leaving open the transaction if in_trans=False or commit otherwise.
         """
         if as_dict:
             cur = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)

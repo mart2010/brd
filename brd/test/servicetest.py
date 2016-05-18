@@ -6,18 +6,19 @@ __author__ = 'mart2010'
 __copyright__ = "Copyright 2016, The BRD Project"
 
 import unittest
-import brd.elt as db
 import brd.service as service
 import datetime
 import brd.config as config
 
+
+# TODO: review this and target an a test DB/schema instead...
 class TestService(unittest.TestCase):
 
 
     def setUp(self):
         self.dbconn = elt.get_connection()
-        self.dbconn.execute_inTransaction("truncate staging.review cascade")
-        self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
+        # self.dbconn.execute_inTransaction("truncate staging.review cascade")
+        # self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
 
 
     def tearDown(self):

@@ -5,10 +5,10 @@ __copyright__ = "Copyright 2016, The BRD Project"
 
 DATABASE = {
     'host': 'localhost',
+    # 'host': '192.168.0.28',
     'database': 'brd',
-    'port': '5432',
-    'user': 'brd',
-    'password' : 'brd'
+    'port': '5432', #  '54355',
+    'user': 'brd'  , 'password': 'brd'
 }
 
 

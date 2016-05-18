@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from brd import elt
 
 __author__ = 'mart2010'
 __copyright__ = "Copyright 2016, The BRD Project"
@@ -18,11 +19,13 @@ class TestPipeline(unittest.TestCase):
 
     def setUp(self):
         self.dbconn = elt.get_connection()
-        self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
+        # change all that .. make sure it's done on a test DB
+        # self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
 
 
     def tearDown(self):
-        self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
+        pass
+        # self.dbconn.execute_inTransaction("truncate staging.load_audit cascade")
 
 
     def test_dump_item_into_flatfile_ok(self):

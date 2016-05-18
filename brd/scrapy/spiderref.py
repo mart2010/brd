@@ -154,7 +154,10 @@ class IsbnLanguage(scrapy.Spider):
     def parse_resp(self, response):
         lang = response.body
         if len(lang) != 3:
-            lang = 'und'
+            if lang == 'unknown':
+                lang = 'und'
+            else:
+                raise scrapy.exceptions.CloseSpider("Spider shutsdown (unexpected response.body: %s)" % lang)
         yield(IsbnLangItem(ean=response.meta['isbn'], lang_code=lang))
 
     def get_dump_filepath(self):

@@ -583,7 +583,7 @@ class LoadIsbnLang(BasePostgresTask):
         return cursor.rowcount
 
 
-# python -m luigi --module brd.taskref BatchLoadIsbnLang --n-isbn 10 --local-scheduler
+# python -m luigi --module brd.taskref BatchLoadIsbnLang --n-isbn 50000 --local-scheduler
 class BatchLoadIsbnLang(luigi.Task):
     """
     Entry point to launch isbn-lang harvest loads

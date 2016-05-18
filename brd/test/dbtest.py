@@ -10,7 +10,7 @@ class Testdb(unittest.TestCase):
 
 
     def setUp(self):
-        self.dbconn = elt.get_connection()
+        self.dbconn = db.get_connection()
         try:
             cr = self.dbconn.execute_inTransaction("create table test(id int, val varchar(20));")
             self.assertEqual(-1, cr, "Create table stmt should have returned -1")
@@ -36,7 +36,7 @@ class Testdb(unittest.TestCase):
         # verify that rollback here has no impact
         self.dbconn.rollback()
 
-        res = self.dbconn.fetch_all_inTransaction("select * from test;")
+        res = self.dbconn.fetch_all("select * from test;", in_trans=True)
         self.assertEquals(psycopg2.extensions.TRANSACTION_STATUS_IDLE,
                           self.dbconn.connection.get_transaction_status(),
                           "Commit expected, leaving no transaction active")
@@ -67,7 +67,7 @@ class Testdb(unittest.TestCase):
     def test_insert_and_fetch_id_ok(self):
         self.dbconn.execute("drop table if exists auto_table;")
         self.dbconn.execute("create table auto_table(id serial, t varchar(10));")
-        ids = self.dbconn.insert_row_get_id("insert into auto_table(t) values('ttt');")
+        ids = db.insert_row_get_id(self.dbconn.connection, "insert into auto_table(t) values('ttt');")
         self.assertEquals(1, ids)
         self.assertTrue(type(ids) == int)
         self.dbconn.execute("drop table auto_table")
@@ -88,6 +88,4 @@ class Testdb(unittest.TestCase):
         one_row = self.dbconn.fetch_one("select id, val from test;")
         self.assertEquals(one_row[0], 1)
         self.assertEquals(one_row[1], '1')
-
-
 
