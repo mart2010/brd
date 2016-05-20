@@ -172,6 +172,22 @@ group by coalesce(usame.same_user_id, u.id), wi.work_refid
 
 
 
+-- Query for review-text similarity:
+-- requires an index on FK work_refid
+-- install as root: create extension pg_trgm;
+
+-- Very Slowww (just the cross-product take 2-3min) (kill after 45min) CPU bound!! need alternative!!!
+-- Must employ solution with 'integration.review_similarto' where I load this incrementally!!!!
+
+select r1.work_refid, r1.id as r1_id, r2.id as r2_id, similarity(r1.review, r2.review)
+from integration.review as r1
+join integration.review as r2 on (r1.work_refid = r2.work_refid
+                                  and r1.review_lang = r2.review_lang
+                                  and r1.id != r2.id)
+where
+r1.work_refid between 2000 and 2500;
+
+
 
 
 
