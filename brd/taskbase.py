@@ -9,11 +9,16 @@ batch_name = "n.a."  # concurrent batch jobs should be launched in separate proc
 
 
 def postgres_target(target_table, update_id):
+    # TODO:  re-implement my own PostgresTarget to do :
+    #  1) avoid exposing password
+    #  2) leverage stating.load_audit as a "marker" table
+    #  3) ??
     return luigi.postgres.PostgresTarget(
             host        =brd.config.DATABASE['host'],
             database    =brd.config.DATABASE['database'],
             user        =brd.config.DATABASE['user'],
             password    =brd.config.DATABASE['password'],
+            port        =brd.config.DATABASE['port'],
             table       =target_table,
             update_id   =update_id)
 
@@ -71,12 +76,28 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
     database = brd.config.DATABASE['database']
     user = brd.config.DATABASE['user']
     password = brd.config.DATABASE['password']
+    port = brd.config.DATABASE['port']
 
     clear_table_before = False
     # default separator
     column_separator = '|'
     # added to manage col headers
     input_has_headers = False
+
+    def output(self):
+        """
+        TODO: signal this Luigi issue
+        Luigi forgot to include port
+        """
+        return luigi.postgres.PostgresTarget(
+            host=self.host,
+            database=self.database,
+            user=self.user,
+            password=self.password,
+            port=self.port,
+            table=self.table,
+            update_id=self.update_id()
+        )
 
     def requires(self):
         raise NotImplementedError
@@ -93,7 +114,8 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
 
     def rows(self):
         """
-        MUST overwrite this as it splits by tab instead of by self.column_seperator!
+        TODO: signal this Luigi issue
+        (luigi splits this by tab instead of by self.column_seperator!)
         """
         with self.input().open('r') as fobj:
             for line in fobj:

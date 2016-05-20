@@ -7,8 +7,9 @@ DATABASE = {
     'host': 'localhost',
     # 'host': '192.168.0.28',
     'database': 'brd',
-    'port': '5432', #  '54355',
-    'user': 'brd'  , 'password': 'brd'
+    'port': '54355',
+    'user': 'brd',
+    'password': 'brd'
 }
 
 
@@ -16,7 +17,6 @@ DATABASE = {
 
 #for now, in french:
 SOURCE_WEBSITES_FR = {
-
     'anobii': 'http://www.anobii.com',   # mostly popular in Italy (has 50M books catalogued)
     'decitre': 'http://www.decitre.fr',
     'amazon': 'http://www.amazon.fr',  # amazon purchased goodreads, but reviews not planned to be integrated..
@@ -33,13 +33,10 @@ SOURCE_WEBSITES_FR = {
 SOURCE_WEBSITES = {
     'goodreads': 'http://www.goodreads.com',  # updated: 50M reviews from 800K (not updated) works
     'librarything': 'http://www.librarything.com',  # 2.7M reviews of 1M works
-    'critiqueslibres': 'http://www.critiqueslibres.com',  # 100K critics  out of 45K livres, (in french only)
-    'babelio': 'http://www.babelio.com' # ?? apparently 500 critiques/jour  (150K/an) !
+    'critiqueslibres': 'http://www.critiqueslibres.com',  # 100K critiques sur 45K livres (french only)
+    'babelio': 'http://www.babelio.com' # ?apparently 500 critiques/jour  (150K/an) !
 }
 
-
-REVIEW_PREFIX = "ReviewOf"
-REVIEW_EXT = ".csv"
 
 SCRAPED_OUTPUT_DIR = "/Users/mart/Temp/reviews"
 # archive NOT under SCRAPED_OUTPUT_DIR as we recursively load review files from there

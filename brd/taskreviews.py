@@ -81,11 +81,20 @@ class BulkLoadReviews(BaseBulkLoadTask):
     harvest_dts = luigi.DateMinuteParameter()
 
     input_has_headers = True
-    clear_table_before = True
+    # truncate would conflict with other site's LoadReviews
+    clear_table_before = False
     table = 'staging.REVIEW'
 
     def requires(self):
         return HarvestReviews(self.site, self.n_work, self.harvest_dts)
+
+    def init_copy(self, connection):
+        """
+        We clean-up previous reviews from harvested from site.
+        Constraint: only one BatchLoadReview on same site can run concurrently
+        """
+        connection.cursor().execute("delete from %s where site_logical_name = '%s';" % (self.table, self.site))
+
 
 # TODO: need to add an update on username on user_ table satellite...
 class LoadUsers(BasePostgresTask):
@@ -130,6 +139,9 @@ class LoadUsers(BasePostgresTask):
 
 
 class LoadReviews(BasePostgresTask):
+    """
+    Warning: cannot be reexecuted on same source (will duplicate all review records)
+    """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
     harvest_dts = luigi.DateMinuteParameter()
@@ -211,7 +223,9 @@ class LoadTag(BasePostgresTask):
                 from ( select unnest(string_to_array(tags_t, '__&__')) as tag
                                 , tags_lang
                        from staging.review
-                       where tags_t IS NOT NULL) as foo
+                       where tags_t IS NOT NULL
+                       and site_logical_name = %(name)s
+                       ) as foo
                 group by tag
             )
             insert into integration.tag(id, tag, tag_upper, ori_site_id, lang_code, create_dts, load_audit_id)
@@ -247,7 +261,9 @@ class LoadWorkTag(BasePostgresTask):
                 from ( select unnest(string_to_array(tags_t, '__&__')) as tag_t
                                 , unnest(string_to_array(tags_n, ';')) as tag_n
                                 , work_refid
-                       from staging.review ) as foo
+                       from staging.review
+                       where tags_t IS NOT NULL
+                       and site_logical_name = %(name)s) as foo
                 group by 1,2,3
             ),
             match_tags as (
@@ -274,8 +290,8 @@ class LoadWorkTag(BasePostgresTask):
 
 class UpdateLtLastHarvest(BasePostgresTask):
     """
-    Updates both work_refid and associated master work_refid (if any), so
-    make sure update work_sameas was processed!
+    For Lt, updates both work_refid and associated master work_refid (if any)
+    to make sure update work_sameas was processed!
     (note: for other site, this gets done in task LoadWorkSiteMapping)
     """
     n_work = luigi.IntParameter()
@@ -313,7 +329,7 @@ class UpdateLtLastHarvest(BasePostgresTask):
 class LoadWorkSiteMapping(BasePostgresTask):
     """
     Required for sites that map Work through reviews harvesting
-    (this also updates last_harvest_dts).
+    TODO: add logic that update the last_harvest_dts when record already exist!!!!!!
     """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()

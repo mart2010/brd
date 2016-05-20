@@ -297,7 +297,7 @@ class TestGrReview(BaseTestReview):
                                                                   work_uid=wuid)}
         resp = spider.parse_reviews(mock_from_file("mockobject/GR_%s_reviews_p2of32.html" % wuid,
                                                    response_type="Html", meta=meta,
-                                                   url=spider.url_review % (wuid, 2)))
+                                                   url=spider.url_review % (wuid, 2, 'newest')))
         #self.assertEqual(spider.current_page, 2)
         i = 0
         for item in resp:
@@ -338,7 +338,7 @@ class TestGrReview(BaseTestReview):
             # the request to next page
             if i == 30:
                 self.assertEqual(type(item), scrapy.http.request.Request)
-                self.assertEqual(item.url, "https://www.goodreads.com/book/show/2776527-traffic?page=3&sort=newest")
+                self.assertEqual(item.url, "https://www.goodreads.com/book/show/2776527-traffic?page=3&sort=oldest")
                 self.assertEqual(item.meta['lastpage_no'], 32)
             i += 1
 
@@ -545,6 +545,8 @@ class TestBOReview(BaseTestReview):
         self.assertEquals(page_rev_req.meta['pass_item']['tags_lang'], u'fre')
         self.assertEquals(page_rev_req.meta['pass_item']['tags_t'],
                           u"adapté au cinéma__&__roman__&__littérature jeunesse__&__jeune adulte__&__littérature pour adolescents__&__jeunesse__&__roman d'amour__&__deuil__&__drame__&__amitié__&__triste__&__adolescence__&__maladie__&__mort__&__espoir__&__cancer__&__humour__&__romance__&__amour__&__littérature américaine")
+        self.assertEquals(page_rev_req.meta['pass_item']['tags_n'], u"15;19;18;15;17;18;20;15;17;17;14;23;25;19;15;24;16;17;27;19")
+
         try:
             res_mainpage.next()
             self.fail("no more request expected")
