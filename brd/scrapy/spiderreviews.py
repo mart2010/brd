@@ -567,7 +567,9 @@ class Goodreads(BaseReviewSpider):
         new_item['user_uid'] = u_link[u_link.index(u'/show/') + 6:]
         # no clear logical rules: finally it seems complete text is at the last span element...
         r_texts = rev.xpath('.//span[starts-with(@id,"reviewTextContainer")]/span[starts-with(@id,"freeText")][last()]//text()').extract()
-        new_item['review'] = u" ".join(r_texts).strip()
+        text_t = u" ".join(r_texts).strip()
+        # issues with \r\n (^M windows line ending) when Bulk-loading postgres
+        new_item['review'] = text_t.replace(u'\r\n', u'\n')
         # for gr, we use automatic lang detection
         new_item['review_lang'] = self.detect_review_lang(new_item['review'])
 
@@ -641,6 +643,8 @@ class Babelio(BaseReviewSpider):
                 logger.info("No reviews found for work-refid=%s in site %s (uid=%s)"
                         % (pass_item['work_refid'], self.name, pass_item['work_uid']))
                 yield pass_item
+            # DATA-ISSUES: may indicate 1-review, when none exist (ex. Ballard-La-Course-au-Paradis/230360)
+            # the impact: try many times to harvest same work as no reviews will be yielded
             else:
                 yield scrapy.Request(self.url_main % uid,
                                      meta={'work_index': widx, 'pass_item': pass_item, 'main_page': True},

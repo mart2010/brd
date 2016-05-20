@@ -48,6 +48,11 @@ comment on column staging.review.work_uid is 'Work id used iby other site; to ma
 comment on column staging.review.parsed_review_date is 'Parsed date from raw string';
 comment on column staging.review.likes is 'Nb of users liking the review (concept such as likes, green flag)';
 
+create or replace view staging.handy_review as
+    select id, work_refid, dup_refid, work_uid, site_logical_name, username, user_uid, rating, parsed_rating, review_date, likes, parsed_likes
+    from staging.review order by 1;
+
+
 create table staging.thingisbn (
     work_refid bigint,
     isbn_ori text,
@@ -97,10 +102,6 @@ comment on column staging.load_audit.output is 'Output produced by a step like e
 create or replace view staging.handy_load_audit as
     select id, batch_job, step_name, status, run_dts, rows_impacted
     from staging.load_audit order by 1;
-
-create or replace view staging.handy_review as
-    select id, work_refid, dup_refid, work_uid, site_logical_name, username, user_uid, rating,  load_audit_id
-    from staging.review order by 1;
 
 
 create table staging.isbn_lang (
