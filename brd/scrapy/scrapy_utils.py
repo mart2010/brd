@@ -22,6 +22,25 @@ mois = {
 }
 
 
+regex_digit = re.compile(r"\(\d+\)")
+
+def digit_in_parenthesis(input):
+    """
+    >>> digit_in_parenthesis(u' (1) &nbsp;')
+    u'1'
+    >>> digit_in_parenthesis(u'(14324)p;')
+    u'14324'
+    >>> digit_in_parenthesis(u'Portuguese (Portugal)') is None
+    True
+    """
+    with_p = regex_digit.search(input)
+    if with_p:
+        t = with_p.group()
+        return t.replace(u'(', u'').replace(u')', u'')
+    else:
+        return None
+
+
 regex_space = re.compile(r"\s+")
 
 def convert_book_title_to_sform(title):

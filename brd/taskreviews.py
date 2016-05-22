@@ -176,8 +176,8 @@ class LoadReviews(BasePostgresTask):
 
 class LoadLtWorkSameAs(BasePostgresTask):
     """
-    Used with lt.  This should not happen since this is also done during harvest of work-info.
-    However we leave as it could still happen that during work-info harvest duplicates still existed..
+    Used with lt.  This should rarely happen since this is also treated during harvest of work-info.
+    (could happen if that during work-info harvest duplicate did not still)
     """
     n_work = luigi.IntParameter()
     harvest_dts = luigi.DateMinuteParameter()

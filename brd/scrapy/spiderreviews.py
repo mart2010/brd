@@ -148,16 +148,18 @@ class LibraryThing(BaseReviewSpider):
         wid = response.url[response.url.index('/work/') + 6:]
         dup_id = None
         # check for duplicate (in case it was not picked up during ref harvest)
-        if wid != requested_wid:
+        if int(wid) != requested_wid:
             dup_id = requested_wid
 
         tags_t = []
         tags_n = []
         for tag_sel in response.xpath('//div[@class="tags"]/span'):
-            tags_t.append(tag_sel.xpath('.//a/text()').extract_first())
-            # returns ' (1)'
-            np = tag_sel.xpath('./span[@class="count"]/text()').extract_first()
-            tags_n.append(np[np.index(u'(') + 1:np.index(u')')])
+            one_t = tag_sel.xpath('.//a/text()').extract_first()
+            if one_t:
+                tags_t.append(one_t)
+                # returns ' (1)'
+                np = tag_sel.xpath('./span[@class="count"]/text()').extract_first()
+                tags_n.append(np[np.index(u'(') + 1:np.index(u')')])
 
         item = self.build_review_item(work_refid=wid, dup_refid=dup_id)
         if len(tags_t) > 0:
@@ -238,17 +240,21 @@ class LibraryThing(BaseReviewSpider):
         list_l_n = response.xpath('//div[@class="languagepick"]//text()').extract()
         if len(list_l_n) > 0:
             for i in xrange(len(list_l_n)):
-                if list_l_n[i].find(u'(') != -1:
+                # first we have language then number
+                nb = scrapy_utils.digit_in_parenthesis(list_l_n[i])
+                if nb:
                     lang = list_l_n[i - 1]
                     if lang != u'All languages':
                         marc_code = brd.get_marc_code(lang, capital=False)
-                        nb = list_l_n[i]
-                        lang_codes_nb[marc_code] = int(nb[nb.index(u'(') + 1:nb.index(u')')])
+                        lang_codes_nb[marc_code] = int(nb)
         else:
             show_t = response.xpath('//div[@id="mainreviews_reviewnav"]/text()').extract_first()
             # 'Showing 4 of 4'  (or 'Showing 1-5 of 9') when there are reviews
             if show_t:
-                nb = int(show_t[show_t.index(u'of') + 2:show_t.index(u'(')])
+                if u'(' in show_t:
+                    nb = int(show_t[show_t.index(u'of') + 2:show_t.index(u'(')])
+                else:
+                    nb = int(show_t[show_t.index(u'of') + 2:])
             # otherwise assume no review (could be 1 or 2.. to harvest later)
             else:
                 nb = 0
