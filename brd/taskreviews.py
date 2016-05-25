@@ -140,7 +140,7 @@ class LoadUsers(BasePostgresTask):
 
 class LoadReviews(BasePostgresTask):
     """
-    Warning: cannot be reexecuted on same source (will duplicate all review records)
+    Warning: cannot be re-executed on same source (will duplicate all review records)
     """
     site = luigi.Parameter()
     n_work = luigi.IntParameter()
@@ -148,7 +148,11 @@ class LoadReviews(BasePostgresTask):
     table = 'integration.REVIEW'
 
     def requires(self):
-        return LoadUsers(self.site, self.n_work, self.harvest_dts)
+        res = [LoadUsers(self.site, self.n_work, self.harvest_dts)]
+        # may have hervested duplicate (redirected) work
+        if self.site == 'librarything':
+            res.append(LoadLtWorkMissing(self.n_work, self.harvest_dts))
+        return res
 
     def exec_sql(self, cursor, audit_id):
         sql = \
@@ -174,6 +178,31 @@ class LoadReviews(BasePostgresTask):
         cursor.execute(sql, {'audit_id': audit_id, 'site': self.site})
         return cursor.rowcount
 
+
+class LoadLtWorkMissing(BasePostgresTask):
+    """
+    Same as TaskRef.LoadWorkMissing but happening while harvesting reviews from lt
+    """
+    n_work = luigi.IntParameter()
+    harvest_dts = luigi.DateMinuteParameter()
+    table = 'integration.WORK'
+
+    def requires(self):
+        return BulkLoadReviews('librarything', self.n_work, self.harvest_dts)
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            insert into integration.work(refid, create_dts, last_seen_date, load_audit_id)
+            select work_refid, now(), now(), %(audit_id)s
+            from staging.review s
+            left join integration.work w on (s.work_refid = w.refid)
+            where w.refid IS NULL;
+            """
+        cursor.execute(sql, {'audit_id': audit_id})
+        return cursor.rowcount
+
+
 class LoadLtWorkSameAs(BasePostgresTask):
     """
     Used with lt.  This should rarely happen since this is also treated during harvest of work-info.
@@ -184,7 +213,7 @@ class LoadLtWorkSameAs(BasePostgresTask):
     table = 'integration.WORK_SAMEAS'
 
     def requires(self):
-        return BulkLoadReviews('librarything', self.n_work, self.harvest_dts)
+        return LoadLtWorkMissing(self.n_work, self.harvest_dts)
 
     def exec_sql(self, cursor, audit_id):
         sql = \
@@ -199,6 +228,7 @@ class LoadLtWorkSameAs(BasePostgresTask):
         c = cursor.rowcount
         logger.warning("Found %s duplicates during lt harvest review (audit_id=%s)" %(str(c), str(audit_id)))
         return c
+
 
 class LoadTag(BasePostgresTask):
     """
@@ -249,7 +279,10 @@ class LoadWorkTag(BasePostgresTask):
     table = 'integration.WORK_TAG'
 
     def requires(self):
-        return [LoadTag(self.site, self.n_work, self.harvest_dts)]
+        reqs = [LoadTag(self.site, self.n_work, self.harvest_dts)]
+        if self.site == 'librarything':
+            reqs.append((LoadLtWorkMissing(self.n_work, self.harvest_dts)))
+        return reqs
 
     def exec_sql(self, cursor, audit_id):
         sql = \

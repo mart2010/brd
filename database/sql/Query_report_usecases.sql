@@ -176,19 +176,51 @@ group by coalesce(usame.same_user_id, u.id), wi.work_refid
 -- requires an index on FK work_refid
 -- install as root: create extension pg_trgm;
 
--- Very Slowww (just the cross-product take 2-3min) (kill after 45min) CPU bound!! need alternative!!!
+-- Very Slowww (just the cross-join takes 2-3min) (kill after 45min) CPU bound!! need alternative!!!
 -- Must employ solution with 'integration.review_similarto' where I load this incrementally!!!!
+--Many issues with that logic:
+-- 1. Cross-product not perf and similariyt re-calculated each time (need to build index and use gist.. see below)
+-- 2. does unneeded comparison nX(n-1)  will do r2233-r3232 and its opposite (should do combination irrespective of ordering.. n choose m ..binomial stuff)
+-- 3. only based on trigram comparison, could quickly eliminate couple using simpler calculation (ex. length of text..)
+select r1.work_refid, r1.id as r1_id, r2.id as r2_id, similarity(r1.review, r2.review)
+from integration.review as r1
+join integration.review as r2 on (r1.work_refid = r2.work_refid
+                                  and r1.review_lang = r2.review_lang
+                                  and r1.site_id != r2.site_id
+                                  and r1.id != r2.id)
+where
+r1.work_refid between 2000 and 2500;
+
+--To avoid having to calculate similarity across each review text, must add an index:
+-- CREATE INDEX reviewt_gist ON integration.review USING gist(review gist_trgm_ops);
+-- and do:
+--
+select set_limit(0.8);
 
 select r1.work_refid, r1.id as r1_id, r2.id as r2_id, similarity(r1.review, r2.review)
 from integration.review as r1
 join integration.review as r2 on (r1.work_refid = r2.work_refid
                                   and r1.review_lang = r2.review_lang
+                                  and r1.site_id != r2.site_id
                                   and r1.id != r2.id)
 where
-r1.work_refid between 2000 and 2500;
+r1.review % r2.review
+-- rules simpler to calculate
+and char_len(r1.review)
 
 
 
+select * from
+(select r1.work_refid, r1.id as r1_id, r2.id as r2_id, r1.review as r1_review, r2.review as r2_review
+from integration.review as r1
+join integration.review as r2 on (r1.work_refid = r2.work_refid
+                                  and r1.review_lang = r2.review_lang
+                                  and r1.site_id != r2.site_id
+                                  and r1.id != r2.id
+                                  and char_length(r1.review) between char_length(r2.review) -10 and char_length(r2.review) + 10)
+where r1.work_refid between 2000 and 2500
+) as foo
+;
 
 
 

@@ -57,12 +57,12 @@ class TestLtReview(BaseTestReview):
         spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         meta = {'work_index': 0}
         item_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_norev.html" % wids[0],
-                                                        url=spider.url_mainpage % "master",
+                                                        url=spider.url_mainpage % "100",
                                                         response_type="Html",
                                                         meta=meta))
         item = item_gen.next()
         self.assertEqual(item['site_logical_name'], 'librarything')
-        self.assertEqual(item['work_refid'], "master")
+        self.assertEqual(item['work_refid'], "100")
         self.assertEqual(item['dup_refid'], wids[0])
         self.assertEqual(item['tags_n'], u'1;1;1;1;1;1;1;1')
         self.assertEqual(item['tags_t'],
@@ -74,43 +74,54 @@ class TestLtReview(BaseTestReview):
         except StopIteration:
             pass
 
-    # although there is one review, we skip it as no information on may is available
     def test_mainpage_onereview_nolang(self):
         wids = ['5266585']
         spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         meta = {'work_index': 0}
-        item_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_onerev_nolang.html" % wids[0],
-                                                        url=spider.url_mainpage % "master",
+        req_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_onerev_nolang.html" % wids[0],
+                                                        url=spider.url_mainpage % wids[0],
                                                         response_type="Html",
                                                         meta=meta))
-        item = item_gen.next()
-        self.assertEqual(item['tags_n'], u'1;2;2;1;1;2;1;2;1;1;1;7;1;2;1;1;1;4;1;4;1;3;1;1;4;1;1;7;1;1')
-        self.assertEqual(item['tags_t'],
-            u'2008__&__21st century__&___global_reads__&__AF__&__BTBA longlist 2012__&__Canada__&__Canadian__&__Canadian literature__&__contemporary literature__&__diaspora__&__ethnic identity__&__fiction__&__French literature__&__Haiti__&__Haitian/Canadian/Japanese__&__home__&__importjan__&__Japan__&__Japan - Novel__&__littérature québécoise__&__my library__&__novel__&__postmodern__&__Q4 12__&__Quebec__&__stream of consciousness__&__to-buy__&__to-read__&__world fiction__&__writing')
+        form_req = req_gen.next()
+        self.assertEqual(spider.works_to_harvest[0]['last_harvest_date'], spider.min_harvest_date)
+        self.assertEqual(form_req.meta['work_index'], 0)
+        self.assertEqual(form_req.meta['passed_item']['tags_n'], u'1;2;2;1;1;2;1;2;1;1;1;7;1;2;1;1;1;4;1;4;1;3;1;1;4;1;1;7;1;1')
+        self.assertEqual(form_req.meta['passed_item']['tags_t'], u'2008__&__21st century__&___global_reads__&__AF__&__BTBA longlist 2012__&__Canada__&__Canadian__&__Canadian literature__&__contemporary literature__&__diaspora__&__ethnic identity__&__fiction__&__French literature__&__Haiti__&__Haitian/Canadian/Japanese__&__home__&__importjan__&__Japan__&__Japan - Novel__&__littérature québécoise__&__my library__&__novel__&__postmodern__&__Q4 12__&__Quebec__&__stream of consciousness__&__to-buy__&__to-read__&__world fiction__&__writing')
+        self.assertEqual(form_req.meta['passed_item']['tags_lang'], u'eng')
+        self.assertEqual(form_req.meta['passed_item']['work_refid'], wids[0])
+        self.assertIsNone(form_req.meta['passed_item'].get('review_lang'))
+        self.assertIsNone(form_req.meta['passed_item'].get('dup_refid'))
 
+        form_body = form_req.body
+        self.assertTrue(form_body.find('workid=%s' %wids[0]) != -1)
+        self.assertTrue(form_body.find('sort=0') != -1)
+        self.assertTrue(form_body.find('languagePick=all') != -1)
+        self.assertTrue(form_body.find('showCount=21') != -1)
+        try:
+            req_gen.next()
+            self.fail("no more request expected")
+        except StopIteration:
+            pass
 
     def test_mainpage_revs_nolang(self):
         wids = ['413508']
         spider = self.mock_spider(spiderreviews.LibraryThing, wids)
         meta = {'work_index': 0}
-
         req_gen = spider.parse_mainpage(mock_from_file("mockobject/LTWorkmain_%s_revs_nolang.html" % wids[0],
                                                        url=spider.url_mainpage % wids[0],
                                                        response_type="Html",
                                                        meta=meta))
         form_req = req_gen.next()
         self.assertEqual(spider.works_to_harvest[0]['last_harvest_date'], spider.min_harvest_date)
-
         self.assertEqual(form_req.meta['work_index'], 0)
 
-        form_body = form_req.body
-        self.assertTrue(form_body.find('workid=413508') != -1)
-        self.assertTrue(form_body.find('sort=0') != -1)
-        self.assertTrue(form_body.find('languagePick=all') != -1)
-        self.assertTrue(form_body.find('showCount=9') != -1)
+        self.assertTrue(form_req.body.find('workid=413508') != -1)
+        self.assertTrue(form_req.body.find('sort=0') != -1)
+        self.assertTrue(form_req.body.find('languagePick=all') != -1)
+        self.assertTrue(form_req.body.find('showCount=29') != -1)
 
         passed_item = form_req.meta['passed_item']
-        self.assertEqual(passed_item['review_lang'], u'und')
+        self.assertIsNone(passed_item.get('review_lang'))
         self.assertEqual(passed_item['work_refid'], wids[0])
         self.assertIsNone(passed_item.get('dup_refid'))
         self.assertIsNone(passed_item.get('tags_t'))
@@ -130,45 +141,16 @@ class TestLtReview(BaseTestReview):
                                                        url=spider.url_mainpage % wids[0],
                                                        response_type="Html",
                                                        meta=meta))
-        nb_req = 0
-        for form_req in req_gen:
-            nb_req += 1
-            form_body = form_req.body
-            self.assertTrue(form_body.find('workid=2371329') != -1)
-            passed_item = form_req.meta['passed_item']
-            self.assertIsNone(passed_item.get('tags_t'))
-            self.assertIsNone(passed_item.get('tags_n'))
+        form_req = req_gen.next()
+        self.assertTrue(form_req.body.find('workid=2371329') != -1)
+        self.assertTrue(form_req.body.find('languagePick=all') != -1)
+        self.assertTrue(form_req.body.find('showCount=77') != -1)
 
-            the_lang = passed_item.get('review_lang')
-            self.assertTrue(the_lang in (u'eng', u'fre', u'ger', u'dut', u'spa', u'cat', u'fin', u'rus', u'ita'))
-            if the_lang == u'eng':
-                self.assertTrue(form_body.find('languagePick=eng') != -1)
-                self.assertTrue(form_body.find('showCount=38') != -1)
-            elif the_lang == u'fre':
-                self.assertTrue(form_body.find('languagePick=fre') != -1)
-                self.assertTrue(form_body.find('showCount=5') != -1)
-            elif the_lang == u'ger':
-                self.assertTrue(form_body.find('languagePick=ger') != -1)
-                self.assertTrue(form_body.find('showCount=1') != -1)
-            elif the_lang == u'dut':
-                self.assertTrue(form_body.find('languagePick=dut') != -1)
-                self.assertTrue(form_body.find('showCount=4') != -1)
-            elif the_lang == u'spa':
-                self.assertTrue(form_body.find('languagePick=spa') != -1)
-                self.assertTrue(form_body.find('showCount=4') != -1)
-            elif the_lang == u'cat':
-                self.assertTrue(form_body.find('languagePick=cat') != -1)
-                self.assertTrue(form_body.find('showCount=2') != -1)
-            elif the_lang == u'fin':
-                self.assertTrue(form_body.find('languagePick=fin') != -1)
-                self.assertTrue(form_body.find('showCount=1') != -1)
-            elif the_lang == u'rus':
-                self.assertTrue(form_body.find('languagePick=rus') != -1)
-                self.assertTrue(form_body.find('showCount=1') != -1)
-            elif the_lang == u'ita':
-                self.assertTrue(form_body.find('languagePick=ita') != -1)
-                self.assertTrue(form_body.find('showCount=1') != -1)
-        self.assertEqual(nb_req, 9)
+        passed_item = form_req.meta['passed_item']
+        self.assertIsNone(passed_item.get('tags_t'))
+        self.assertIsNone(passed_item.get('tags_n'))
+        self.assertIsNone(passed_item.get('review_lang'))
+
 
     def test_parse_reviews(self):
         wid = ['2371329']
@@ -204,7 +186,6 @@ class TestLtReview(BaseTestReview):
                 self.assertIsNone(item.get('parsed_likes'))
             # language is detected automatically
             self.assertEqual(item['review_lang'], u'fre')
-
 
         all_users = u"yermat==soniaandree==grimm==briconcella==Cecilturtle"
         self.assertEqual(all_users, u"==".join(usernames))

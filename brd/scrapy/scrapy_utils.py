@@ -32,6 +32,8 @@ def digit_in_parenthesis(input):
     u'14324'
     >>> digit_in_parenthesis(u'Portuguese (Portugal)') is None
     True
+    >>> digit_in_parenthesis(u'12') is None
+    True
     """
     with_p = regex_digit.search(input)
     if with_p:

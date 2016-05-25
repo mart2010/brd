@@ -456,7 +456,7 @@ comment on column integration.review.user_id is 'User identifier derived from MD
 
 
 create or replace view integration.handy_review as
-    select id, work_refid, user_id, site_id, parsed_rating, review_date, load_audit_id
+    select id, work_refid, user_id, site_id, review_lang, parsed_rating, review_date, load_audit_id
     from integration.review;
 
 

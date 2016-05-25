@@ -113,8 +113,9 @@ class LibraryThing(BaseReviewSpider):
     request a small nb of newest reviews (ex. 20 per lang found) until reviews
     are older than last_harvest_date
 
-    Note: it fetches # reviews based on nb review on Site vs DB AND add a buffer as user can
-    remove reviews, and we may miss some otherwise!
+    Used to fetch per language, but of DATA-ISSUES the proper language is not 100% right (ex. work-id=11883),
+    so now fetch 'All languages' and detect language manually.
+
     """
     name = 'librarything'
     allowed_domains = ['www.librarything.com']
@@ -127,7 +128,7 @@ class LibraryThing(BaseReviewSpider):
     url_formRequest = 'https://www.librarything.com/ajax_profilereviews.php'
     form_static = {'offset': '0', 'type': '3', 'container': 'wp_reviews', 'sort': '0'}
     # 'offset': 25 (i.e. skip first 25.. showing 26 to 50), 'sort': '0'  (0=desc, 3=asc)
-    # to set dynamically: 'showCount':25, 'languagePick':'fre', 'workid': '2371329'
+    # to set dynamically: 'showCount':25, 'languagePick':'fre' ('all' for all languages), 'workid': '2371329'
     # 'showCount': 25 (i.e. show 25 reviews, show all is set to 10'000 in lt)
     # other formData not mandatory:  bookid: , optionalTitle:, uniqueID: , mode: profile
     ##########################
@@ -138,17 +139,12 @@ class LibraryThing(BaseReviewSpider):
             yield scrapy.Request(self.url_mainpage % wid, callback=self.parse_mainpage, meta={'work_index': i})
 
     def parse_mainpage(self, response):
-        def prepare_form(workid, langpick, n_to_fetch):
-            if langpick == u'und':
-                langpick = u'all'
-            return dict(self.form_static, workid=workid, languagePick=langpick, showCount=str(n_to_fetch))
-
         work_index = response.meta['work_index']
         requested_wid = self.works_to_harvest[work_index]['work_refid']
         wid = response.url[response.url.index('/work/') + 6:]
         dup_id = None
         # check for duplicate (in case it was not picked up during ref harvest)
-        if int(wid) != requested_wid:
+        if int(wid) != int(requested_wid):
             dup_id = requested_wid
 
         tags_t = []
@@ -159,7 +155,7 @@ class LibraryThing(BaseReviewSpider):
                 tags_t.append(one_t)
                 # returns ' (1)'
                 np = tag_sel.xpath('./span[@class="count"]/text()').extract_first()
-                tags_n.append(np[np.index(u'(') + 1:np.index(u')')])
+                tags_n.append(scrapy_utils.digit_in_parenthesis(np))
 
         item = self.build_review_item(work_refid=wid, dup_refid=dup_id)
         if len(tags_t) > 0:
@@ -167,27 +163,28 @@ class LibraryThing(BaseReviewSpider):
             item['tags_n'] = u";".join(tags_n)
             # tag in eng (lt translates them, except for intl sites like lt.de...)
             item['tags_lang'] = u'eng'
-        nb_page_site = self.scrape_langs_nb(response)
-        # no review
-        if len(nb_page_site) == 0 or nb_page_site.get(u'und') == 0:
-            logger.info("No reviews found for work-refid= %s" % wid)
-            yield item
-        else:
+
+        nb_text = response.xpath('//tr[@class="wslcontent"]/td/a[contains(@href,"/reviews")]/text()').extract_first()
+        if nb_text:
             last_harvest_date = self.works_to_harvest[work_index].get('last_harvest_date')
             # initial harvest
             if last_harvest_date is None:
                 self.works_to_harvest[work_index]['last_harvest_date'] = self.min_harvest_date
-                for lang_code in nb_page_site:
-                    item['review_lang'] = lang_code
-                    yield scrapy.FormRequest(self.url_formRequest,
-                                             formdata=prepare_form(wid, lang_code, nb_page_site[lang_code]),
-                                             meta={'work_index': work_index, 'passed_item': item},
-                                             callback=self.parse_reviews)
+                # top-level #OfReviews is sometimes smaller
+                to_fetch = int(nb_text) + 20
+                yield scrapy.FormRequest(self.url_formRequest,
+                                         formdata=dict(self.form_static, workid=wid, languagePick='all', showCount=str(to_fetch)),
+                                         meta={'work_index': work_index, 'passed_item': item},
+                                         callback=self.parse_reviews)
             else:
                 raise NotImplementedError('incremental harvest not implemented')
+        else:
+            logger.info("No reviews found for work-refid= %s" % wid)
+            yield item
 
-    # keep initial logic as-is, then adapt this callback so that when it is incremental, should call back itself
-    # by triggering new FormRequest with offset/page as long as reviews are newer than last_harvest_date
+
+    # For incremental: adapt this callback so it calls back itself by triggering FormRequest
+    # with offset/page as long as there are reviews newer than last_harvest_date
     def parse_reviews(self, response):
         widx = response.meta['work_index']
         last_harvest_date = self.works_to_harvest[widx]['last_harvest_date']
@@ -202,7 +199,9 @@ class LibraryThing(BaseReviewSpider):
         new_item = dict(passed_item)
         sel1 = rev_sel.xpath('./div[@class="commentText"]')
         all_text = sel1.xpath('.//text()').extract()
-        new_item['review'] = u' '.join(all_text).strip()
+        review_t = u' '.join(all_text).strip()
+        new_item['review'] = review_t.replace(u' (   )', u'')
+
         # http://pics..../ss6.gif
         r = sel1.xpath('./span[@class="rating"]/img/@src').extract_first()
         if r:
@@ -225,42 +224,9 @@ class LibraryThing(BaseReviewSpider):
                 new_item['parsed_likes'] = int(new_item['likes'])
             except ValueError:
                 pass
-        # in case the review lang was not determined previously, detect automatically
-        if new_item['review_lang'] == u'und':
-            new_item['review_lang'] = self.detect_review_lang(new_item['review'])
+        # now always detect language manually
+        new_item['review_lang'] = self.detect_review_lang(new_item['review'])
         return new_item
-
-    def scrape_langs_nb(self, response):
-        """Extract language/nb of reviews when <bar language> is found
-         otherwise use lang= u'und' as a flag to fetch all lang
-        :return when lang-bar : {u'eng':  34, u'fre': 12, .. }
-                otherwise     : {u'und': 5}
-        """
-        lang_codes_nb = {}
-        list_l_n = response.xpath('//div[@class="languagepick"]//text()').extract()
-        if len(list_l_n) > 0:
-            for i in xrange(len(list_l_n)):
-                # first we have language then number
-                nb = scrapy_utils.digit_in_parenthesis(list_l_n[i])
-                if nb:
-                    lang = list_l_n[i - 1]
-                    if lang != u'All languages':
-                        marc_code = brd.get_marc_code(lang, capital=False)
-                        lang_codes_nb[marc_code] = int(nb)
-        else:
-            show_t = response.xpath('//div[@id="mainreviews_reviewnav"]/text()').extract_first()
-            # 'Showing 4 of 4'  (or 'Showing 1-5 of 9') when there are reviews
-            if show_t:
-                if u'(' in show_t:
-                    nb = int(show_t[show_t.index(u'of') + 2:show_t.index(u'(')])
-                else:
-                    nb = int(show_t[show_t.index(u'of') + 2:])
-            # otherwise assume no review (could be 1 or 2.. to harvest later)
-            else:
-                nb = 0
-                logger.warning("Page '%s' has no indication on nb of reviews" % response.url)
-            lang_codes_nb[u'und'] = nb
-        return lang_codes_nb
 
     def parse_rating(self, rating):
         parsed_rating = None
@@ -598,7 +564,7 @@ class Goodreads(BaseReviewSpider):
 class Babelio(BaseReviewSpider):
     """
     Babelio has no global list to easily crawl from.  Best approach is to
-    search reviews based on ISBNs lie goodreads.
+    search reviews based on ISBNs like goodreads.
     """
     name = 'babelio'
     allowed_domains = ['www.babelio.com']
