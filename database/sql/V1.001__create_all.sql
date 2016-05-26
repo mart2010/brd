@@ -529,9 +529,76 @@ create table integration.review_similarto (
 );
 
 --could be convenient for downstream to store all pair-wise of similar review ??
-comment on table integration.review_similarto is 'To track down reviews with similarity';
-comment on column integration.review_similarto.rev_id is 'Review-id constraint that it is larger than other_rev_id (avoid dup pairwise comparison)'
-comment on column integration.review_similarto.other_rev_id is 'The other similar review-id';
+comment on table integration.review_similarto is 'To track down reviews with some similarity threshold';
+comment on column integration.review_similarto.rev_id is 'Review-id (under constraint: larger than other_rev_id to avoid dup pairwise comparison)';
+comment on column integration.review_similarto.other_rev_id is 'The other similar review-id (with smaller id)';
+
+------------------------------ work in progress -----------------------------
+
+
+create table integration.review_similarto_process (
+    work_refid bigint not null,
+    review_id bigint primary key,
+    text_lenght int not null,
+    review_lang char(3),
+    similarto_review_id bigint,
+    similarity float,
+    date_processed timestamp,
+    primary key (work_refid, review_id),
+    unique constraint (review_id, similarto_review_id)
+);
+
+
+-- sql load table (business rules: text must be of certain size and valid language)
+insert into integration.review_similarto_process(work_refid, review_id, text_length, review_lang)
+select work_refid, id, char_length(review), review_lang
+from integration.review
+where work_refid between %(wid_min)s and %(wid_max)s
+and char_length(review) >= 50
+and review_lang not in ('--','und')
+order by work_refid, id;
+
+
+--temporary table for text analysis where other_rev_id's id smaller than rev_id
+-- used to manage volumetry (bokk having over 1000 reviews generate near 1M rows comparison (if length would be equal)!!
+-- and they have similar text length (+/- x%)
+create table rev_process_wx_to_wy as
+(select work_refid, rev.review_id, review,
+from integration.review_similarto_process rev
+join integration.review_similar_to smaller
+            on (rev.work_refid = smaller.work_refid
+                and rev.review_lang = smaller.review_lang
+                and rev.review_id > smaller.review_id
+                and rev.text_lenght between smaller.text_lenght - round(smaller.text_lenght * 0.08) and
+                                            smaller.text_lenght + round(smaller.text_lenght * 0.08)
+                );
+where
+rev.work_refid betweem x and y
+and smaller.work_refid betweem x and y
+)
+;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------------------------------------------------------
+
+
+
 
 
 -- to

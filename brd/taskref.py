@@ -499,9 +499,11 @@ class FetchIsbnList(luigi.Task):
             """
             select w.ean::text
             from integration.work_isbn w
+            join integration.work_info wi on (w.work_refid = wi.work_refid)
             left join integration.isbn_info i on (w.ean = i.ean)
             where i.lang_code IS NULL
-            order by w.work_refid
+            order by wi.popularity
+            --order by w.work_refid
             limit %(nb)s
             """
         conn = elt.get_ro_connection()

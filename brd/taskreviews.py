@@ -221,8 +221,12 @@ class LoadLtWorkSameAs(BasePostgresTask):
             insert into integration.work_sameas(work_refid, master_refid, create_dts, load_audit_id)
             select distinct dup_refid, work_refid, now(), %(audit_id)s
             from staging.review r
-            where site_logical_name = 'librarything'
-            and dup_refid is not null;
+            where r.site_logical_name = 'librarything'
+            and r.dup_refid is not null
+            and not exists (select work_refid
+                            from integration.work_sameas w
+                            where w.work_refid = r.dup_refid
+                            and w.master_refid = r.work_refid);
             """
         cursor.execute(sql, {'audit_id': audit_id})
         c = cursor.rowcount

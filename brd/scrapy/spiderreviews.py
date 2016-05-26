@@ -164,14 +164,14 @@ class LibraryThing(BaseReviewSpider):
             # tag in eng (lt translates them, except for intl sites like lt.de...)
             item['tags_lang'] = u'eng'
 
-        nb_text = response.xpath('//tr[@class="wslcontent"]/td/a[contains(@href,"/reviews")]/text()').extract_first()
-        if nb_text:
+        nrev_text = response.xpath('//tr[@class="wslcontent"]/td/a[contains(@href,"/reviews")]/text()').extract_first()
+        if nrev_text:
             last_harvest_date = self.works_to_harvest[work_index].get('last_harvest_date')
             # initial harvest
             if last_harvest_date is None:
                 self.works_to_harvest[work_index]['last_harvest_date'] = self.min_harvest_date
                 # top-level #OfReviews is sometimes smaller
-                to_fetch = int(nb_text) + 20
+                to_fetch = int(nrev_text) + 20
                 yield scrapy.FormRequest(self.url_formRequest,
                                          formdata=dict(self.form_static, workid=wid, languagePick='all', showCount=str(to_fetch)),
                                          meta={'work_index': work_index, 'passed_item': item},

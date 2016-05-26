@@ -26,7 +26,7 @@ ITEM_PIPELINES = {
 
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay and autothrottle settings
-DOWNLOAD_DELAY = 0.1  # 0.25 = 250 ms
+DOWNLOAD_DELAY = 0.5  # 0.25 = 250 ms
 # be a good citizen with clear identification:
 USER_AGENT = 'dataPFranc/1.0 (http://datapfranc.github.io)'
 # USER_AGENT = 'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)'
