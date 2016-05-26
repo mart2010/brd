@@ -186,8 +186,7 @@ select r1.work_refid, r1.id as r1_id, r2.id as r2_id, similarity(r1.review, r2.r
 from integration.review as r1
 join integration.review as r2 on (r1.work_refid = r2.work_refid
                                   and r1.review_lang = r2.review_lang
-                                  and r1.site_id != r2.site_id
-                                  and r1.id != r2.id)
+                                  and r1.id > r2.id)
 where
 r1.work_refid between 2000 and 2500;
 

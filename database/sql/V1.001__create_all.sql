@@ -536,24 +536,24 @@ comment on column integration.review_similarto.other_rev_id is 'The other simila
 ------------------------------ work in progress -----------------------------
 
 
-create table integration.review_similarto_process (
+create table integration.rev_similarto_process (
     work_refid bigint not null,
-    review_id bigint primary key,
-    text_lenght int not null,
+    review_id bigint not null,
+    text_length int not null,
     review_lang char(3),
     similarto_review_id bigint,
     similarity float,
+    site_id int not null,
     date_processed timestamp,
-    primary key (work_refid, review_id),
-    unique constraint (review_id, similarto_review_id)
+    primary key (work_refid, review_id)
 );
 
 
 -- sql load table (business rules: text must be of certain size and valid language)
-insert into integration.review_similarto_process(work_refid, review_id, text_length, review_lang)
-select work_refid, id, char_length(review), review_lang
+insert into integration.rev_similarto_process(work_refid, review_id, text_length, review_lang, site_id)
+select work_refid, id, char_length(review), review_lang, review, site_id
 from integration.review
-where work_refid between %(wid_min)s and %(wid_max)s
+where work_refid between  1000 and 1500 -- %(wid_min)s and %(wid_max)s
 and char_length(review) >= 50
 and review_lang not in ('--','und')
 order by work_refid, id;
@@ -562,21 +562,28 @@ order by work_refid, id;
 --temporary table for text analysis where other_rev_id's id smaller than rev_id
 -- used to manage volumetry (bokk having over 1000 reviews generate near 1M rows comparison (if length would be equal)!!
 -- and they have similar text length (+/- x%)
-create table rev_process_wx_to_wy as
-(select work_refid, rev.review_id, review,
-from integration.review_similarto_process rev
-join integration.review_similar_to smaller
-            on (rev.work_refid = smaller.work_refid
-                and rev.review_lang = smaller.review_lang
-                and rev.review_id > smaller.review_id
-                and rev.text_lenght between smaller.text_lenght - round(smaller.text_lenght * 0.08) and
-                                            smaller.text_lenght + round(smaller.text_lenght * 0.08)
-                );
+-- takes 42sec on 13K reviews (1000 < wid < 1100 ) and generated about 600K rows (cross-product of reviews with similar length)
+create table rev_process_tmp as
+(select rev.work_refid, rev.review_id as id, r.review, other.review_id as other_id, o.review as other_review
+from integration.rev_similarto_process rev
+join integration.review r on (rev.review_id = r.id)
+join integration.rev_similarto_process other on
+    (rev.work_refid = other.work_refid
+     and rev.review_lang = other.review_lang
+     and rev.review_id > other.review_id
+     and rev.text_length between other.text_length - round(other.text_length * 0.08) and
+                                 other.text_length + round(other.text_length * 0.08))
+join integration.review o on (other.review_id = o.id)
 where
-rev.work_refid betweem x and y
-and smaller.work_refid betweem x and y
+rev.work_refid between 0 and 100000
+and other.work_refid between 0 and 100000
+and rev.date_processed IS NULL
 )
-;
+
+
+select work_refid, id, review, other_id, other_review, similarity(review, other_review)
+from rev_process_tmp
+where similarity(review, other_review) > 0.6 limit 100;
 
 
 
