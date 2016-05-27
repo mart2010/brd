@@ -47,7 +47,7 @@ class BulkLoadThingISBN(BaseBulkLoadTask):
 
 class LoadWorkRef(BasePostgresTask):
     filename = luigi.Parameter()
-    table = 'integration.work'
+    table = 'integration.WORK'
 
     def requires(self):
         return BulkLoadThingISBN(self.filename)
@@ -76,7 +76,7 @@ class LoadWorkRef(BasePostgresTask):
 
 class LoadIsbnRef(BasePostgresTask):
     filename = luigi.Parameter()
-    table = 'integration.isbn'
+    table = 'integration.ISBN'
 
     def requires(self):
         return BulkLoadThingISBN(self.filename)
@@ -128,7 +128,7 @@ class LoadWorkIsbnRef(BasePostgresTask):
     3) Update deletion_date on NO LONGER existing (isbn,work)
     """
     filename = luigi.Parameter()
-    table = 'integration.work_isbn'
+    table = 'integration.WORK_ISBN'
 
     def requires(self):
         return [LoadWorkRef(self.filename), LoadIsbnRef(self.filename)]
@@ -431,7 +431,7 @@ class LoadMDS(BasePostgresTask):
 class LoadWorkLangTitle(BasePostgresTask):
     n_work = luigi.IntParameter()
     harvest_dts = luigi.DateMinuteParameter()
-    table = 'integration.work_title'
+    table = 'integration.WORK_TITLE'
 
     def requires(self):
         return BulkLoadWorkInfo(self.n_work, self.harvest_dts)

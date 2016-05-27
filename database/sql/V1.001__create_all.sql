@@ -541,10 +541,12 @@ create table integration.rev_similarto_process (
     review_id bigint not null,
     text_length int not null,
     review_lang char(3),
-    similarto_review_id bigint,
+    other_review_id bigint,
     similarity float,
     site_id int not null,
     date_processed timestamp,
+    create_dts timestamp,
+    load_audit_id int,
     primary key (work_refid, review_id)
 );
 
@@ -564,7 +566,8 @@ order by work_refid, id;
 -- and they have similar text length (+/- x%)
 -- takes 42sec on 13K reviews (1000 < wid < 1100 ) and generated about 600K rows (cross-product of reviews with similar length)
 create table rev_process_tmp as
-(select rev.work_refid, rev.review_id as id, r.review, other.review_id as other_id, o.review as other_review
+(select rev.work_refid, rev.review_id as id, r.review, other.review_id as other_id,
+        o.review as other_review, similarity(r.review, o.review)
 from integration.rev_similarto_process rev
 join integration.review r on (rev.review_id = r.id)
 join integration.rev_similarto_process other on
@@ -575,10 +578,13 @@ join integration.rev_similarto_process other on
                                  other.text_length + round(other.text_length * 0.08))
 join integration.review o on (other.review_id = o.id)
 where
+rev.date_processed IS NULL --only the ones not yet processed
 rev.work_refid between 0 and 100000
 and other.work_refid between 0 and 100000
 and rev.date_processed IS NULL
-)
+);
+
+
 
 
 select work_refid, id, review, other_id, other_review, similarity(review, other_review)
