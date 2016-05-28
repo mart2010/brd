@@ -11,17 +11,16 @@ __copyright__ = "Copyright 2016, The BRD Project"
 logger = logging.getLogger(__name__)
 
 
-
 # --------------------------------------------------------------------------------------------- #
 # -----------------------------  LOAD REVIEW_SIMILAR_TO --------------------------------------- #
 # --------------------------------------------------------------------------------------------- #
 
 class LoadReviewSimilarToProcess(BasePostgresTask):
     """
-    This loads new work/reviews into rev_similarto_process in sequential order.
+    Loads new work/reviews into rev_similarto_process in sequential order.
 
-    Only loads work not yet processed, not adapted for incremental reviews
-    (new reviews loaded since work was last processed)
+    Only loads work not yet processed (not adapted for incremental reviews
+    loaded after work was last processed)
     """
     n_work = luigi.IntParameter()
     process_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
@@ -30,9 +29,8 @@ class LoadReviewSimilarToProcess(BasePostgresTask):
     def exec_sql(self, cursor, audit_id):
         sql = \
             """
-            insert into {table}(work_refid, review_id, text_length, review_lang,
-                                site_id, create_dts, load_audit_id)
-            select rev.work_refid, id, char_length(review), review_lang, site_id, now(), %(audit_id)s
+            insert into {table}(work_refid, review_id, text_length, review_lang, create_dts, load_audit_id)
+            select rev.work_refid, id, char_length(review), review_lang, now(), %(audit_id)s
             from integration.review rev
             join (select distinct work_refid
                   from integration.review r
@@ -55,7 +53,7 @@ class CreateTempRevProcess(BasePostgresTask):
 
     # process reviews with minimum nb of char and of similar text length
     length_min = 100
-    length_delta = 0.10
+    length_delta = 0.08
 
     def requires(self):
         return LoadReviewSimilarToProcess(self.n_work, self.process_dts)
@@ -84,6 +82,27 @@ class CreateTempRevProcess(BasePostgresTask):
         cursor.execute(sql, {'len_min': self.length_min, 'len_delta': self.length_delta, 'audit_id': audit_id})
         return cursor.rowcount
 
+class LoadReviewSimilarTo(BasePostgresTask):
+    n_work = luigi.IntParameter()
+    process_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
+    table = 'integration.REVIEW_SIMILARTO'
+
+    # min similarity index for two reviews to be considered similar
+    similarity_min = 0.6
+
+    def requires(self):
+        return CreateTempRevProcess(self.n_work, self.process_dts)
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            insert into {table}(review_id, other_review_id, similarity, create_dts, load_audit_id)
+            select id, other_id, similarity, now(), %(audit_id)s
+            from {source}_{dt}
+            where similarity >= %(sim)s
+            """.format(table=self.table, source=CreateTempRevProcess.table, dt=self.process_dts.strftime('%Y_%m_%dT%H%M'))
+        cursor.execute(sql, {'sim': self.similarity_min, 'audit_id': audit_id})
+
 
 class UpdateReviewSimilarToProcess(BasePostgresTask):
     n_work = luigi.IntParameter()
@@ -91,7 +110,7 @@ class UpdateReviewSimilarToProcess(BasePostgresTask):
     table = 'integration.REV_SIMILARTO_PROCESS'
 
     def requires(self):
-        return CreateTempRevProcess(self.n_work, self.process_dts)
+        return LoadReviewSimilarTo(self.n_work, self.process_dts)
 
     def exec_sql(self, cursor, audit_id):
         sql = \

@@ -514,27 +514,25 @@ comment on column integration.work_site_mapping.title is 'Book title, author, la
 
 
 create table integration.review_similarto (
-    rev_id bigint,
-    other_rev_id bigint,
-    similar_index float,
-    same_work_flag boolean,
-    same_author_flag boolean,
-    check (other_rev_id < rev_id),
-    primary key(rev_id, other_rev_id),
-    foreign key(rev_id) references integration.review(id),
-    foreign key(other_rev_id) references integration.review(id),
+    review_id bigint,
+    other_review_id bigint,
+    similarity float,
+    check (other_review_id < review_id),
+    primary key(review_id, other_review_id),
+    foreign key(review_id) references integration.review(id),
+    foreign key(other_review_id) references integration.review(id),
     create_dts timestamp,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 
---could be convenient for downstream to store all pair-wise of similar review ??
-comment on table integration.review_similarto is 'To track down reviews with some similarity threshold';
-comment on column integration.review_similarto.rev_id is 'Review-id (under constraint: larger than other_rev_id to avoid dup pairwise comparison)';
-comment on column integration.review_similarto.other_rev_id is 'The other similar review-id (with smaller id)';
+comment on table integration.review_similarto is 'Track down reviews of similarity (min) threshold';
+comment on column integration.review_similarto.review_id is 'Review-id  (under constraint: larger than other_rev_id to avoid dup pairwise comparison)';
+-- however, will not recursively go back to the mininal: Ex. if r1 is same to r4 only and r7 only to r4, then: (r4,r1) and (r7,r4) although the three are probably all similar
+comment on column integration.review_similarto.other_review_id is 'The other similar review-id (take minimum id, if more than one).  If r1, r4, r7 are all similar, then: (r4,r1), (r7,r1);
+
 
 ------------------------------ work in progress -----------------------------
-
 
 create table integration.rev_similarto_process (
     work_refid bigint not null,
@@ -543,76 +541,25 @@ create table integration.rev_similarto_process (
     review_lang char(3),
     other_review_id bigint,
     similarity float,
-    site_id int not null,
     date_processed timestamp,
     create_dts timestamp,
     load_audit_id int,
-    primary key (work_refid, review_id)
+    primary key (work_refid, review_id),
+    check (other_review_id < review_id)
 );
 
-
--- sql load table (business rules: text must be of certain size and valid language)
-insert into integration.rev_similarto_process(work_refid, review_id, text_length, review_lang, site_id)
-select work_refid, id, char_length(review), review_lang, review, site_id
-from integration.review
-where work_refid between  1000 and 1500 -- %(wid_min)s and %(wid_max)s
-and char_length(review) >= 50
-and review_lang not in ('--','und')
-order by work_refid, id;
-
-
---temporary table for text analysis where other_rev_id's id smaller than rev_id
--- used to manage volumetry (bokk having over 1000 reviews generate near 1M rows comparison (if length would be equal)!!
--- and they have similar text length (+/- x%)
--- takes 42sec on 13K reviews (1000 < wid < 1100 ) and generated about 600K rows (cross-product of reviews with similar length)
-create table rev_process_tmp as
-(select rev.work_refid, rev.review_id as id, r.review, other.review_id as other_id,
-        o.review as other_review, similarity(r.review, o.review)
-from integration.rev_similarto_process rev
-join integration.review r on (rev.review_id = r.id)
-join integration.rev_similarto_process other on
-    (rev.work_refid = other.work_refid
-     and rev.review_lang = other.review_lang
-     and rev.review_id > other.review_id
-     and rev.text_length between other.text_length - round(other.text_length * 0.08) and
-                                 other.text_length + round(other.text_length * 0.08))
-join integration.review o on (other.review_id = o.id)
-where
-rev.date_processed IS NULL --only the ones not yet processed
-rev.work_refid between 0 and 100000
-and other.work_refid between 0 and 100000
-and rev.date_processed IS NULL
-);
-
-
-
-
-select work_refid, id, review, other_id, other_review, similarity(review, other_review)
-from rev_process_tmp
-where similarity(review, other_review) > 0.6 limit 100;
+comment on table integration.rev_similarto_process is 'Use to help manage the similar processing reviews (keep all reviews processed or being processed';
+comment on column integration.rev_similarto_process.review_id is 'The review being compared for similarity';
+comment on column integration.rev_similarto_process.other_review_id is 'The other review found to be similar to review (min id if more than one found, or NULL of none found)';
+comment on column integration.rev_similarto_process.similarity is 'Similarity index between the two reviews using tri-gram (pg_trgm)';
+comment on column integration.rev_similarto_process.date_processed is 'Flag indicating when review comparison was processed (NULL when not yet processed)';
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
---------------------------------------------------------------------------------
-
-
-
-
+-------------------------------------------------------------------------------
 
 -- to
 -- some user writes their reviews on diff site
