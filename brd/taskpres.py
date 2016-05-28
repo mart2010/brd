@@ -98,7 +98,11 @@ class LoadReviewSimilarTo(BasePostgresTask):
             """
             insert into {table}(review_id, other_review_id, similarity, create_dts, load_audit_id)
             select id, other_id, similarity, now(), %(audit_id)s
-            from {source}_{dt}
+            from {source}_{dt} s
+            join (select id, min(other_id) o_id
+                  from {source}_{dt}
+                  where similarity >= %(sim)s
+                  group by 1) t on (s.id = t.id and s.other_id = t.o_id)
             where similarity >= %(sim)s
             """.format(table=self.table, source=CreateTempRevProcess.table, dt=self.process_dts.strftime('%Y_%m_%dT%H%M'))
         cursor.execute(sql, {'sim': self.similarity_min, 'audit_id': audit_id})
