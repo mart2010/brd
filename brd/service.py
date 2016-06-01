@@ -39,11 +39,10 @@ def fetch_workIds_no_info(nb_work):
     return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work}, as_dict=True)
 
 
-def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', popularity=None):
+def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', orderby_pop=False):
     """
     Fetch work_refid/isbns not yet harvested (mapping not present)
-    using a source work_info and isbn_info (for lang) and, optionally with popularity
-    smaller than specified (more popular)
+    using a source work_info and isbn_info (for lang) and, optionally order by popularity (more popular first)
 
     For lt, return ids for work that had their reference harvested.
 
@@ -52,22 +51,17 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', pop
     (not used for lt)
     :return:
     """
-    if popularity:
-        pop_th_max = popularity
-    else:
-        pop_th_max = 100000000
-
     sql_other = \
         """
         with ref as (
             select  coalesce(same.master_refid, w.work_refid) as wid
+                    , w.popularity
                     , array_agg(wi.ean) as isbn_list
             from integration.work_info w
             left join integration.work_sameas same on (w.work_refid = same.work_refid)
             join integration.work_isbn wi on (wi.work_refid = w.work_refid and wi.deletion_date IS NULL )
             join integration.isbn_info ii on (wi.ean = ii.ean and ii.lang_code = %(lang)s)
-            where popularity <= %(pop)s
-            group by 1
+            group by 1,2
         )
         select ref.wid as work_refid, ref.isbn_list as isbns
         from ref
@@ -77,7 +71,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', pop
              join integration.site s on (m.site_id = s.id and s.logical_name = %(name)s)
             ) as mapped on (mapped.work_refid = ref.wid)
         where mapped.last_harvest_dts IS NULL
-        order by 1
+        order by {order_by}
         limit %(nb)s
         """
     # select only ones with work_info harvested
@@ -88,18 +82,23 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', pop
         inner join integration.work w on (wi.work_refid = w.refid)
         where
         w.last_harvest_dts IS NULL
-        and popularity <= %(pop)s
-        order by 1
+        order by {order_by}
         limit %(nb)s
         """
-    if site_logical_name == 'librarything':
-        return elt.get_ro_connection().fetch_all(sql_lt, {'nb': nb_work,
-                                                          'pop': pop_th_max}, as_dict=True)
+
+    if orderby_pop:
+        order_by = 'popularity'
     else:
-        return elt.get_ro_connection().fetch_all(sql_other, {'nb': nb_work,
-                                                             'name': site_logical_name,
-                                                             'lang': lang_code,
-                                                             'pop': pop_th_max}, as_dict=True)
+        order_by = '1'
+
+    if site_logical_name == 'librarything':
+        sql = sql_lt.format(order_by=order_by)
+        return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work}, as_dict=True)
+    else:
+        sql = sql_other.format(order_by=order_by)
+        return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work,
+                                                       'name': site_logical_name,
+                                                       'lang': lang_code}, as_dict=True)
 
 
 def fetch_ltwids_stat_harvested(nb_work):

@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 # -----------------------------  LOAD REVIEW_SIMILAR_TO --------------------------------------- #
 # --------------------------------------------------------------------------------------------- #
 
-class LoadReviewSimilarToProcess(BasePostgresTask):
+class LoadRevSimilarToProcess(BasePostgresTask):
     """
-    Loads new work/reviews into rev_similarto_process in sequential order.
+    Loads new work/review-ids into rev_similarto_process in sequential order.
 
     Only loads work not yet processed (not adapted for incremental reviews
-    loaded after work was last processed)
+    created after work was last processed)
     """
     n_work = luigi.IntParameter()
     process_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
@@ -30,7 +30,7 @@ class LoadReviewSimilarToProcess(BasePostgresTask):
         sql = \
             """
             insert into {table}(work_refid, review_id, text_length, review_lang, create_dts, load_audit_id)
-            select rev.work_refid, id, char_length(review), review_lang, now(), %(audit_id)s
+            select rev.work_refid, id, coalesce(char_length(review),0), review_lang, now(), %(audit_id)s
             from integration.review rev
             join (select distinct work_refid
                   from integration.review r
@@ -56,15 +56,15 @@ class CreateTempRevProcess(BasePostgresTask):
     length_delta = 0.08
 
     def requires(self):
-        return LoadReviewSimilarToProcess(self.n_work, self.process_dts)
+        return LoadRevSimilarToProcess(self.n_work, self.process_dts)
 
     def exec_sql(self, cursor, audit_id):
         # process only new batch of work (rev.date_processed IS NULL)
         sql = \
             """
             create table {table}_{dt} as
-                select rev.work_refid, rev.review_id as id, r.review, other.review_id as other_id,
-                        o.review as other_review, similarity(r.review, o.review), %(audit_id)s
+                select rev.work_refid, rev.review_id as id, r.review, r.site_id, other.review_id as other_id,
+                        o.review as other_review, o.site_id as other_site_id, similarity(r.review, o.review), %(audit_id)s
                 from integration.rev_similarto_process rev
                 join integration.review r on (rev.review_id = r.id)
                 join integration.rev_similarto_process other on
@@ -96,8 +96,8 @@ class LoadReviewSimilarTo(BasePostgresTask):
     def exec_sql(self, cursor, audit_id):
         sql = \
             """
-            insert into {table}(review_id, other_review_id, similarity, create_dts, load_audit_id)
-            select id, other_id, similarity, now(), %(audit_id)s
+            insert into {table}(site_id, review_id, other_site_id, other_review_id, similarity, create_dts, load_audit_id)
+            select site_id, s.id, other_site_id, other_id, similarity, now(), %(audit_id)s
             from {source}_{dt} s
             join (select id, min(other_id) o_id
                   from {source}_{dt}
@@ -126,17 +126,54 @@ class UpdateReviewSimilarToProcess(BasePostgresTask):
 
 
 # python -m luigi --module brd.taskpres BatchProcessReviewSimilarTo --n-work 2 --process-dts 2016-05-26T1200  --local-scheduler
-class BatchProcessReviewSimilarTo(luigi.Task):
+class BatchProcessReviewSimilarTo(BasePostgresTask):
     """
-    Entry point to launch batch
+    Entry point to launch batch and clear temporary table..
     """
     n_work = luigi.IntParameter()
     process_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
-
-    global batch_name
-    batch_name = "Process similarTo review"  # for auditing
+    table = CreateTempRevProcess.table
 
     def requires(self):
         return [UpdateReviewSimilarToProcess(self.n_work, self.process_dts)]
+
+    def exec_sql(self, cursor, audit_id):
+        sql = \
+            """
+            drop table {tmp}_{dt};
+            """.format(tmp=self.table, dt=self.process_dts.strftime('%Y_%m_%dT%H%M'))
+        cursor.execute(sql, {'dts': self.process_dts})
+
+
+import argparse
+import subprocess
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    # mandatory argument is name of task
+    parser.add_argument('task', help="Name of task (only 'BatchProcessReviewSimilarTo' supported for now)")
+    parser.add_argument('-t', '--nbtask', default=1, type=int, help="Number of tasks to execute sequentially")
+    # too low nbwork result in skipping tasks (take less than 1 min so following task have same process_dts)
+    # too high yields too large result due to cross-product
+    parser.add_argument('-w', '--nbwork', default=100, type=int, help="Number of works to process by task")
+    parser.add_argument('--caffeinate', action="store_true", help="Optionally prefix with caffeinate command")
+    args = parser.parse_args()
+
+    if args.task != 'BatchProcessReviewSimilarTo':
+        raise RuntimeError("Stop script, only 'BatchProcessReviewSimilarTo' can be launched")
+
+    cmd = []
+    if args.caffeinate:
+        cmd.extend(['caffeinate', '-i'])
+    cmd.extend(['python', '-m'])
+    cmd.extend(['luigi', '--module'])
+    cmd.extend(['brd.taskpres', args.task])
+    cmd.extend(['--n-work', str(args.nbwork)])
+    cmd.append('--local-scheduler')
+    logger.info("Command '%s' will be executed %d times" % (" ".join(cmd), args.nbtask))
+    for i in xrange(args.nbtask):
+        subprocess.check_call(cmd)
+
 
 
