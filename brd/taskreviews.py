@@ -35,7 +35,7 @@ class FetchNewWorkIds(luigi.Task):
         if self.site in ('babelio'):
             lang = 'fre'
 
-        res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work, lang_code=lang)
+        res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work, lang_code=lang, orderby_pop=True)
         if len(res_dic) == 0:
             raise brd.WorkflowError("No more work available to harvest for site %s, STOP PROCESSING!" % self.site)
         elif len(res_dic) < self.n_work:

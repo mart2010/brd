@@ -223,8 +223,15 @@ where r1.work_refid between 2000 and 2500
 
 
 
-
-
+select r.site_id, o.site_id as other_site_id
+       ,sim.review_id, sim.other_review_id
+       ,u.user_uid, ou.user_uid as other_user_uid
+       ,sim.similarity, r.review, o.review as other_review
+from integration.review_similarto sim
+join integration.review r on sim.review_id = r.id
+join integration.user u on r.user_id = u.id
+join integration.review o on sim.other_review_id = o.id
+join integration.user ou on o.user_id = ou.id
 
 
 
