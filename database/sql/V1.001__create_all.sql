@@ -553,7 +553,7 @@ create table integration.rev_similarto_process (
 
 -- sql load table (business rules: text must be of certain size and valid language)
 insert into integration.rev_similarto_process(work_refid, review_id, text_length, review_lang, site_id)
-select work_refid, id, char_length(review), review_lang, review, site_id
+select work_refid, id, char_length(review), review_lang, site_id
 from integration.review
 where work_refid between  1000 and 1500 -- %(wid_min)s and %(wid_max)s
 and char_length(review) >= 50
@@ -579,7 +579,7 @@ join integration.rev_similarto_process other on
 join integration.review o on (other.review_id = o.id)
 where
 rev.date_processed IS NULL --only the ones not yet processed
-rev.work_refid between 0 and 100000
+and rev.work_refid between 0 and 100000
 and other.work_refid between 0 and 100000
 and rev.date_processed IS NULL
 );
@@ -703,65 +703,96 @@ $$ LANGUAGE plpgsql;
 -------------------------------------- Presentation layer -----------------------------------------
 ---------------------------------------------------------------------------------------------------
 -- Goals:   - Layer where data is exposed for tools and user consumption
---          - Star schema/Datamart for analytical purposes
+--          - Design is oriented toward Redshift  (so a denormalized of version of integraton)
+--          - also need to avoid unavailable data type (ex. uuid)
 --          - Other delivery:  the sparse Matrix...built for recommending app
---              (efficiently stored in relation model)
+--              (efficiently stored in relation model) (that should be an sql extract)
 ---------------------------------------------------------------------------------------------------
 
-create table presentation.fact_review (
-    -- all dims
-
+create table presentation.review (
+    id bigint primary key,
+    id_similarto bigint,
+    book_id int not null,
+    reviewer_id int not null,
+    site_id smallint not null,
+    date_id smallint not null, --smart-key
     -- all facts
     rating smallint,
     nb_likes int,
-    nb_dislikes int,
-
-
+    lang_code char(3),
+    review varchar(30000),  --based on max currently found
+    foreign key (book_id) references presentation.book(id),
+    foreign key (reviewer_id) references presentation.reviewer(id),
+    foreign key (site_id) references presentation.site(id),
+    foreign key (date_id) references presentation.dim_date(id),
 );
 
---grain def: work level (will include diff language title atts..)
-create table presentation.dim_book (
-    id bigint primary key
+--Denormalized version of integration.Work (will include diff language title atts..)
+create table presentation.book (
+    id int primary key,
+    title_ori text,
+    ori_lang_code char(3),
+    mds_code varchar(30),
+    --calculate pop based on nb_of_reviews loaded
+    --pivot 10th most popular lang
+    english_title varchar(500),
+    french_title varchar(500),
+    german_title varchar(500),
+    dutch_title varchar(500),
+    spanish_title varchar(500),
+    italian_title varchar(500),
+    japenese_title varchar(500),
+    swedish_title varchar(500),
+    finish_title varchar(500),
+    portuguese_title varchar(500)
 );
+
 
 --not personal info here just the high-level demographics and others..
-create table presentation.dim_reviewer (
-    id bigint primary key
-
+create table presentation.reviewer (
+    id int primary key,
+    username varchar(200),
+    gender char(1),
+    birth_year smallint,
+    status varchar(20),
+    occupation varchar(100),
+    country varchar(100),
+    region varchar(200),
+    city varchar(200),
+    site_id smallint not null,
+    foreign key(site_id) references presentation.site(id)
 );
 
---to be used in two distinct Role-playing:  Review-lang and Book-ori-lang
-create table presentation.dim_language (
-    id smallint primary key
+create table presentation.site (
+    id smallint primary key,
+    name varchar(20) not null,
+    hostname varchar(20) not null
 );
 
---standardized rating info
-create table presentation.dim_rating (
-    id smallint primary key
-);
 
---Review's date
+-- to implement with code
 create table presentation.dim_date (
     id int primary key
 );
 
--- model review text as dim, while keeping text only (stripped from html tag/content):
--- would be ideal place for storing special extracted features or text dim-reduced representation ...)
-create table presentation.dim_review_text (
-    id uuid,
-    review_t text,
 
+create table presentation.dim_language (
+    code char(3) primary key,
+    name varchar(100),
+    french_name varchar(100)
 );
 
--- the idea is that if I want to be able to report similar review (for account duplication, plagirism, ..)
--- then I need to preserve each review here (as opposed to clean them upstream and loose this capability in presentation layer!)
-create table presentation.review_similar_to (
--- sort of dim outrigger!
+
+--check.. if I could add this so to track more than one duplciates (the fill dupes review with master being a reference (minimum) id?)
+create table presentation.review_similarto (
+    review_id bigint,
+    master_review_id bigint,
 
 );
 
 create table presentation.dim_mds (
     id int primary key
+
 );
 
 --see how to best manage the many-to-many...
@@ -770,17 +801,6 @@ create table presentation.dim_tag (
 );
 
 
--- check out other representation for review text typical of text mining app
--- like n-grams or shingling representation (see Google’s Ngram Viewer) requiring NLP techniques such as stemming and stop word removal
--- or  chunking, i.e., light sentence parsing, to extract sequences of words likely to be meaningful phrases
---checkout pg_similarity
-create table presentation.dim_text_reformat (
-    id bigint primary key
-);
-
-create table presentation.dim_source (
-    smallint primary key
-);
 
 
 
