@@ -513,6 +513,12 @@ comment on column integration.work_site_mapping.last_harvest_dts is 'Last time w
 comment on column integration.work_site_mapping.title is 'Book title, author, lang are for QA purposes (mapping between sites done through isbn(s) lookup)';
 
 
+-- Rules to find similar review are based on text-length and similarity, so there could be group of similar reviews (with three or more similar reviews) not
+-- correctly flagged.  For ex, r7 --> r2 --> r1 , r7 --> r4 --> r3,  r3 --> r1  : r7,r2,r3 will all be tied to r1, but r4 will be missed (although it's probably also similar)
+--                                --> r1
+-- Any review not found similar to the one with lowest work-id will be missed from the group.
+-- Simple Ex. if r4 --> r1 and r7 --> r4, then: we'll have (r4,r1) and (r7,r4) although three are probably all similar
+-- That's ok for the Experiment, but to do things right we'd need to recursively find grouping by going up and down all relationship and attach reviews along the way (not straighfowrard in SQL)
 create table integration.review_similarto (
     review_id bigint,
     other_review_id bigint,
@@ -529,7 +535,6 @@ create table integration.review_similarto (
 comment on table integration.review_similarto is 'Track down reviews having some similarity (min threshold)';
 comment on column integration.review_similarto.review_id is 'Review-id  (under constraint: larger than other_rev_id to avoid dup pairwise comparison)';
 comment on column integration.review_similarto.other_review_id is 'The other similar review-id (take minimum id, if more than one).  If r1, r4, r7 are all similar, then: (r4,r1), (r7,r1);
--- Don't recursively go back to mininal: Ex. if r1 is same as r4 only and r7 same as r4, then: we'll have (r4,r1) and (r7,r4) although three are probably all similar
 
 
 ------------------------------ work in progress -----------------------------

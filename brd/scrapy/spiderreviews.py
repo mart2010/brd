@@ -217,7 +217,11 @@ class LibraryThing(BaseReviewSpider):
         # gives :   |  Nov 22, 2012  |
         rdate = date_user_sel.xpath('./text()').extract_first()
         new_item['review_date'] = rdate[rdate.index(u'|') + 1:rdate.rindex(u'|')].strip()
-        new_item['parsed_review_date'] = self.parse_review_date(new_item['review_date'])
+        # DATA issues: review date may be missing in lt!
+        try:
+            new_item['parsed_review_date'] = self.parse_review_date(new_item['review_date'])
+        except ValueError:
+            pass
         new_item['likes'] = rev_sel.xpath('.//span[@class="reviewVoteCount"]/text()').extract_first()
         if new_item['likes']:  # and len(item['likes'] >= 1) and item['likes'].find(u'nbsp') == -1:
             try:

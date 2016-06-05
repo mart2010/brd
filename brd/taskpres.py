@@ -125,7 +125,7 @@ class UpdateReviewSimilarToProcess(BasePostgresTask):
         cursor.execute(sql, {'dts': self.process_dts})
 
 
-# python -m luigi --module brd.taskpres BatchProcessReviewSimilarTo --n-work 2 --process-dts 2016-05-26T1200  --local-scheduler
+# python -m luigi --module brd.taskpres BatchProcessReviewSimilarTo --n-work 50 --process-dts 2016-05-26T1200  --local-scheduler
 class BatchProcessReviewSimilarTo(BasePostgresTask):
     """
     Entry point to launch batch and clear temporary table..

@@ -439,7 +439,7 @@ class LoadWorkLangTitle(BasePostgresTask):
     def exec_sql(self, cursor, audit_id):
         # Add language text not present in from language reference
         # filter out empty language string in web page
-        #  lang_title[2:5] used to avoid splitting WHEN title has ':' (4 of these are possible ;-!)
+  §       #  lang_title[2:5] used to avoid splitting WHEN title has ':' (4 of these are possible ;-!)
         sql = \
             """
             with title_harvest as
