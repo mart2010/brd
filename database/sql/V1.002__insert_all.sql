@@ -97,6 +97,42 @@ values
 --;
 
 
+-- Dim_Date population dml
+
+SELECT
+	datum AS DATE,
+	EXTRACT(YEAR FROM datum) AS YEAR,
+	EXTRACT(MONTH FROM datum) AS MONTH,
+	-- Localized month name
+	to_char(datum, 'TMMonth') AS MonthName,
+	EXTRACT(DAY FROM datum) AS DAY,
+	EXTRACT(doy FROM datum) AS DayOfYear,
+	-- Localized weekday
+	to_char(datum, 'TMDay') AS WeekdayName,
+	-- ISO calendar week
+	EXTRACT(week FROM datum) AS CalendarWeek,
+	to_char(datum, 'dd. mm. yyyy') AS FormattedDate,
+	'Q' || to_char(datum, 'Q') AS Quarter,
+	to_char(datum, 'yyyy/"Q"Q') AS YearQuarter,
+	to_char(datum, 'yyyy/mm') AS YearMonth,
+	-- ISO calendar year and week
+	to_char(datum, 'iyyy/IW') AS YearCalendarWeek,
+	-- Weekend
+	CASE WHEN EXTRACT(isodow FROM datum) IN (6, 7) THEN 'Weekend' ELSE 'Weekday' END AS Weekend,
+	-- ISO start and end of the week of this date
+	datum + (1 - EXTRACT(isodow FROM datum))::INTEGER AS CWStart,
+	datum + (7 - EXTRACT(isodow FROM datum))::INTEGER AS CWEnd,
+	-- Start and end of the month of this date
+	datum + (1 - EXTRACT(DAY FROM datum))::INTEGER AS MonthStart,
+	(datum + (1 - EXTRACT(DAY FROM datum))::INTEGER + '1 month'::INTERVAL)::DATE - '1 day'::INTERVAL AS MonthEnd
+FROM (
+	-- starting from min review_date + 50 year + 12..missing days for leap year: 365*50+12=18262
+	SELECT '1969-01-01'::DATE + SEQUENCE.DAY AS datum
+	FROM generate_series(0,18262) AS SEQUENCE(DAY)
+	GROUP BY SEQUENCE.DAY
+     ) DQ
+ORDER BY 1;
+
 
 
 

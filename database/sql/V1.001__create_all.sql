@@ -692,9 +692,9 @@ $$ LANGUAGE plpgsql;
 
 -------------------------------------- Presentation layer -----------------------------------------
 ---------------------------------------------------------------------------------------------------
--- Goals:   - Layer where data is exposed for tools and user consumption
---          - Design is oriented toward Redshift  (so a denormalized of version of integraton)
---          - also need to avoid unavailable data type (ex. uuid)
+-- Goals:   - Layer for data access done by tools and user ad-hoc queries
+--          - physical design is targeting Redshift backend
+--              (denormalized of version of integraton, replace unavailable data type, e.g. uuid)
 --          - Other delivery:  the sparse Matrix...built for recommending app
 --              (efficiently stored in relation model) (that should be an sql extract)
 ---------------------------------------------------------------------------------------------------

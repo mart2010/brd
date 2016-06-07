@@ -26,6 +26,8 @@ class LoadRevSimilarToProcess(BasePostgresTask):
     process_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
     table = 'integration.REV_SIMILARTO_PROCESS'
 
+
+    # TODO: vaidate the new rules that take only work_refid harvested for 3 sites (using work and work_site_mapping instead!!!)
     def exec_sql(self, cursor, audit_id):
         sql = \
             """
@@ -33,10 +35,13 @@ class LoadRevSimilarToProcess(BasePostgresTask):
             select rev.work_refid, id, coalesce(char_length(review),0), review_lang, now(), %(audit_id)s
             from integration.review rev
             join (select distinct work_refid
-                  from integration.review r
+                  from integration.work w
+                  join work_site_mapping wg on (wg.work_refid = w.refid and wg.site_id = 2 and w.last_harvest_dts IS NOT NULL)
+                  join work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
                   where not exists (select work_refid
                                     from {table} rs
-                                    where rs.work_refid = r.work_refid)
+                                    where rs.work_refid = w.refid)
+                  and w.last_harvest_dts IS NOT NULL
                   order by 1
                   limit %(n_work)s) as new_work
             on new_work.work_refid = rev.work_refid

@@ -192,7 +192,8 @@ class LibraryThing(BaseReviewSpider):
 
         for review_sel in response.xpath('//div[@class="bookReview"]'):
             item = self.extract_onereview(passed_item, review_sel)
-            if self.within_harvestperiod(item, last_harvest_date) == 0:
+            # For lt, we also reject review without review-date
+            if item.get('parsed_review_date') and self.within_harvestperiod(item, last_harvest_date) == 0:
                 yield item
 
     def extract_onereview(self, passed_item, rev_sel):
