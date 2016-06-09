@@ -8,6 +8,9 @@ import brd.elt as elt
 import brd.config as config
 import os
 import datetime
+import langdetect
+
+
 __author__ = 'mart2010'
 __copyright__ = "Copyright 2016, The BRD Project"
 
@@ -24,6 +27,38 @@ def treat_loaded_file(processed_filepath, remove, archive_dir):
         shutil.move(processed_filepath, archivefilepath)
         return archivefilepath
 
+
+
+_factory = None
+
+
+def detect_text_language(text):
+    """
+    Detect language based on langdetect module.  This version is working with prior map
+    based on real reviews sample.  It is better but still fails on short text.
+
+    Returns: language detected
+    >>> detect_text_language(u"J'ai adoré")
+    u'fr'
+    >>> detect_text_language(u'its an amazing book!')
+    u'en'
+    >>> detect_text_language(u'how do you read a book')
+    u'en'
+    """
+
+    def get_factory():
+        global _factory
+        if _factory is None:
+            _factory = langdetect.DetectorFactory()
+            _factory.load_profile(os.path.join(langdetect.__path__[0], "profiles"))
+        return _factory
+
+    detector = get_factory().create()
+    detector.set_prior_map(brd.config.prior_prob_map)
+    detector.append(text)
+    lang = detector.detect()
+
+    return lang
 
 def fetch_workIds_no_info(nb_work):
     sql = \
@@ -54,7 +89,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', ord
     sql_other = \
         """
         with ref as (
-            select  coalesce(same.master_refid, w.work_refid) as wid
+            select  coalesce(same.master_refid, w.work_refid) a s wid
                     , w.popularity
                     , array_agg(wi.ean) as isbn_list
             from integration.work_info w
@@ -180,3 +215,6 @@ def _bulkload_file(filepath, schematable, archive_file=True):
     return (audit_id, n)
 
 
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
