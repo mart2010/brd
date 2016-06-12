@@ -9,6 +9,7 @@ import brd.config as config
 import os
 import datetime
 import langdetect
+import langdetect.lang_detect_exception as lang_detect_exception
 
 
 __author__ = 'mart2010'
@@ -29,22 +30,35 @@ def treat_loaded_file(processed_filepath, remove, archive_dir):
 
 
 
+
 _factory = None
 
-
-def detect_text_language(text):
+def detect_text_language(text, default='eng'):
     """
-    Detect language based on langdetect module.  This version is working with prior map
-    based on real reviews sample.  It is better but still fails on short text.
+    Detect language based on langdetect module using a prior map from reviews sample.
+    This classifier is not precise (type-I error) with small text (between short to mid size), so it
+    returns a default language (except for the listed language).
 
-    Returns: language detected
-    >>> detect_text_language(u"J'ai adoré")
-    u'fr'
-    >>> detect_text_language(u'its an amazing book!')
-    u'en'
-    >>> detect_text_language(u'how do you read a book')
-    u'en'
+    >>> detect_text_language(u"small")
+    u'und'
+    >>> detect_text_language(u"A great life and biography.")
+    u'eng'
+    >>> detect_text_language(u"อ่านเพลิน ๆ")
+    u'tha'
+    >>> detect_text_language(u"J'ai adoré ce livre")
+    u'und'
+    >>> detect_text_language(u'http://wp.me/p20PAS-ct')
+    u'und'
+    >>> detect_text_language(u'how do you not read a book')
+    u'eng'
+    >>> detect_text_language(u'Voici un suspens à son comble!!')
+    u'fre'
+    >>> detect_text_language(u'Ottimo come infarinatura.')
+    u'und'
+
     """
+    short_text = 5
+    mid_text = 30
 
     def get_factory():
         global _factory
@@ -53,12 +67,33 @@ def detect_text_language(text):
             _factory.load_profile(os.path.join(langdetect.__path__[0], "profiles"))
         return _factory
 
+    undetermined = u'und'
+    if not text:
+        return None
+    elif len(text) < short_text:
+        return undetermined
+
     detector = get_factory().create()
     detector.set_prior_map(brd.config.prior_prob_map)
     detector.append(text)
-    lang = detector.detect()
+    try:
+        lang_detected = detector.detect()
+    except lang_detect_exception.LangDetectException:
+        return undetermined
 
-    return lang
+    if lang_detected == detector.UNKNOWN_LANG:
+        return undetermined
+
+    if short_text <= len(text) < mid_text:
+        # Classifier precision is good for following languages:
+        # 'eng','ara','per','spa','por','tur','jpn','rus','ben','cze','kor','bul','heb','gre','tha','ukr','mal','urd','mac','tam'
+        if lang_detected in ('ar', 'bn', 'bg', 'cs', 'en', 'el', 'he', 'ja', 'ko', 'mk', 'ml', 'fa', 'pt', 'ru', 'es', 'ta', 'th', 'tr', 'uk', 'ur'):
+            return brd.get_marc_code(lang_detected, capital=False)
+        else:
+            return default
+    else:
+        return brd.get_marc_code(lang_detected, capital=False)
+
 
 def fetch_workIds_no_info(nb_work):
     sql = \
@@ -89,7 +124,7 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', ord
     sql_other = \
         """
         with ref as (
-            select  coalesce(same.master_refid, w.work_refid) a s wid
+            select  coalesce(same.master_refid, w.work_refid) as wid
                     , w.popularity
                     , array_agg(wi.ean) as isbn_list
             from integration.work_info w
