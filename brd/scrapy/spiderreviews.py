@@ -13,8 +13,7 @@ import scrapy.exceptions
 from brd.scrapy.items import ReviewItem
 import brd.scrapy.scrapy_utils as scrapy_utils
 import datetime
-from langdetect import detect
-from langdetect.lang_detect_exception import LangDetectException
+import brd.service as service
 
 __author__ = 'mouellet'
 
@@ -70,17 +69,7 @@ class BaseReviewSpider(scrapy.Spider):
         return datetime.datetime.strptime(raw_date, self.raw_date_format).date()
 
     def detect_review_lang(self, review):
-        lang_code = u'und'
-        if not review:
-            return None
-        elif len(review) < 4:
-            return lang_code
-        else:
-            try:
-                lang_code = detect(review)
-            except LangDetectException:
-                pass
-            return brd.get_marc_code(lang_code, capital=False)
+        return service.detect_text_language(review)
 
     def within_harvestperiod(self, item, last_harvest_date):
         """
@@ -376,8 +365,7 @@ class Amazon(BaseReviewSpider):
         full_t = rev_sel.xpath('.//span[@class="a-size-base review-text"]//text()').extract()
         new_item['review'] = u" ".join(full_t).strip()
         # assume language english (true 99.? % of the time!)
-        # TODO: could use langdetect..instead
-        new_item['review_lang'] = u'eng'
+        new_item['review_lang'] = self.detect_review_lang(new_item['review'])
 
         # 'on November 30, 2015'
         new_item['review_date'] = rev_sel.xpath('.//span[@class="a-size-base a-color-secondary review-date"]/text()').extract_first()
@@ -723,9 +711,9 @@ class Babelio(BaseReviewSpider):
             item['parsed_rating'] = int(float(item['rating'])) * 2
         else:
             item['parsed_rating'] = 0
-        item['review_lang'] = u'fre'
         lines = rev.xpath('.//div[@class="text row"]/div/text()').extract()
         item['review'] = u" ".join(lines).strip()
+        item['review_lang'] = self.detect_review_lang(item['review'])
         item['likes'] = rev.xpath('.//span[@class="post_items_like "]/span[@id]/text()').extract_first()
         item['parsed_likes'] = int(item['likes'])
 

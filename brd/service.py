@@ -8,8 +8,8 @@ import brd.elt as elt
 import brd.config as config
 import os
 import datetime
-import langdetect
-import langdetect.lang_detect_exception as lang_detect_exception
+from langid.langid import LanguageIdentifier, model
+
 
 
 __author__ = 'mart2010'
@@ -29,70 +29,73 @@ def treat_loaded_file(processed_filepath, remove, archive_dir):
         return archivefilepath
 
 
+# Review's language with shorter text is set as u'und'
+MIN_DETECT_SIZE = 30
+# Review's language detected with probability smaller is set as u'und'
+MIN_DETECT_PROB = 0.70
 
+_langidentifier = LanguageIdentifier.from_modelstring(model, norm_probs=True)
 
-_factory = None
-
-def detect_text_language(text, default='eng'):
+def detect_text_language(text):
     """
-    Detect language based on langdetect module using a prior map from reviews sample.
-    This classifier is not precise (type-I error) with small text (between short to mid size), so it
-    returns a default language (except for the listed language).
+    Detect language now based on langid (langdetect fails miserably).
+    When classification is below probability_min or text is too short
+    returns undetermined language
 
-    >>> detect_text_language(u"small")
+    >>> detect_text_language(u"review with text too small 30")
     u'und'
-    >>> detect_text_language(u"A great life and biography.")
-    u'eng'
-    >>> detect_text_language(u"อ่านเพลิน ๆ")
-    u'tha'
-    >>> detect_text_language(u"J'ai adoré ce livre")
+    >>> detect_text_language(u'Mixed language etrange et muy bieno super confusing')
     u'und'
-    >>> detect_text_language(u'http://wp.me/p20PAS-ct')
-    u'und'
-    >>> detect_text_language(u'how do you not read a book')
-    u'eng'
-    >>> detect_text_language(u'Voici un suspens à son comble!!')
+    >>> detect_text_language(u"סיפור נפלא ממש. תרגום בסדר פלוס.")
+    u'heb'
+    >>> detect_text_language(u"J'ai adoré ce livre mais il était long")
     u'fre'
-    >>> detect_text_language(u'Ottimo come infarinatura.')
-    u'und'
-
     """
-    short_text = 5
-    mid_text = 30
+    global MIN_DETECT_SIZE
+    global MIN_DETECT_PROB
 
-    def get_factory():
-        global _factory
-        if _factory is None:
-            _factory = langdetect.DetectorFactory()
-            _factory.load_profile(os.path.join(langdetect.__path__[0], "profiles"))
-        return _factory
-
-    undetermined = u'und'
     if not text:
         return None
-    elif len(text) < short_text:
-        return undetermined
+    elif len(text) < MIN_DETECT_SIZE:
+        return u'und'
 
-    detector = get_factory().create()
-    detector.set_prior_map(brd.config.prior_prob_map)
-    detector.append(text)
-    try:
-        lang_detected = detector.detect()
-    except lang_detect_exception.LangDetectException:
-        return undetermined
+    lang_prob = _langidentifier.classify(text)
 
-    if lang_detected == detector.UNKNOWN_LANG:
-        return undetermined
-
-    if short_text <= len(text) < mid_text:
-        # Classifier precision is good for following languages:
-        # 'eng','ara','per','spa','por','tur','jpn','rus','ben','cze','kor','bul','heb','gre','tha','ukr','mal','urd','mac','tam'
-        if lang_detected in ('ar', 'bn', 'bg', 'cs', 'en', 'el', 'he', 'ja', 'ko', 'mk', 'ml', 'fa', 'pt', 'ru', 'es', 'ta', 'th', 'tr', 'uk', 'ur'):
-            return brd.get_marc_code(lang_detected, capital=False)
-        else:
-            return default
+    if lang_prob[1] < MIN_DETECT_PROB:
+        return u'und'
     else:
-        return brd.get_marc_code(lang_detected, capital=False)
+        return brd.get_marc_code(lang_prob[0], capital=False)
+
+# simple batch-processor for correcting review language
+# on n reviews having review_lang = NULL OR = 'und'
+def batch_detect_language(n_reviews):
+    src_sql = \
+        """
+        select id, review
+        from integration.review
+        where review_lang IS NULL
+        and review IS NOT NULL
+        order by 1
+        limit %s;
+        """
+    upd_sql = \
+        """
+        update integration.review as t set review_lang = s.lang
+        from (values {values_src}
+        ) as s(id, lang)
+        where s.id = t.id;
+        """
+    step_size = 500
+
+    for i in xrange(0, n_reviews, step_size):
+        rows_src = elt.get_ro_connection().fetch_all(src_sql, params=(step_size,), in_trans=True)
+        tgt_list = [(rev_t[0], detect_text_language(rev_t[1])) for rev_t in rows_src]
+
+        values_src = str(tgt_list).strip("[]").replace("u'", "'").replace("L,", ",")
+        update_sql = upd_sql.format(values_src=values_src)
+        rowcount = elt .get_connection().execute_inTransaction(update_sql)
+        logger.info("Batch detect language processed for %d reviews..." % rowcount)
+
 
 
 def fetch_workIds_no_info(nb_work):
