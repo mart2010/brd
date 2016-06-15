@@ -27,17 +27,17 @@ class LoadRevSimilarToProcess(BasePostgresTask):
     table = 'integration.REV_SIMILARTO_PROCESS'
 
 
-    # TODO: vaidate the new rules that take only work_refid harvested for 3 sites (using work and work_site_mapping instead!!!)
+    # TODO: validate new rules that take only work_refid harvested for 3 sites (using work and work_site_mapping instead!!!)
     def exec_sql(self, cursor, audit_id):
         sql = \
             """
             insert into {table}(work_refid, review_id, text_length, review_lang, create_dts, load_audit_id)
             select rev.work_refid, id, coalesce(char_length(review),0), review_lang, now(), %(audit_id)s
             from integration.review rev
-            join (select distinct work_refid
+            join (select distinct wg.work_refid
                   from integration.work w
-                  join work_site_mapping wg on (wg.work_refid = w.refid and wg.site_id = 2 and w.last_harvest_dts IS NOT NULL)
-                  join work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
+                  join integration.work_site_mapping wg on (wg.work_refid = w.refid and wg.site_id = 2 and w.last_harvest_dts IS NOT NULL)
+                  join integration.work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
                   where not exists (select work_refid
                                     from {table} rs
                                     where rs.work_refid = w.refid)

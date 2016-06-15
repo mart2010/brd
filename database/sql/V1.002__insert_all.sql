@@ -136,5 +136,22 @@ ORDER BY 1;
 
 
 
+-- patch to reset review_lang for reviews written mostly in CAPITAL letter (over 50%)
+
+update integration.review set review_lang = NULL
+where id in
+(select id
+from integration.review
+where
+char_length(review) >= 30
+-- at least one capital letter exist
+and review ~ '[A-Z]'
+-- capital letters represent at least 50% of text
+and  char_length(regexp_replace(review, '[A-Z]','','g'))::float / char_length(review) < 0.5
+);
+
+
+
+
 
 

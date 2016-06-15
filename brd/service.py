@@ -50,7 +50,10 @@ def detect_text_language(text):
     u'heb'
     >>> detect_text_language(u"J'ai adoré ce livre mais il était long")
     u'fre'
+    >>> detect_text_language(u"CLASSIC BOOKS YOU CAN'T BELIEVE ANYONE WOULD EVER READ EXCEPT FOR SCHOOL OR TO LOOK SMART?")
+    u'eng'
     """
+
     global MIN_DETECT_SIZE
     global MIN_DETECT_PROB
 
@@ -59,12 +62,17 @@ def detect_text_language(text):
     elif len(text) < MIN_DETECT_SIZE:
         return u'und'
 
-    lang_prob = _langidentifier.classify(text)
+    # langid does not work well with all-capitalized text
+    lang_prob = _langidentifier.classify(text.lower())
 
     if lang_prob[1] < MIN_DETECT_PROB:
         return u'und'
     else:
         return brd.get_marc_code(lang_prob[0], capital=False)
+
+
+# hack to avoid issue with ever longer index-scan to process...
+next_rev_id = 1
 
 # simple batch-processor for correcting review language
 # on n reviews having review_lang = NULL OR = 'und'
@@ -73,10 +81,12 @@ def batch_detect_language(n_reviews):
         """
         select id, review
         from integration.review
-        where review_lang IS NULL
+        where
+        id >= %(next_id)s
+        and review_lang IS NULL
         and review IS NOT NULL
         order by 1
-        limit %s;
+        limit %(nb)s;
         """
     upd_sql = \
         """
@@ -85,16 +95,19 @@ def batch_detect_language(n_reviews):
         ) as s(id, lang)
         where s.id = t.id;
         """
-    step_size = 500
+    global next_rev_id
+    step_size = 1000
 
     for i in xrange(0, n_reviews, step_size):
-        rows_src = elt.get_ro_connection().fetch_all(src_sql, params=(step_size,), in_trans=True)
+        rows_src = elt.get_ro_connection().fetch_all(src_sql, params={'next_id': next_rev_id, 'nb': step_size}, in_trans=True)
         tgt_list = [(rev_t[0], detect_text_language(rev_t[1])) for rev_t in rows_src]
 
         values_src = str(tgt_list).strip("[]").replace("u'", "'").replace("L,", ",")
         update_sql = upd_sql.format(values_src=values_src)
         rowcount = elt .get_connection().execute_inTransaction(update_sql)
-        logger.info("Batch detect language processed for %d reviews..." % rowcount)
+
+        next_rev_id = rows_src[-1][0]
+        logger.info("Batch detect language processed %d reviews (last rowcount= %d, last id= %d )" % (i, rowcount, next_rev_id))
 
 
 
