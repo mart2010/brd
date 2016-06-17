@@ -32,21 +32,20 @@ class LoadRevSimilarToProcess(BasePostgresTask):
         sql = \
             """
             insert into {table}(work_refid, review_id, text_length, review_lang, create_dts, load_audit_id)
-            select rev.work_refid, id, coalesce(char_length(review),0), review_lang, now(), %(audit_id)s
+            select new_work.work_refid, coalesce(id,-1), coalesce(char_length(review),0), review_lang, now(), %(audit_id)s
             from integration.review rev
-            join (select distinct wg.work_refid
+            right join
+                 (select distinct wg.work_refid
                   from integration.work w
                   join integration.work_site_mapping wg on (wg.work_refid = w.refid and wg.site_id = 2 and w.last_harvest_dts IS NOT NULL)
                   join integration.work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
-                  where not exists (select work_refid
+                  where not exists (select 1
                                     from {table} rs
                                     where rs.work_refid = w.refid)
                   and w.last_harvest_dts IS NOT NULL
                   order by 1
                   limit %(n_work)s) as new_work
             on new_work.work_refid = rev.work_refid
-            where
-            review_lang not in ('--','und');
             """.format(table=self.table)
         cursor.execute(sql, {'n_work': self.n_work, 'audit_id': audit_id})
         return cursor.rowcount

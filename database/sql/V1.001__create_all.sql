@@ -534,8 +534,8 @@ create table integration.review_similarto (
 
 comment on table integration.review_similarto is 'Track down reviews having some similarity (min threshold)';
 comment on column integration.review_similarto.review_id is 'Review-id  (under constraint: larger than other_rev_id to avoid dup pairwise comparison)';
-comment on column integration.review_similarto.other_review_id is 'The other similar review-id (take minimum id, if more than one).  If r1, r4, r7 are all similar, then: (r4,r1), (r7,r1);
-
+comment on column integration.review_similarto.other_review_id is 'The other review found to be similar to review (min id if more than one found, or NULL if none is found).  If r1, r4, r7 are all similar, then: (r4,r1), (r7,r1)';
+comment on column integration.review_similarto.similarity is 'Similarity index between the two reviews using tri-gram (pg_trgm)';
 
 ------------------------------ work in progress -----------------------------
 
@@ -544,8 +544,6 @@ create table integration.rev_similarto_process (
     review_id bigint not null,
     text_length int not null,
     review_lang char(3),
-    other_review_id bigint,
-    similarity float,
     date_processed timestamp,
     create_dts timestamp,
     load_audit_id int,
@@ -556,8 +554,6 @@ create table integration.rev_similarto_process (
 comment on table integration.rev_similarto_process is 'Use to help manage the similar processing reviews (keep all reviews processed or being processed';
 comment on column integration.rev_similarto_process.review_id is 'The review being compared for similarity';
 comment on column integration.rev_similarto_process.other_review_id is 'The other review found to be similar to review (min id if more than one found, or NULL if none is found)';
-comment on column integration.rev_similarto_process.similarity is 'Similarity index between the two reviews using tri-gram (pg_trgm)';
-comment on column integration.rev_similarto_process.date_processed is 'Flag indicating when review comparison was processed (NULL when not yet processed)';
 
 
 
