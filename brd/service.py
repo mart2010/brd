@@ -137,6 +137,30 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', ord
     (not used for lt)
     :return:
     """
+    # These two are just temp and should be removed...
+    sql_temp_harvested_in_babelio_not_lt = \
+        """
+        select m.work_refid
+        from integration.work_site_mapping m
+        join integration.work w on (w.refid = m.work_refid and site_id = 4 and w.last_harvest_dts is null)
+        order by {order_by}
+        limit %(nb)s
+        """
+    sql_temp_harvested_in_babelio_not_gr = \
+        """
+        select ba.work_refid, array_agg(wi.ean) as isbns
+        from integration.work_site_mapping ba
+        left join integration.work_site_mapping gr on (ba.work_refid = gr.work_refid and ba.site_id = 4 and gr.site_id = 2)
+        left join integration.work_sameas s on (ba.work_refid = s.work_refid)
+        join integration.work_isbn wi on (ba.work_refid = wi.work_refid)
+        where
+        ba.site_id = 4
+        and gr.work_refid is null
+        and s.work_refid is null
+        group by 1
+        limit %(nb)s
+        """
+
     sql_other = \
         """
         with ref as (
@@ -178,10 +202,10 @@ def fetch_workIds_not_harvested(site_logical_name, nb_work, lang_code='eng', ord
         order_by = '1'
 
     if site_logical_name == 'librarything':
-        sql = sql_lt.format(order_by=order_by)
+        sql = sql_temp_harvested_in_babelio_not_lt.format(order_by=order_by)
         return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work}, as_dict=True)
     else:
-        sql = sql_other.format(order_by=order_by)
+        sql = sql_temp_harvested_in_babelio_not_gr.format(order_by=order_by)
         return elt.get_ro_connection().fetch_all(sql, {'nb': nb_work,
                                                        'name': site_logical_name,
                                                        'lang': lang_code}, as_dict=True)

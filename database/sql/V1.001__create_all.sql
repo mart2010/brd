@@ -525,8 +525,8 @@ create table integration.review_similarto (
     similarity float,
     check (other_review_id < review_id),
     primary key(review_id, other_review_id),
-    foreign key(review_id) references integration.review(id),
-    foreign key(other_review_id) references integration.review(id),
+    foreign key(review_id) references integration.review(id) ON DELETE CASCADE,
+    foreign key(other_review_id) references integration.review(id) ON DELETE CASCADE,
     create_dts timestamp,
     load_audit_id int,
     foreign key (load_audit_id) references staging.load_audit(id)
@@ -548,6 +548,7 @@ create table integration.rev_similarto_process (
     create_dts timestamp,
     load_audit_id int,
     primary key (work_refid, review_id),
+    foreign key (load_audit_id) references staging.load_audit(id),
     check (other_review_id < review_id)
 );
 

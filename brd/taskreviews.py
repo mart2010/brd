@@ -35,7 +35,7 @@ class FetchNewWorkIds(luigi.Task):
         if self.site in ('babelio'):
             lang = 'fre'
 
-        res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work, lang_code=lang, orderby_pop=True)
+        res_dic = service.fetch_workIds_not_harvested(self.site, nb_work=self.n_work, lang_code=lang, orderby_pop=False)
         if len(res_dic) == 0:
             raise brd.WorkflowError("No more work available to harvest for site %s, STOP PROCESSING!" % self.site)
         elif len(res_dic) < self.n_work:
@@ -155,6 +155,7 @@ class LoadReviews(BasePostgresTask):
         return res
 
     def exec_sql(self, cursor, audit_id):
+        # TODO: For Lt, avoid loading reviews corresponding to duplicated work when its master work's review already loaded
         sql = \
             """
             insert into integration.review
@@ -194,10 +195,12 @@ class LoadLtWorkMissing(BasePostgresTask):
         sql = \
             """
             insert into integration.work(refid, create_dts, last_seen_date, load_audit_id)
-            select work_refid, now(), now(), %(audit_id)s
+            select distinct work_refid, now(), now(), %(audit_id)s
             from staging.review s
             left join integration.work w on (s.work_refid = w.refid)
-            where w.refid IS NULL;
+            where
+            s.site_logical_name = 'librarything'
+            and w.refid IS NULL;
             """
         cursor.execute(sql, {'audit_id': audit_id})
         return cursor.rowcount
@@ -328,7 +331,6 @@ class LoadWorkTag(BasePostgresTask):
 class UpdateLtLastHarvest(BasePostgresTask):
     """
     For Lt, updates both work_refid and associated master work_refid (if any)
-    to make sure update work_sameas was processed!
     (note: for other site, this gets done in task LoadWorkSiteMapping)
     """
     n_work = luigi.IntParameter()

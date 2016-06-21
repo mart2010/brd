@@ -4,6 +4,7 @@ import datetime
 
 import luigi
 from brd.taskbase import BasePostgresTask
+import brd
 
 __author__ = 'mart2010'
 __copyright__ = "Copyright 2016, The BRD Project"
@@ -47,8 +48,11 @@ class LoadRevSimilarToProcess(BasePostgresTask):
                   limit %(n_work)s) as new_work
             on new_work.work_refid = rev.work_refid
             """.format(table=self.table)
-        cursor.execute(sql, {'n_work': self.n_work, 'audit_id': audit_id})
-        return cursor.rowcount
+        rowcount = cursor.execute(sql, {'n_work': self.n_work, 'audit_id': audit_id})
+        if rowcount:
+            return rowcount
+        else:
+            raise brd.WorkflowError("No more reviews available for similarity comparison, STOP PROCESS!")
 
 class CreateTempRevProcess(BasePostgresTask):
     n_work = luigi.IntParameter()
