@@ -15,6 +15,22 @@
 --            integration steps done by DB-engine (ELT).
 --
 --------------------------------------------------------------------------------------------------------
+create table staging.load_audit (
+    id serial primary key,
+    batch_job text,
+    step_name text,
+    step_no int,
+    status text,
+    run_dts timestamp,
+    elapse_sec int,
+    rows_impacted int,
+    output text
+);
+comment on table staging.load_audit is 'Metadata to report on running batch_job/steps';
+comment on column staging.load_audit.status is 'Status of step';
+comment on column staging.load_audit.run_dts is 'Timestamp when step run (useful for things like limiting harvest period)';
+comment on column staging.load_audit.output is 'Output produced by a step like error msg when failure or additional info';
+
 create table staging.review (
     id bigserial primary key,
     site_logical_name text not null,
@@ -80,24 +96,6 @@ create table staging.work_info (
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 comment on table staging.work_info is 'Staging for reference data harvested from work';
-
-
-create table staging.load_audit (
-    id serial primary key,
-    batch_job text,
-    step_name text,
-    step_no int,
-    status text,
-    run_dts timestamp,
-    elapse_sec int,
-    rows_impacted int,
-    output text
-);
-comment on table staging.load_audit is 'Metadata to report on running batch_job/steps';
-comment on column staging.load_audit.status is 'Status of step';
-comment on column staging.load_audit.run_dts is 'Timestamp when step run (useful for things like limiting harvest period)';
-comment on column staging.load_audit.output is 'Output produced by a step like error msg when failure or additional info';
-
 
 create or replace view staging.handy_load_audit as
     select id, batch_job, step_name, status, run_dts, rows_impacted
@@ -315,8 +313,8 @@ create table integration.mds (
     foreign key (load_audit_id) references staging.load_audit(id)
 );
 comment on table integration.mds is 'Melvil decimal system as of lt, but has some issues with Not-Set level';
-comment on column integration.mds.code 'Code corrected (original code truncated based on levels found in text)';
-comment on column integration.mds.code 'Code corrected (original code truncated based on levels found in text)';
+comment on column integration.mds.code is 'Code corrected (original code truncated based on levels found in text)';
+comment on column integration.mds.code is 'Code corrected (original code truncated based on levels found in text)';
 
 
 --Still to do...
@@ -537,7 +535,6 @@ comment on column integration.review_similarto.review_id is 'Review-id  (under c
 comment on column integration.review_similarto.other_review_id is 'The other review found to be similar to review (min id if more than one found, or NULL if none is found).  If r1, r4, r7 are all similar, then: (r4,r1), (r7,r1)';
 comment on column integration.review_similarto.similarity is 'Similarity index between the two reviews using tri-gram (pg_trgm)';
 
------------------------------- work in progress -----------------------------
 
 create table integration.rev_similarto_process (
     work_refid bigint not null,
@@ -548,8 +545,7 @@ create table integration.rev_similarto_process (
     create_dts timestamp,
     load_audit_id int,
     primary key (work_refid, review_id),
-    foreign key (load_audit_id) references staging.load_audit(id),
-    check (other_review_id < review_id)
+    foreign key (load_audit_id) references staging.load_audit(id)
 );
 
 comment on table integration.rev_similarto_process is 'Use to help manage the similar processing reviews (keep all reviews processed or being processed';
@@ -557,51 +553,8 @@ comment on column integration.rev_similarto_process.review_id is 'The review bei
 comment on column integration.rev_similarto_process.other_review_id is 'The other review found to be similar to review (min id if more than one found, or NULL if none is found)';
 
 
-
--- sql load table (business rules: text must be of certain size and valid language)
-insert into integration.rev_similarto_process(work_refid, review_id, text_length, review_lang, site_id)
-select work_refid, id, char_length(review), review_lang, site_id
-from integration.review
-where work_refid between  1000 and 1500 -- %(wid_min)s and %(wid_max)s
-and char_length(review) >= 50
-and review_lang not in ('--','und')
-order by work_refid, id;
-
-
---temporary table for text analysis where other_rev_id's id smaller than rev_id
--- used to manage volumetry (bokk having over 1000 reviews generate near 1M rows comparison (if length would be equal)!!
--- and they have similar text length (+/- x%)
--- takes 42sec on 13K reviews (1000 < wid < 1100 ) and generated about 600K rows (cross-product of reviews with similar length)
-create table rev_process_tmp as
-(select rev.work_refid, rev.review_id as id, r.review, other.review_id as other_id,
-        o.review as other_review, similarity(r.review, o.review)
-from integration.rev_similarto_process rev
-join integration.review r on (rev.review_id = r.id)
-join integration.rev_similarto_process other on
-    (rev.work_refid = other.work_refid
-     and rev.review_lang = other.review_lang
-     and rev.review_id > other.review_id
-     and rev.text_length between other.text_length - round(other.text_length * 0.08) and
-                                 other.text_length + round(other.text_length * 0.08))
-join integration.review o on (other.review_id = o.id)
-where
-rev.date_processed IS NULL --only the ones not yet processed
-and rev.work_refid between 0 and 100000
-and other.work_refid between 0 and 100000
-and rev.date_processed IS NULL
-);
-
-
-select work_refid, id, review, other_id, other_review, similarity(review, other_review)
-from rev_process_tmp
-where similarity(review, other_review) > 0.6 limit 100;
-
-
-
-
 -------------------------------------------------------------------------------
 
--- to
 -- some user writes their reviews on diff site
 create table integration.user_sameas (
     user_id uuid not null,
@@ -623,29 +576,6 @@ create table integration.user_sameas (
 comment on table integration.user_sameas as 'Store "same-as" user across sites spotted when multiple reviews have very similar text (exact rules TBD)';
 comment on column integration.user_sameas.user_id as 'All user_id in diff sites recognized as same user';
 comment on column integration.user_sameas.same_user_id as 'Flag to identify same user_id (taken arbitrarily)';
-
-
-
-
----------------------- View -------------------------
-
--- View that return how many reviews already persisted per site (logical name)
-
-
---create or replace view integration.reviews_persisted_lookup  as
---    select   s.logical_name
---            ,r.work_refid
---            ,r.lang_code
---            ,count(*) as nb_review
---    from integration.review r
---    join integration.site s on (s.id = r.site_id)
---    group by 1,2,3
---    ;
---
---comment on view integration.reviews_persisted_lookup is 'Report of #Review by work, lang and site currently persisted' ;
-
-
-
 
 
 ---------------------- Function -------------------------
@@ -682,110 +612,6 @@ CREATE OR REPLACE function integration.derive_userid
         return cast( md5( concat(userid, site_logical_name) ) as uuid);
     END;
 $$ LANGUAGE plpgsql;
-
-
-
-
-
--------------------------------------- Presentation layer -----------------------------------------
----------------------------------------------------------------------------------------------------
--- Goals:   - Layer for data access done by tools and user ad-hoc queries
---          - physical design is targeting Redshift backend
---              (denormalized of version of integraton, replace unavailable data type, e.g. uuid)
---          - Other delivery:  the sparse Matrix...built for recommending app
---              (efficiently stored in relation model) (that should be an sql extract)
----------------------------------------------------------------------------------------------------
-
-create table presentation.review (
-    id bigint primary key,
-    id_similarto bigint,
-    book_id int not null,
-    reviewer_id int not null,
-    site_id smallint not null,
-    date_id smallint not null, --smart-key
-    -- all facts
-    rating smallint,
-    nb_likes int,
-    lang_code char(3),
-    review varchar(30000),  --based on max currently found
-    foreign key (book_id) references presentation.book(id),
-    foreign key (reviewer_id) references presentation.reviewer(id),
-    foreign key (site_id) references presentation.site(id),
-    foreign key (date_id) references presentation.dim_date(id),
-);
-
---Denormalized version of integration.Work (will include diff language title atts..)
-create table presentation.book (
-    id int primary key,
-    title_ori text,
-    ori_lang_code char(3),
-    mds_code varchar(30),
-    --calculate pop based on nb_of_reviews loaded
-    --pivot 10th most popular lang
-    english_title varchar(500),
-    french_title varchar(500),
-    german_title varchar(500),
-    dutch_title varchar(500),
-    spanish_title varchar(500),
-    italian_title varchar(500),
-    japenese_title varchar(500),
-    swedish_title varchar(500),
-    finish_title varchar(500),
-    portuguese_title varchar(500)
-);
-
-
---not personal info here just the high-level demographics and others..
-create table presentation.reviewer (
-    id int primary key,
-    username varchar(200),
-    gender char(1),
-    birth_year smallint,
-    status varchar(20),
-    occupation varchar(100),
-    country varchar(100),
-    region varchar(200),
-    city varchar(200),
-    site_id smallint not null,
-    foreign key(site_id) references presentation.site(id)
-);
-
-create table presentation.site (
-    id smallint primary key,
-    name varchar(20) not null,
-    hostname varchar(20) not null
-);
-
-
--- to implement with code
-create table presentation.dim_date (
-    id int primary key
-);
-
-
-create table presentation.dim_language (
-    code char(3) primary key,
-    name varchar(100),
-    french_name varchar(100)
-);
-
-
---check.. if I could add this so to track more than one duplciates (the fill dupes review with master being a reference (minimum) id?)
-create table presentation.review_similarto (
-    review_id bigint,
-    master_review_id bigint,
-
-);
-
-create table presentation.dim_mds (
-    id int primary key
-
-);
-
---see how to best manage the many-to-many...
-create table presentation.dim_tag (
-    id int primary key
-);
 
 
 
