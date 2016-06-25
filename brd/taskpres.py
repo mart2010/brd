@@ -39,7 +39,7 @@ class LoadRevSimilarToProcess(BasePostgresTask):
                  (select distinct wg.work_refid
                   from integration.work w
                   join integration.work_site_mapping wg on (wg.work_refid = w.refid and wg.site_id = 2 and w.last_harvest_dts IS NOT NULL)
-                  join integration.work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
+                  --join integration.work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
                   where not exists (select 1
                                     from {table} rs
                                     where rs.work_refid = w.refid)
@@ -48,8 +48,9 @@ class LoadRevSimilarToProcess(BasePostgresTask):
                   limit %(n_work)s) as new_work
             on new_work.work_refid = rev.work_refid
             """.format(table=self.table)
-        rowcount = cursor.execute(sql, {'n_work': self.n_work, 'audit_id': audit_id})
-        if rowcount:
+        cursor.execute(sql, {'n_work': self.n_work, 'audit_id': audit_id})
+        rowcount = cursor.rowcount
+        if rowcount and rowcount > 0:
             return rowcount
         else:
             raise brd.WorkflowError("No more reviews available for similarity comparison, STOP PROCESS!")
@@ -114,6 +115,7 @@ class LoadReviewSimilarTo(BasePostgresTask):
             where similarity >= %(sim)s
             """.format(table=self.table, source=CreateTempRevProcess.table, dt=self.process_dts.strftime('%Y_%m_%dT%H%M'))
         cursor.execute(sql, {'sim': self.similarity_min, 'audit_id': audit_id})
+        return cursor.rowcount
 
 
 class UpdateReviewSimilarToProcess(BasePostgresTask):
@@ -131,6 +133,7 @@ class UpdateReviewSimilarToProcess(BasePostgresTask):
             where date_processed IS NULL
             """.format(table=self.table)
         cursor.execute(sql, {'dts': self.process_dts})
+        return cursor.rowcount
 
 
 # python -m luigi --module brd.taskpres BatchProcessReviewSimilarTo --n-work 50 --process-dts 2016-05-26T1200  --local-scheduler
@@ -151,6 +154,8 @@ class BatchProcessReviewSimilarTo(BasePostgresTask):
             drop table {tmp}_{dt};
             """.format(tmp=self.table, dt=self.process_dts.strftime('%Y_%m_%dT%H%M'))
         cursor.execute(sql, {'dts': self.process_dts})
+        return cursor.rowcount
+
 
 
 import argparse
@@ -182,6 +187,4 @@ if __name__ == '__main__':
     logger.info("Command '%s' will be executed %d times" % (" ".join(cmd), args.nbtask))
     for i in xrange(args.nbtask):
         subprocess.check_call(cmd)
-
-
 
