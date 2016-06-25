@@ -2,68 +2,19 @@
 -- copyright = "Copyright 2016, The BRD Project"
 
 
--------------------------------------- Presentation layer -----------------------------------------
----------------------------------------------------------------------------------------------------
--- Goals:   - Layer for data access done by tools and user ad-hoc queries
---          - physical design is targeting Redshift backend
---              (denormalized of version of integraton, replace unavailable data type, e.g. uuid)
---          - Other delivery:  the sparse Matrix...built for recommending app
---              (efficiently stored in relation model) (that should be an sql extract)
----------------------------------------------------------------------------------------------------
-
-
-
--- Site and Language tables created only for possible lookup at client application side
--- but names are used directly as FK (compressed by RS anyway)
-
----------------------------------------------------------------
-create table presentation.dim_site (
-    name varchar(20) primary key,
-    hostname varchar(25) not null
-);
--- For RS distribution:
---diststyle ALL
-
 -- DML given to create the table/flat file for Redshift
 insert into presentation.dim_site
-values
-('librarything','www.librarything.com'),
-,('goodreads','www.goodreads.com'),
-,('babelio','www.babelio.com');
+select s.id, s.logical_name, si.hostname
+from integration.site s
+join integration.site_identifier si on s.id = si.site_id
+where s.id in (1,2,4)
+;
 
----------------------------------------------------------------
-create table presentation.dim_language (
-    name varchar(??30) primary key,
-    french_name varchar(30) not null --etc..
-);
---diststyle ALL
 
 insert into presentation.dim_language
-select english_name, french_name
+select code, english_name, french_name
 from integration.language ;
 
----------------------------------------------------------------
-create table presentation.dim_date (
-    id date primary key
-    year smallint,
-    month smallint,
-    month_name varchar(10),
-    day smallint,
-    day_of_year smallint,
-    day_name varchar(10),
-    calendar_week smallint,
-    format_date char(10),
-    quarter char(2),
-    year_quarter char(7),
-    year_month char(7),
-    year_iso_week char(7),
-    weekend char(7),
-    iso_start_week date,
-    iso_end_week date,
-    month_start date,
-    month_end date
-);
---diststyle ALL
 
 insert into presentation.dim_date
 SELECT
@@ -101,80 +52,15 @@ FROM (
 ORDER BY 1;
 
 
----------------------------------------------------------------
-create table presentation.dim_mds (
-    code varchar(30) primary key,
-    parent_code varchar(30),
-    original_code varchar(35),
-    value varchar(100),
-    foreign key parent_code references presentation.dim_mds(code)
-)
---diststyle ALL
-;
+
+
 
 
 ---------------------------------------------------------------
-create table presentation.dim_tag (
-    id varchar(??) primary key, --as lower case?
-    --etc..
-)
---diststyle ALL
-;
-
---colocate rel_tag with its book
-create table presentation.rel_tag (
-    tag_id varchar(??),
-    book_id bigint,
-    primary key (tag_id, book_id),
-    foreign key (tag_id) references presentation.tag(id),
-    foreign key (book_id) references presentation.book(id)
-)
-diststyle key distkey (book_id)
-;
-
-
----------------------------------------------------------------
-create table presentation.dim_author (
-    id int primary key,
-    --etc..
-)
---diststyle ALL
-;
-
---colocate rel_author with its book
-create table presentation.rel_author (
-    author_id varchar(??),
-    book_id bigint,
-    primary key (author_id, book_id),
-    foreign key (author_id) references presentation.author(id),
-    foreign key (book_id) references presentation.book(id)
-)
-diststyle key distkey (book_id)
-;
-
-
----------------------------------------------------------------
-create table presentation.book (
-    id bigint primary key,
-    title_ori text,
-    original_lang varchar(??),
-    mds_code varchar(30),
-    --calculate pop based on nb_of_reviews loaded
-    --pivot 10th most popular lang
-    english_title varchar(500),
-    french_title varchar(500),
-    german_title varchar(500),
-    dutch_title varchar(500),
-    spanish_title varchar(500),
-    italian_title varchar(500),
-    japenese_title varchar(500),
-    finish_title varchar(500),
-    portuguese_title varchar(500)
-)
-diststyle key distkey (id);
-;
 
 --TODO: validate this
+insert into presentation. book(id, title_ori, original_lang, mds_code,
+                english_name, french_name, german_title, )
 select coalesce(s.master_refid, w.work_refid) as id
         --make sure only master title and mds are used
         , max(case when s.master_refid is null then w.title else NULL end) as title_ori
