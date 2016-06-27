@@ -53,13 +53,52 @@ ORDER BY 1;
 
 
 
+---------------------------------------------------------------
+--TODO: validate exclusion of a lot of "technical" tag beginning by :
+-- '!',  '"' (could keep those but remove double quote),
+-- '#' , '$', "'" (single quote.. same as double quote)
+-- '32.41' (a bunch of leading number but with a dot ), (to avoid removing date like 1607-1776, 15th century)
+-- '=', ':', '?', '@' (probbaly need to keep the following text), etc...
+
+with tags as (
+    insert into presentation.dim_tag(id, tag, lang_code)
+    select seq.next_val() as new_id --Todo add seq
+        , tag_upper as tag
+        , max(lang_code) as lang_code
+    from integration.tag t
+    -- filter out all unwanted tags (validate: the escape of $ (\$), the dot ., and the ?
+    where tag !~ '^(!|#|\$|[0-9]+\.[0-9]+|=|:|\?|@)'
+    group by tag_upper
+)
+insert into presentation.rel_tag(book_id, tag_id)
+select distinct wt.work_refid as book_id
+        , tags.new_id
+from integration.work_tag wt
+join integration.tag t on t.id = wt.tag_id
+join tags on (tags.tag = t.tag_upper)
+;
+
+
+---------------------------------------------------------------
+with authors as (
+    insert into presentation.author(id, code, name)
+    select seq.next_va() as new_id
+            , code
+            , name
+    from integration.author
+)
+insert into presentation.rel_author(book_id, author_id)
+select w.work_refid, authors.new_id
+from integration.work_author w
+join integration.author a on w.author_id = a.id
+join authors on a.code = authors.code
+;
 
 
 
 ---------------------------------------------------------------
-
 --TODO: validate this
-insert into presentation. book(id, title_ori, original_lang, mds_code,
+insert into presentation.book(id, title_ori, original_lang, mds_code,
                 english_name, french_name, german_title, )
 select coalesce(s.master_refid, w.work_refid) as id
         --make sure only master title and mds are used
@@ -77,7 +116,7 @@ group by coalesce(s.master_refid, w.work_refid)
 ---------------------------------------------------------------
 create table presentation.reviewer (
     id serial,
-    id_uuid uuid unique,  -- for lookup only (not exported for RS)
+    id_uuid uuid unique,  -- DONT NEED IT if DML done with CTE !!! for lookup only (not exported for RS)
     username varchar(200),
     gender char(1),
     birth_year smallint,
