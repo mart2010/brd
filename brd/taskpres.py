@@ -27,8 +27,17 @@ class LoadRevSimilarToProcess(BasePostgresTask):
     process_dts = luigi.DateMinuteParameter(default=datetime.datetime.now())
     table = 'integration.REV_SIMILARTO_PROCESS'
 
+# (select distinct wg.work_refid
+#                   from integration.work w
+#                   join integration.work_site_mapping wg on (wg.work_refid = w.refid and wg.site_id = 2 and w.last_harvest_dts IS NOT NULL)
+#                   join integration.work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
+#                   where not exists (select 1
+#                                     from {table} rs
+#                                     where rs.work_refid = w.refid)
+#                   and w.last_harvest_dts IS NOT NULL
+#                   order by 1
+#                   limit %(n_work)s
 
-    # TODO: validate new rules that take only work_refid harvested for 3 sites (using work and work_site_mapping instead!!!)
     def exec_sql(self, cursor, audit_id):
         sql = \
             """
@@ -36,15 +45,15 @@ class LoadRevSimilarToProcess(BasePostgresTask):
             select new_work.work_refid, coalesce(id,-1), coalesce(char_length(review),0), review_lang, now(), %(audit_id)s
             from integration.review rev
             right join
-                 (select distinct wg.work_refid
+                 (select refid as work_refid
                   from integration.work w
-                  join integration.work_site_mapping wg on (wg.work_refid = w.refid and wg.site_id = 2 and w.last_harvest_dts IS NOT NULL)
-                  --join integration.work_site_mapping wb on (wb.work_refid = wg.work_refid and wb.site_id = 4)
-                  where not exists (select 1
-                                    from {table} rs
-                                    where rs.work_refid = w.refid)
-                  and w.last_harvest_dts IS NOT NULL
-                  order by 1
+                  where last_harvest_dts IS NOT NULL
+                  and not exists (select 1 from integration.rev_similarto_process s where s.work_refid = w.refid)
+                  union
+                  select work_refid
+                  from integration.work_site_mapping m
+                  where site_id = 2 and last_harvest_dts IS NOT NULL
+                  and not exists (select 1 from integration.rev_similarto_process s where s.work_refid = m.work_refid)
                   limit %(n_work)s) as new_work
             on new_work.work_refid = rev.work_refid
             """.format(table=self.table)
@@ -154,9 +163,12 @@ class BatchProcessReviewSimilarTo(BasePostgresTask):
             drop table {tmp}_{dt};
             """.format(tmp=self.table, dt=self.process_dts.strftime('%Y_%m_%dT%H%M'))
         cursor.execute(sql, {'dts': self.process_dts})
+
+        # to avoid degrading performance as tasks are processed
+        # cursor.execute('vacuum integration.rev_similarto_process;')
         return cursor.rowcount
 
-
+# caffeinate -i python -m brd.taskpres -w 200 BatchProcessReviewSimilarTo
 
 import argparse
 import subprocess
