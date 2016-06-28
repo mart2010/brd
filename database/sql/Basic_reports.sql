@@ -73,7 +73,7 @@ select
 from per_wid;
 
 
---here it's just the distinct dupes (the same 2 reviews only be counted once)
+--here it's just the distinct dupes (the same 2 reviews only counted once)
 select sum(case when r.site_id = 1 and o.site_id = 1 then 1 else 0 end) as "Total within Lt"
      , sum(case when r.site_id = 2 and o.site_id = 2 then 1 else 0 end) as "Total within Gr"
      , sum(case when r.site_id = 4 and o.site_id = 4 then 1 else 0 end) as "Total within Ba"
@@ -83,15 +83,33 @@ select sum(case when r.site_id = 1 and o.site_id = 1 then 1 else 0 end) as "Tota
                 when r.site_id = 4 and o.site_id = 1 then 1 else 0 end) as "Total between Lt and Ba"
      , sum(case when r.site_id = 2 and o.site_id = 4 then 1
                 when r.site_id = 4 and o.site_id = 2 then 1 else 0 end) as "Total between Gr and Ba"
+     , sum(case when u.username = o.username and r.review_date = o.review_date
+                     and r.site_id = o.site_id then 1 else 0 end) as "Exact copies"
+     , sum(case when u.username != o.username and r.review_date = o.review_date
+                     and r.site_id = o.site_id then 1 else 0 end) as "Copies except username"
+     , sum(case when u.username = o.username and r.review_date != o.review_date
+                     and r.site_id = o.site_id then 1 else 0 end) as "Copies except date"
+     , sum(case when u.username = o.username and r.review_date = o.review_date
+                     and r.site_id != o.site_id then 1 else 0 end) as "Copies except site"
+     , sum(case when u.username = o.username and r.review_date != o.review_date
+                     and r.site_id != o.site_id then 1 else 0 end) as "Copies only username"
+     , sum(case when u.username != o.username and r.review_date = o.review_date
+                     and r.site_id != o.site_id then 1 else 0 end) as "Copies only date"
+     , sum(case when u.username != o.username and r.review_date = o.review_date
+                     and r.site_id != o.site_id then 1 else 0 end) as "Copies only date"
+     , sum(case when u.username != o.username and r.review_date != o.review_date
+                     and r.site_id != o.site_id then 1 else 0 end) as "Diff everything"
 from integration.review_similarto s
 join integration.review r on (s.review_id = r.id)
-join integration.review o on (s.other_review_id = o.id);
+join integration.user u on (r.user_id = u.id)
+join integration.review o on (s.other_review_id = o.id)
+join integration.user ou on (o.user_id = ou.id)
+;
 
 
 select review_lang, count(1)
 from integration.review
 where review_lang not in ('--','')
 group by 1
-order by 2 desc
-limit 20;
+order by 2 desc;
 

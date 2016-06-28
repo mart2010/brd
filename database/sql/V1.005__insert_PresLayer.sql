@@ -52,6 +52,7 @@ FROM (
 ORDER BY 1;
 
 
+CREATE SEQUENCE seq;
 
 ---------------------------------------------------------------
 --TODO: validate exclusion of a lot of "technical" tag beginning by :
@@ -62,7 +63,7 @@ ORDER BY 1;
 
 with tags as (
     insert into presentation.dim_tag(id, tag, lang_code)
-    select seq.next_val() as new_id --Todo add seq
+    select nextval('seq') as new_id
         , tag_upper as tag
         , max(lang_code) as lang_code
     from integration.tag t
@@ -82,7 +83,7 @@ join tags on (tags.tag = t.tag_upper)
 ---------------------------------------------------------------
 with authors as (
     insert into presentation.author(id, code, name)
-    select seq.next_va() as new_id
+    select nextval('seq') as new_id
             , code
             , name
     from integration.author
@@ -111,12 +112,13 @@ from integration.work_info w
 left join integration.work_sameas s on w.work_refid = s.work_refid
 left join integration.work_title wt on wt.work_refid = w.work_refid
 group by coalesce(s.master_refid, w.work_refid)
+;
 
 
 ---------------------------------------------------------------
 create table presentation.reviewer (
     id serial,
-    id_uuid uuid unique,  -- DONT NEED IT if DML done with CTE !!! for lookup only (not exported for RS)
+    id_uuid uuid unique,
     username varchar(200),
     gender char(1),
     birth_year smallint,
@@ -130,7 +132,7 @@ create table presentation.reviewer (
 diststyle key distkey (id);
 
 --TODO: validate if something similar can be done
---need to be populated prior to review (to get id)
+--need to be populated prior to review
 insert into presentation.reviewer(id_uuid, username, gender, birth_year, status, site_name)
 select u.id as id_uuid
         , username
