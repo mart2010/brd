@@ -1,0 +1,93 @@
+
+ site_id | Nb of reviewer | Avg nb of reviews per reviewer | Avg nb of reviews per book 
+---------+----------------+--------------------------------+----------------------------
+       1 |          84095 |               14.3560378143766 |            9.9600778807204
+       2 |        2485912 |               8.26341559958679 |           130.208756172233
+       4 |          29499 |               14.0721380385776 |           9.11437040289823
+(3 rows)
+
+                             concat                             | count 
+----------------------------------------------------------------+-------
+ The Hunger Games (id=4979986)                                  |  7020
+ Twilight (The Twilight Saga, Book 1) (id=8384326)              |  5578
+ The Book Thief (id=393681)                                     |  5155
+ Catching Fire (id=8662515)                                     |  5127
+ Harry Potter and the Sorcerer's Stone (Book 1) (id=5403381)    |  5082
+ The Girl With The Dragon Tattoo (id=1541442)                   |  5027
+ Mockingjay (id=9279041)                                        |  5024
+ The Help (id=8019757)                                          |  4954
+ Divergent (id=10261765)                                        |  4873
+ The Guernsey Literary and Potato Peel Pie Society (id=5072307) |  4858
+ Harry Potter and the Deathly Hallows (id=3577382)              |  4668
+ The Da Vinci Code (id=3123767)                                 |  4616
+ The Road (id=1222607)                                          |  4575
+ Pride and Prejudice (id=2773690)                               |  4545
+ Gone Girl (id=11234211)                                        |  4436
+ The Giver (id=9726954)                                         |  4384
+ The Kite Runner (id=5276341)                                   |  4307
+ The Curious Incident of the Dog in the Night-Time (id=2930)    |  4291
+ 1984 (id=1472)                                                 |  4253
+ Water for Elephants: A Novel (id=522063)                       |  4230
+(20 rows)
+
+        mean_lt         |         std_lt         |      mean_gr       |         std_gr         |        mean_ba         |         std_ba         |       mean_lt_gr        |        std_lt_gr        |       mean_lt_ba       |        std_lt_ba        |       mean_gr_ba       |        std_gr_ba        |    corr_lt_gr     |    corr_lt_ba    |    corr_gr_ba    
+------------------------+------------------------+--------------------+------------------------+------------------------+------------------------+-------------------------+-------------------------+------------------------+-------------------------+------------------------+-------------------------+-------------------+------------------+------------------
+ 7.49585741055264396862 | 1.63936734855840744794 | 7.5079899448094942 | 1.88021426639611565094 | 6.98744319230119223389 | 2.38624913903445434025 | -0.01257420587732029445 | -0.29941296679539548787 | 0.39860498596201599460 | -0.74462062212625838877 | 0.42784537946367929680 | -0.50887297776845947196 | 0.377322769701208 | 0.14521932398109 | 0.17960425231123
+(1 row)
+
+ Total dupes | Total reviews |     Avg dupes      | Ratio avg dupes over avg nb reviews 
+-------------+---------------+--------------------+-------------------------------------
+      581723 |      22164509 | 2.8899028788593855 |              0.02624569756993037852
+(1 row)
+
+ Total within Lt | Total within Gr | Total within Ba | Total between Lt and Gr | Total between Lt and Ba | Total between Gr and Ba 
+-----------------+-----------------+-----------------+-------------------------+-------------------------+-------------------------
+           17554 |           60050 |            2254 |                  215227 |                     775 |                    4381
+(1 row)
+
+psql:Basic_reports.sql:85: ERROR:  column "lang_code" does not exist
+LINE 1: select lang_code, count(1)
+               ^
+
+
+brd=> select review_lang, count(1)                                                                                                                                                                                    from integration.review                                                                                                                                                                                               where review_lang not in ('--','')                                                                                                                                                                                    group by 1                                                                                                                                                                                                            limit 20;
+ review_lang |  count   
+-------------+----------
+ chi         |     1489
+ tha         |     2581
+ baq         |      766
+ kaz         |        7
+ dzo         |        2
+ lav         |     2547
+ xho         |      178
+ hun         |     3738
+ nor         |     3601
+ wel         |      418
+ kor         |      312
+ amh         |       12
+ aze         |      489
+ eng         | 19061241
+ mac         |      258
+ bel         |       47
+ afr         |      723
+ oci         |      166
+ fre         |   496543
+ sme         |      188
+(20 rows)
+
+brd=> select review_lang, count(1)
+brd-> from integration.review
+brd-> where review_lang not in ('--','')
+brd-> group by 1
+brd-> order by 2 desc
+brd-> limit 20;
+^CCancel request sent
+ERROR:  canceling statement due to user request
+brd=> select site_id, count(1) from integration.review group by 1;
+ site_id |  count   
+---------+----------
+       2 | 20542124
+       1 |  1207271
+       4 |   415114
+(3 rows)
+

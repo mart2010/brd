@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class LoadRevSimilarToProcess(BasePostgresTask):
     """
-    Loads new work/review-ids into rev_similarto_process in sequential order. 
+    Loads new work/review-ids into rev_similarto_process in sequential order.
 
     Only loads work not yet processed (not adapted for incremental reviews
     created after work was last processed)
