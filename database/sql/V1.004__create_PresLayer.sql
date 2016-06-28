@@ -1,7 +1,6 @@
 -- author = 'mart2010'
 -- copyright = "Copyright 2016, The BRD Project"
 
-
 -------------------------------------- Presentation layer -----------------------------------------
 ---------------------------------------------------------------------------------------------------
 -- Goals:   - Layer for data access either for tools or user ad-hoc queries
@@ -10,7 +9,6 @@
 --          - Other delivery:  the sparse Matrix...built for recommending app
 --              (efficiently stored in relation model) (that should be an sql extract)
 ---------------------------------------------------------------------------------------------------
-
 
 ---------------------------------------------------------------
 create table presentation.dim_site (
@@ -70,16 +68,11 @@ create table presentation.dim_mds (
 
 
 ---------------------------------------------------------------
---TODO: will need to exclude a lot of "technical" tag beginning by :
--- '!',  '"' (could keep those but remove double quote),
--- '#' , '$', "'" (single quote.. same as double quote)
--- '3241' (a bunch of leading number ), but careful with date like 1607-1776, 15th century,
--- '=', ':', '?', '@' (probbaly need to keep the following text), etc...
-
-
 create table presentation.dim_tag (
-    -- aggregate by capitalized form to reduce duplications
-    tag varchar(255) primary key
+    id int primary key,
+    -- aggregated by capitalized form (to reduce duplications)
+    tag varchar(255) unique,
+    lang_code char(3)
 )
 --diststyle ALL
 ;
@@ -87,7 +80,7 @@ create table presentation.dim_tag (
 
 --colocate rel_tag with its book
 create table presentation.rel_tag (
-    tag_id varchar(255) not null,
+    tag_id int not null,
     book_id bigint not null,
     primary key (tag_id, book_id),
     foreign key (tag_id) references presentation.tag(id),
@@ -100,7 +93,7 @@ create table presentation.rel_tag (
 ---------------------------------------------------------------
 create table presentation.dim_author (
     id int primary key,
-    id_uuid uuid unique, --for lookup only (not exported to RS)
+    code varchar(100??) unique,
     name varchar(250) not null
 )
 --diststyle ALL
