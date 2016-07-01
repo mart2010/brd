@@ -76,7 +76,7 @@ create table staging.thingisbn (
     isbn10 char(10),
     loading_dts timestamp
 );
-comment on table staging.thingisbn is 'Data from thingISBN.xml to refresh reference work/isbn data (No PK, as duplicates of <work_id,isbn> exist in source)'
+comment on table staging.thingisbn is 'Data from thingISBN.xml to refresh reference work/isbn data (No PK, as duplicates of <work_id,isbn> exist in source)';
 
 create table staging.work_info (
     work_refid bigint unique,
@@ -550,7 +550,6 @@ create table integration.rev_similarto_process (
 
 comment on table integration.rev_similarto_process is 'Use to help manage the similar processing reviews (keep all reviews processed or being processed';
 comment on column integration.rev_similarto_process.review_id is 'The review being compared for similarity';
-comment on column integration.rev_similarto_process.other_review_id is 'The other review found to be similar to review (min id if more than one found, or NULL if none is found)';
 
 
 -------------------------------------------------------------------------------
@@ -571,11 +570,11 @@ create table integration.user_sameas (
 );
 
 -- if user_id s1-u13, s3-u654 are considered the same, then this stores 2 rows (user_id, same_userid):
--- (s1-u13,s1-u13)
--- (s3-u654,s1-u13)
-comment on table integration.user_sameas as 'Store "same-as" user across sites spotted when multiple reviews have very similar text (exact rules TBD)';
-comment on column integration.user_sameas.user_id as 'All user_id in diff sites recognized as same user';
-comment on column integration.user_sameas.same_user_id as 'Flag to identify same user_id (taken arbitrarily)';
+-- (s1-u13,s1-u13) and (s3-u654,s1-u13)
+-- where same_userid is taken arbitrarily from site with minimum site_id (WHAT ABOUT same user within same site??)
+comment on table integration.user_sameas is 'Store same-as user across sites spotted when multiple reviews have very similar text (exact rules TBD)';
+comment on column integration.user_sameas.user_id is 'All user_id in diff sites recognized as same user';
+comment on column integration.user_sameas.same_user_id is 'Flag to identify same user_id (taken arbitrarily from lowest site_id)';
 
 
 ---------------------- Function -------------------------

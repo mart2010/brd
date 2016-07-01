@@ -2,7 +2,7 @@
 -- copyright = "Copyright 2016, The BRD Project"
 
 
--- DML given to create the table/flat file for Redshift
+-- DML given to create the table & flat file for Redshift import
 insert into presentation.dim_site
 select s.id, s.logical_name, si.hostname
 from integration.site s
@@ -13,7 +13,8 @@ where s.id in (1,2,4)
 
 insert into presentation.dim_language
 select code, english_name, french_name
-from integration.language ;
+from integration.language
+;
 
 
 insert into presentation.dim_date
@@ -49,7 +50,8 @@ FROM (
 	FROM generate_series(0,18262) AS SEQUENCE(DAY)
 	GROUP BY SEQUENCE.DAY
      ) DQ
-ORDER BY 1;
+ORDER BY 1
+;
 
 
 CREATE SEQUENCE seq;
@@ -63,17 +65,18 @@ CREATE SEQUENCE seq;
 
 with tags as (
     insert into presentation.dim_tag(id, tag, lang_code)
-    select nextval('seq') as new_id
-        , tag_upper as tag
-        , max(lang_code) as lang_code
+    select nextval('seq')
+        , tag_upper
+        , max(lang_code)
     from integration.tag t
     -- filter out all unwanted tags (validate: the escape of $ (\$), the dot ., and the ?
     where tag !~ '^(!|#|\$|[0-9]+\.[0-9]+|=|:|\?|@)'
     group by tag_upper
+    returning *
 )
 insert into presentation.rel_tag(book_id, tag_id)
 select distinct wt.work_refid as book_id
-        , tags.new_id
+        , tags.id
 from integration.work_tag wt
 join integration.tag t on t.id = wt.tag_id
 join tags on (tags.tag = t.tag_upper)
@@ -82,25 +85,26 @@ join tags on (tags.tag = t.tag_upper)
 
 ---------------------------------------------------------------
 with authors as (
-    insert into presentation.author(id, code, name)
-    select nextval('seq') as new_id
-            , code
-            , name
-    from integration.author
+    insert into presentation.dim_author(id, code, name)
+    select nextval('seq')
+            , a.code
+            , ai.name
+    from integration.author a
+    join integration.author_info ai on a.id = ai.author_id
+    returning *
 )
 insert into presentation.rel_author(book_id, author_id)
-select w.work_refid, authors.new_id
+select w.work_refid, authors.id
 from integration.work_author w
 join integration.author a on w.author_id = a.id
 join authors on a.code = authors.code
 ;
 
 
-
 ---------------------------------------------------------------
 --TODO: validate this
-insert into presentation.book(id, title_ori, original_lang, mds_code,
-                english_name, french_name, german_title, )
+insert into presentation.dim_book(id, title_ori, mds_code,
+                english_title, french_title, german_title)
 select coalesce(s.master_refid, w.work_refid) as id
         --make sure only master title and mds are used
         , max(case when s.master_refid is null then w.title else NULL end) as title_ori
@@ -116,71 +120,33 @@ group by coalesce(s.master_refid, w.work_refid)
 
 
 ---------------------------------------------------------------
-create table presentation.reviewer (
-    id serial,
-    id_uuid uuid unique,
-    username varchar(200),
-    gender char(1),
-    birth_year smallint,
-    status varchar(20),
-    occupation varchar(100),
-    country varchar(100),
-    region varchar(200),
-    city varchar(200),
-    site_name varchar(20) not null
-)
-diststyle key distkey (id);
-
---TODO: validate if something similar can be done
+--TODO: validate
 --need to be populated prior to review
-insert into presentation.reviewer(id_uuid, username, gender, birth_year, status, site_name)
+insert into presentation.dim_reviewer(id_uuid, username, gender, birth_year, status, site_name)
 select u.id as id_uuid
         , username
         , case when random() < 0.4 then 'F' when random() < 0.6 then 'M' else 'U' end as gender
         , cast(random() * 50 + 1950 as smallint) as birth_year
+        , case when random() < 0.4 then 'Single' when random() < 0.6 then 'Married' when random() < 0.2 then 'Divorced' else 'Unkwnown' end as status
         , s.logical_name
 from integration.user u
 join integration.site s on u.site_id = s.id
 ;
 
-
 ---------------------------------------------------------------
-create table presentation.review (
-    id bigint primary key,
-    id_similarto bigint,
-    book_id int not null,
-    reviewer_id int not null,
-    site_name varchar(20) not null,
-    date_id date not null,
-    -- all facts
-    rating smallint,
-    nb_likes int,
-    lang_code char(3),
-    -- review varchar(30000),  --based on max currently found
-    foreign key (book_id) references presentation.book(id),
-    foreign key (reviewer_id) references presentation.reviewer(id),
-    foreign key (site_id) references presentation.site(id),
-    foreign key (date_id) references presentation.dim_date(id),
-)
-diststyle key distkey (book_id)
-;
-
-
-insert into presentation.review
+insert into presentation.review(id, id_similarto, book_id, reviewer_id, site_id, date_id, rating, nb_likes, lang_code)
 select r.id
         , s.other_review_id as id_similarto
-        , coalesce(ws.master_refid, r.work_refid) as book_id
-        , pr.id as reviewer_id
-        , si.logical_name as site_name
-        , r.review_date as date_id
-        , r.parsed_rating as rating
-        , r.likes as nb_likes
-        , r.review_lang as lang_id
+        , coalesce(ws.master_refid, r.work_refid)
+        , pr.id
+        , r.site_id
+        , r.review_date
+        , r.parsed_rating
+        , r.parsed_likes
+        , r.review_lang
 from integration.review r
 left join integration.review_similarto s on s.review_id = r.id
 left join integration.work_sameas ws on ws.work_refid = r.work_refid
-join presentation.reviewer pr on pr.id_uuid = r.user_id
-join integration.site si on si.id = r.site_id
+join presentation.dim_reviewer pr on pr.id_uuid = r.user_id
 ;
-
 
