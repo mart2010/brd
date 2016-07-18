@@ -40,40 +40,15 @@
       581723 |      22164509 | 2.8899028788593855 |              0.02624569756993037852
 (1 row)
 
- Total within Lt | Total within Gr | Total within Ba | Total between Lt and Gr | Total between Lt and Ba | Total between Gr and Ba 
------------------+-----------------+-----------------+-------------------------+-------------------------+-------------------------
-           17554 |           60050 |            2254 |                  215227 |                     775 |                    4381
+
+ Total within Lt | Total within Gr | Total within Ba | Total between Lt and Gr | Total between Lt and Ba | Total between Gr and Ba | Exact copies | Copies except username | Copies except date | Copies except site | Copies only username | Copies only date | Copies only date | Diff everything 
+-----------------+-----------------+-----------------+-------------------------+-------------------------+-------------------------+--------------+------------------------+--------------------+--------------------+----------------------+------------------+------------------+-----------------
+           17554 |           60050 |            2254 |                  215227 |                     775 |                    4381 |        47375 |                   2750 |               7900 |               2598 |                 5190 |            47705 |            47705 |          164890
 (1 row)
 
-psql:Basic_reports.sql:85: ERROR:  column "lang_code" does not exist
-LINE 1: select lang_code, count(1)
-               ^
 
 
-brd=> select review_lang, count(1)                                                                                                                                                                                    from integration.review                                                                                                                                                                                               where review_lang not in ('--','')                                                                                                                                                                                    group by 1                                                                                                                                                                                                            limit 20;
- review_lang |  count   
--------------+----------
- chi         |     1489
- tha         |     2581
- baq         |      766
- kaz         |        7
- dzo         |        2
- lav         |     2547
- xho         |      178
- hun         |     3738
- nor         |     3601
- wel         |      418
- kor         |      312
- amh         |       12
- aze         |      489
- eng         | 19061241
- mac         |      258
- bel         |       47
- afr         |      723
- oci         |      166
- fre         |   496543
- sme         |      188
-(20 rows)
+
 
 brd=> select review_lang, count(1)
 brd-> from integration.review

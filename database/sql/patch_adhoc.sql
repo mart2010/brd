@@ -64,3 +64,7 @@ where rev.work_refid = dupes.work_refid
 and rev.site_id = 4
 ;
 
+
+
+-- There were '.' in mds_code included initially in table work_info
+update integration.work_info set mds_code = replace(mds_code,'.','');

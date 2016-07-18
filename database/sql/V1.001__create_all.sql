@@ -6,7 +6,7 @@
 --It seems flyway picks up and create the schema automatically from table prefix!
 --create schema staging;
 --create schema integration;
---create schema delivery;
+--create schema presentation;
 
 
 ------------------------------------------ Staging layer -----------------------------------------------

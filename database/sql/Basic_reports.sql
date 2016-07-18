@@ -68,6 +68,7 @@ with per_wid as (
 select
      sum(Nb_dupes) as "Total dupes"
      , sum(Nb_reviews) as "Total reviews"
+     , avg(Nb_reviews) as "Avg Reviews"
      , avg(Nb_dupes) as "Avg dupes"
      , avg(Nb_dupes) / avg(Nb_reviews) as "Ratio avg dupes over avg nb reviews"
 from per_wid;
@@ -83,21 +84,21 @@ select sum(case when r.site_id = 1 and o.site_id = 1 then 1 else 0 end) as "Tota
                 when r.site_id = 4 and o.site_id = 1 then 1 else 0 end) as "Total between Lt and Ba"
      , sum(case when r.site_id = 2 and o.site_id = 4 then 1
                 when r.site_id = 4 and o.site_id = 2 then 1 else 0 end) as "Total between Gr and Ba"
-     , sum(case when u.username = o.username and r.review_date = o.review_date
+     , sum(case when u.username = ou.username and r.review_date = o.review_date
                      and r.site_id = o.site_id then 1 else 0 end) as "Exact copies"
-     , sum(case when u.username != o.username and r.review_date = o.review_date
+     , sum(case when u.username != ou.username and r.review_date = o.review_date
                      and r.site_id = o.site_id then 1 else 0 end) as "Copies except username"
-     , sum(case when u.username = o.username and r.review_date != o.review_date
+     , sum(case when u.username = ou.username and r.review_date != o.review_date
                      and r.site_id = o.site_id then 1 else 0 end) as "Copies except date"
-     , sum(case when u.username = o.username and r.review_date = o.review_date
+     , sum(case when u.username = ou.username and r.review_date = o.review_date
                      and r.site_id != o.site_id then 1 else 0 end) as "Copies except site"
-     , sum(case when u.username = o.username and r.review_date != o.review_date
+     , sum(case when u.username = ou.username and r.review_date != o.review_date
                      and r.site_id != o.site_id then 1 else 0 end) as "Copies only username"
-     , sum(case when u.username != o.username and r.review_date = o.review_date
+     , sum(case when u.username != ou.username and r.review_date = o.review_date
                      and r.site_id != o.site_id then 1 else 0 end) as "Copies only date"
-     , sum(case when u.username != o.username and r.review_date = o.review_date
+     , sum(case when u.username != ou.username and r.review_date = o.review_date
                      and r.site_id != o.site_id then 1 else 0 end) as "Copies only date"
-     , sum(case when u.username != o.username and r.review_date != o.review_date
+     , sum(case when u.username != ou.username and r.review_date != o.review_date
                      and r.site_id != o.site_id then 1 else 0 end) as "Diff everything"
 from integration.review_similarto s
 join integration.review r on (s.review_id = r.id)

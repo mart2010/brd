@@ -54,51 +54,23 @@ ORDER BY 1
 ;
 
 
-CREATE SEQUENCE seq;
-
 ---------------------------------------------------------------
---TODO: validate exclusion of a lot of "technical" tag beginning by :
--- '!',  '"' (could keep those but remove double quote),
--- '#' , '$', "'" (single quote.. same as double quote)
--- '32.41' (a bunch of leading number but with a dot ), (to avoid removing date like 1607-1776, 15th century)
--- '=', ':', '?', '@' (probbaly need to keep the following text), etc...
+insert into presentation.dim_mds(code, parent_code, original_code, text)
+select code, left(code, char_length(code)-1), code_w_dot, mds_text
+from integration.mds
+;
 
-with tags as (
-    insert into presentation.dim_tag(id, tag, lang_code)
-    select nextval('seq')
-        , tag_upper
-        , max(lang_code)
-    from integration.tag t
-    -- filter out all unwanted tags (validate: the escape of $ (\$), the dot ., and the ?
-    where tag !~ '^(!|#|\$|[0-9]+\.[0-9]+|=|:|\?|@)'
-    group by tag_upper
-    returning *
-)
-insert into presentation.rel_tag(book_id, tag_id)
-select distinct wt.work_refid as book_id
-        , tags.id
-from integration.work_tag wt
-join integration.tag t on t.id = wt.tag_id
-join tags on (tags.tag = t.tag_upper)
+--insert the missing parent node
+insert into presentation.dim_mds(code, text)
+select parent_code,  max(array_to_string((string_to_array(text,'-->'))[1:array_length(string_to_array(text,'-->'),1)-1], '-->'))
+from presentation.dim_mds d
+where not exists (select 1 from presentation.dim_mds c where d.parent_code = c.code)
+group by parent_code
 ;
 
 
----------------------------------------------------------------
-with authors as (
-    insert into presentation.dim_author(id, code, name)
-    select nextval('seq')
-            , a.code
-            , ai.name
-    from integration.author a
-    join integration.author_info ai on a.id = ai.author_id
-    returning *
-)
-insert into presentation.rel_author(book_id, author_id)
-select w.work_refid, authors.id
-from integration.work_author w
-join integration.author a on w.author_id = a.id
-join authors on a.code = authors.code
-;
+alter table presentation.dim_mds add foreign key (parent_code) references presentation.dim_mds (code);
+
 
 
 ---------------------------------------------------------------
@@ -117,6 +89,61 @@ left join integration.work_sameas s on w.work_refid = s.work_refid
 left join integration.work_title wt on wt.work_refid = w.work_refid
 group by coalesce(s.master_refid, w.work_refid)
 ;
+
+
+
+
+create sequence presentation.tag_seq;
+
+---------------------------------------------------------------
+--TODO: validate exclusion of a lot of "technical" tag beginning by :
+-- '!',  '"' (could keep those but remove double quote),
+-- '#' , '$', "'" (single quote.. same as double quote)
+-- '32.41' (a bunch of leading number but with a dot ), (to avoid removing date like 1607-1776, 15th century)
+-- '=', ':', '?', '@', '%', '&', '*'
+-- '"', '(',  ''' (probably need to keep the following text)
+-- still to analyze to remove others
+
+
+with tags as (
+    insert into presentation.dim_tag(id, tag, lang_code)
+    select nextval('presentation.tag_seq')
+        , tag_upper
+        , max(lang_code)
+    from integration.tag t
+    -- filter out all unwanted tags (validate: the escape of $ (\$), the dot ., and the ?
+    where tag !~ '^(!|#|\$|[0-9]+\.[0-9]+|=|:|\?|@|"|''|%|&|\*|\()'
+    group by tag_upper
+    returning *
+)
+insert into presentation.rel_tag(book_id, tag_id)
+select distinct wt.work_refid as book_id
+        , tags.id
+from integration.work_tag wt
+join integration.tag t on t.id = wt.tag_id
+join tags on (tags.tag = t.tag_upper)
+;
+
+
+create sequence presentation.author_seq;
+
+---------------------------------------------------------------
+with authors as (
+    insert into presentation.dim_author(id, code, name)
+    select nextval('presentation.author_seq')
+            , a.code
+            , ai.name
+    from integration.author a
+    join integration.author_info ai on a.id = ai.author_id
+    returning *
+)
+insert into presentation.rel_author(book_id, author_id)
+select w.work_refid, authors.id
+from integration.work_author w
+join integration.author a on w.author_id = a.id
+join authors on a.code = authors.code
+;
+
 
 
 ---------------------------------------------------------------

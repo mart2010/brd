@@ -10,6 +10,7 @@
 --              (efficiently stored in relation model) (that should be an sql extract)
 ---------------------------------------------------------------------------------------------------
 
+-- TODO:  not nullable definition.. to add to all fields mandatory
 ---------------------------------------------------------------
 create table presentation.dim_site (
     id smallint primary key,
@@ -58,8 +59,7 @@ create table presentation.dim_mds (
     code varchar(15) primary key,
     parent_code varchar(15),
     original_code varchar(20),
-    text varchar(450),
-    foreign key (parent_code) references presentation.dim_mds(code)
+    text varchar(450)
 )
 --diststyle ALL
 ;
@@ -70,7 +70,7 @@ create table presentation.dim_book (
     id bigint primary key,
     title_ori text,
     original_lang char(3),
-    mds_code varchar(15),
+    mds_code varchar(30),
     --pivot most popular lang
     english_title varchar(550),
     french_title varchar(430),
