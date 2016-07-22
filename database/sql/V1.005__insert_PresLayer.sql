@@ -117,11 +117,12 @@ with tags as (
     returning *
 )
 insert into presentation.rel_tag(book_id, tag_id)
-select distinct wt.work_refid as book_id
+select distinct coalesce(ws.master_refid, wt.work_refid) as book_id
         , tags.id
 from integration.work_tag wt
 join integration.tag t on t.id = wt.tag_id
 join tags on (tags.tag = t.tag_upper)
+left join integration.work_sameas ws on ws.work_refid = wt.work_refid
 ;
 
 
@@ -138,10 +139,11 @@ with authors as (
     returning *
 )
 insert into presentation.rel_author(book_id, author_id)
-select w.work_refid, authors.id
+select distinct coalesce(ws.master_refid, w.work_refid), authors.id
 from integration.work_author w
 join integration.author a on w.author_id = a.id
 join authors on a.code = authors.code
+left join integration.work_sameas ws on ws.work_refid = w.work_refid
 ;
 
 
@@ -161,9 +163,9 @@ join integration.site s on u.site_id = s.id
 ;
 
 ---------------------------------------------------------------
-insert into presentation.review(id, id_similarto, book_id, reviewer_id, site_id, date_id, rating, nb_likes, lang_code)
+insert into presentation.review(id, similarto_id, book_id, reviewer_id, site_id, date_id, rating, nb_likes, lang_code)
 select r.id
-        , s.other_review_id as id_similarto
+        , s.other_review_id
         , coalesce(ws.master_refid, r.work_refid)
         , pr.id
         , r.site_id

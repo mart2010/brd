@@ -522,7 +522,7 @@ create table integration.review_similarto (
     other_review_id bigint,
     similarity float,
     check (other_review_id < review_id),
-    primary key(review_id, other_review_id),
+    primary key(review_id),
     foreign key(review_id) references integration.review(id) ON DELETE CASCADE,
     foreign key(other_review_id) references integration.review(id) ON DELETE CASCADE,
     create_dts timestamp,

@@ -150,7 +150,7 @@ create table presentation.dim_reviewer (
 ---------------------------------------------------------------
 create table presentation.review (
     id bigint primary key,
-    id_similarto bigint,
+    similarto_id bigint,
     book_id int not null,
     reviewer_id int not null,
     site_id smallint not null,

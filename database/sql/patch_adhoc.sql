@@ -68,3 +68,23 @@ and rev.site_id = 4
 
 -- There were '.' in mds_code included initially in table work_info
 update integration.work_info set mds_code = replace(mds_code,'.','');
+
+-- To truncate too long mds_code stored in work_info (initially loaded before mds were corrected)
+--keep decreasing mds_code length such as above until no more update are done...
+
+-- About 15 iterations like these were run before no more rows were updated (19/07/2016)
+update integration.work_info set mds_code = left(mds_code,char_length(mds_code)-1)
+where mds_code in (select distinct mds_code from integration.work_info w where mds_code is not null and not exists (select 1 from integration.mds m where m.code= w.mds_code));
+
+
+-- Path to remove duplicates of review_similarto created on early "faulty" process (load_audit_id = 1167)
+delete from rev_similarto_process where load_audit_id = 1167;
+delete from review_similarto where load_audit_id = 1169;
+
+--relaunch job
+--python -m luigi --module brd.taskpres BatchProcessReviewSimilarTo --n-work 50 --local-scheduler
+
+--re-define PK correctly
+alter table integration.review_similarto drop constraint review_similarto_pkey;
+
+alter table integration.review_similarto add primary key (review_id);
