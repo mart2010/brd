@@ -138,9 +138,9 @@ create table presentation.dim_reviewer (
     birth_year smallint,
     status varchar(20),
     occupation varchar(100),
-    country varchar(100),
-    region varchar(200),
     city varchar(200),
+    lati float,
+    longi float,
     site_name varchar(20) not null
 )
 --diststyle key distkey (id);
