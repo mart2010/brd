@@ -68,61 +68,68 @@ where not exists (select 1 from presentation.dim_mds c where d.parent_code = c.c
 group by parent_code
 ;
 
-
 alter table presentation.dim_mds add foreign key (parent_code) references presentation.dim_mds (code);
 
 
 
----------------------------------------------------------------
---TODO: validate this
-insert into presentation.dim_book(id, title_ori, mds_code,
+----------------------------------------------------------------------
+-- Rules For presentation on dim_book:
+ -- ignore all duplicate work (only use master work)
+ -- ignore all work with null Title
+
+----------------------------------------------------------------------
+insert into presentation.dim_book(book_id, title_ori, lang_ori, mds_code,
                 english_title, french_title, german_title)
-select coalesce(s.master_refid, w.work_refid) as id
-        --make sure only master title and mds are used
-        , max(case when s.master_refid is null then w.title else NULL end) as title_ori
-        , max(case when s.master_refid is null then w.mds_code else NULL end) as mds_code
-        , max(case when s.master_refid is null then w.title else NULL end) as english_title
+select w.work_refid
+        , w.title
+        , lower(w.ori_lang_code)
+        , mds_code
+        , w.title as english_title
         , max(case when wt.lang_code = 'fre' then wt.title else NULL end) as french_title
         , max(case when wt.lang_code = 'ger' then wt.title else NULL end) as german_title
 from integration.work_info w
-left join integration.work_sameas s on w.work_refid = s.work_refid
 left join integration.work_title wt on wt.work_refid = w.work_refid
-group by coalesce(s.master_refid, w.work_refid)
+where not exists (select 1 from integration.work_sameas s where w.work_refid = s.work_refid)
+and w.title IS NOT NULL
+group by 1,2,3,4,5
 ;
-
 
 
 
 create sequence presentation.tag_seq;
 
 ---------------------------------------------------------------
---TODO: validate exclusion of a lot of "technical" tag beginning by :
+-- Rules:
+--reject "technical" tag beginning with :
 -- '!',  '"' (could keep those but remove double quote),
 -- '#' , '$', "'" (single quote.. same as double quote)
--- '32.41' (a bunch of leading number but with a dot ), (to avoid removing date like 1607-1776, 15th century)
 -- '=', ':', '?', '@', '%', '&', '*'
 -- '"', '(',  ''' (probably need to keep the following text)
--- still to analyze to remove others
+-- '[0-9.]+$' 'only a bunch of leading number with/without optional dot
+-- '[0-9]{5,}' having 5 or more consecitive digits or non-word characters
+-- tag longer than 40 characters
+-- finally easier    tag ~ '^[\w]{3,}' and tag !~ '^[0-9.]+$'
 
 
 with tags as (
-    insert into presentation.dim_tag(id, tag, lang_code)
+    insert into presentation.dim_tag(tag_id, tag, lang_code)
     select nextval('presentation.tag_seq')
         , tag_upper
         , max(lang_code)
     from integration.tag t
-    -- filter out all unwanted tags (validate: the escape of $ (\$), the dot ., and the ?
-    where tag !~ '^(!|#|\$|[0-9]+\.[0-9]+|=|:|\?|@|"|''|%|&|\*|\()'
+    where tag ~ '^[\w]{3,}' and tag !~ '^[0-9.]+$'
+    and char_length(tag) <= 40
     group by tag_upper
     returning *
 )
 insert into presentation.rel_tag(book_id, tag_id)
-select distinct coalesce(ws.master_refid, wt.work_refid) as book_id
-        , tags.id
+select distinct wt.work_refid as book_id
+        , tags.tag_id
 from integration.work_tag wt
 join integration.tag t on t.id = wt.tag_id
 join tags on (tags.tag = t.tag_upper)
-left join integration.work_sameas ws on ws.work_refid = wt.work_refid
+--keep only Books loaded in Presentation
+join presentation.dim_book b on b.book_id = wt.work_refid
 ;
 
 
@@ -130,7 +137,7 @@ create sequence presentation.author_seq;
 
 ---------------------------------------------------------------
 with authors as (
-    insert into presentation.dim_author(id, code, name)
+    insert into presentation.dim_author(author_id, code, name)
     select nextval('presentation.author_seq')
             , a.code
             , ai.name
@@ -139,19 +146,18 @@ with authors as (
     returning *
 )
 insert into presentation.rel_author(book_id, author_id)
-select distinct coalesce(ws.master_refid, w.work_refid), authors.id
+select distinct w.work_refid, authors.author_id
 from integration.work_author w
 join integration.author a on w.author_id = a.id
 join authors on a.code = authors.code
-left join integration.work_sameas ws on ws.work_refid = w.work_refid
+--keep only Books loaded in Presentation
+join presentation.dim_book b on b.book_id = w.work_refid
 ;
 
 
 
 ---------------------------------------------------------------
---TODO: validate
---need to be populated prior to review
-insert into presentation.dim_reviewer(id_uuid, username, gender, birth_year, status, site_name)
+insert into presentation.dim_reviewer(reviewer_uuid, username, gender, birth_year, status, site_name)
 select u.id as id_uuid
         , username
         , case when random() < 0.4 then 'F' when random() < 0.6 then 'M' else 'U' end as gender
@@ -160,22 +166,31 @@ select u.id as id_uuid
         , s.logical_name
 from integration.user u
 join integration.site s on u.site_id = s.id
+where u.username is not null
+;
+
+-- add fake city data at random based on Normal dist (assumption: staging.city exist)
+update presentation.dim_reviewer r set city = c.city, lati = c.lat + (random()*2-1) , longi = c.long + (random()*2-1)
+from (select reviewer_id, (SELECT abs(normal_rand(1, 0, 200))::int + 1  WHERE s = s) as rank
+      from presentation.dim_reviewer s) sub
+      join staging.city c on c.rank = sub.rank
+where sub.reviewer_id = r.reviewer_id
 ;
 
 ---------------------------------------------------------------
 insert into presentation.review(id, similarto_id, book_id, reviewer_id, site_id, date_id, rating, nb_likes, lang_code)
 select r.id
         , s.other_review_id
-        , coalesce(ws.master_refid, r.work_refid)
-        , pr.id
+        , r.work_refid
+        , pr.reviewer_id
         , r.site_id
         , r.review_date
         , r.parsed_rating
         , r.parsed_likes
         , r.review_lang
 from integration.review r
+join presentation.dim_book db on db.book_id = r.work_refid
+join presentation.dim_reviewer pr on pr.reviewer_uuid = r.user_id
 left join integration.review_similarto s on s.review_id = r.id
-left join integration.work_sameas ws on ws.work_refid = r.work_refid
-join presentation.dim_reviewer pr on pr.id_uuid = r.user_id
 ;
 

@@ -13,7 +13,7 @@
 -- TODO:  not nullable definition.. to add to all fields mandatory
 ---------------------------------------------------------------
 create table presentation.dim_site (
-    id smallint primary key,
+    site_id smallint primary key,
     name varchar(20) not null,
     hostname varchar(30) not null
 )
@@ -32,24 +32,24 @@ create table presentation.dim_language (
 
 --------------------------------------------------------------
 create table presentation.dim_date (
-    id date primary key,
-    year smallint,
-    month smallint,
-    month_name varchar(10),
-    day smallint,
-    day_of_year smallint,
-    day_name varchar(10),
-    calendar_week smallint,
-    format_date char(10),
-    quarter char(2),
-    year_quarter char(7),
-    year_month char(7),
-    year_iso_week char(7),
-    weekend char(7),
-    iso_start_week date,
-    iso_end_week date,
-    month_start date,
-    month_end date
+    date_id date primary key,
+    year smallint not null,
+    month smallint not null,
+    month_name varchar(10) not null,
+    day smallint not null,
+    day_of_year smallint not null,
+    day_name varchar(10) not null,
+    calendar_week smallint not null,
+    format_date char(10) not null,
+    quarter char(2) not null,
+    year_quarter char(7) not null,
+    year_month char(7) not null,
+    year_iso_week char(7) not null,
+    weekend char(7) not null,
+    iso_start_week date not null,
+    iso_end_week date not null,
+    month_start date not null,
+    month_end date not null
 )
 --diststyle ALL
 ;
@@ -59,7 +59,7 @@ create table presentation.dim_mds (
     code varchar(15) primary key,
     parent_code varchar(15),
     original_code varchar(20),
-    text varchar(450)
+    text varchar(450) not null
 )
 --diststyle ALL
 ;
@@ -67,9 +67,9 @@ create table presentation.dim_mds (
 
 ---------------------------------------------------------------
 create table presentation.dim_book (
-    id bigint primary key,
+    book_id bigint primary key,
     title_ori text,
-    original_lang char(3),
+    lang_ori char(3),
     mds_code varchar(30),
     --pivot most popular lang
     english_title varchar(550),
@@ -89,10 +89,10 @@ create table presentation.dim_book (
 
 ---------------------------------------------------------------
 create table presentation.dim_tag (
-    id int primary key,
+    tag_id int primary key,
     -- capitalized form (aggregation)
-    tag varchar(255) unique,
-    lang_code char(3)
+    tag varchar(255) unique not null,
+    lang_code char(3) not null
 )
 --diststyle ALL
 ;
@@ -102,16 +102,16 @@ create table presentation.rel_tag (
     tag_id int not null,
     book_id bigint not null,
     primary key (tag_id, book_id),
-    foreign key (tag_id) references presentation.dim_tag(id),
-    foreign key (book_id) references presentation.dim_book(id)
+    foreign key (tag_id) references presentation.dim_tag(tag_id),
+    foreign key (book_id) references presentation.dim_book(book_id)
 )
 --diststyle key distkey (book_id)
 ;
 
 ---------------------------------------------------------------
 create table presentation.dim_author (
-    id int primary key,
-    code varchar(100) unique,
+    author_id int primary key,
+    code varchar(100) unique not null,
     name varchar(250) not null
 )
 --diststyle ALL
@@ -122,8 +122,8 @@ create table presentation.rel_author (
     author_id int not null,
     book_id bigint not null,
     primary key (author_id, book_id),
-    foreign key (author_id) references presentation.dim_author(id),
-    foreign key (book_id) references presentation.dim_book(id)
+    foreign key (author_id) references presentation.dim_author(author_id),
+    foreign key (book_id) references presentation.dim_book(book_id)
 )
 --diststyle key distkey (book_id)
 ;
@@ -131,8 +131,8 @@ create table presentation.rel_author (
 
 ---------------------------------------------------------------
 create table presentation.dim_reviewer (
-    id serial primary key,
-    id_uuid uuid unique,  -- for lookup only (not exported to RS)
+    reviewer_id serial primary key,
+    reviewer_uuid uuid unique,  -- for lookup only (not exported to RS)
     username varchar(200),
     gender char(1),
     birth_year smallint,
@@ -160,10 +160,10 @@ create table presentation.review (
     nb_likes int,
     lang_code char(3),
     -- review varchar(30000),  --based on max found
-    foreign key (book_id) references presentation.dim_book(id),
-    foreign key (reviewer_id) references presentation.dim_reviewer(id),
-    foreign key (site_id) references presentation.dim_site(id),
-    foreign key (date_id) references presentation.dim_date(id)
+    foreign key (book_id) references presentation.dim_book(book_id),
+    foreign key (reviewer_id) references presentation.dim_reviewer(reviewer_id),
+    foreign key (site_id) references presentation.dim_site(site_id),
+    foreign key (date_id) references presentation.dim_date(date_id)
 )
 --diststyle key distkey (book_id)
 ;

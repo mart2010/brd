@@ -88,11 +88,3 @@ delete from review_similarto where load_audit_id = 1169;
 alter table integration.review_similarto drop constraint review_similarto_pkey;
 alter table integration.review_similarto add primary key (review_id);
 
-
--- add fake city data at random based on Normal dist
-update presentation.dim_reviewer r set city = c.city, lati = c.lat + (random()*2-1) , longi = c.long + (random()*2-1)
-from (select id, (SELECT abs(normal_rand(1, 0, 200))::int + 1  WHERE s = s) as rank
-      from presentation.dim_reviewer s) sub
-      join staging.city c on c.rank = sub.rank
-where sub.id = r.id
-;

@@ -14,5 +14,7 @@
 	grant all on schema public to brd;
 	
 	
+-- used to backup database
+pg_dump -f brd_20160727.sql  --schema=staging --schema=integration -U brd  -p 54355 brd
 
 
