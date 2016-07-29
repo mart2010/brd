@@ -1,3 +1,6 @@
+---------------------------------------------------------------------------------
+-- Examples of Report implemented from both integration and presentation layer
+---------------------------------------------------------------------------------
 
 --------------------------------------------------------------------
 -- Report: Trend (time series) of rating for Books
@@ -6,6 +9,7 @@ select wi.title
         , r.review_date
         , avg(r.parsed_rating) as avg_rating
         , count(r.id) as nb_rating
+        , sum(count(r.id)) OVER (partition by title) as nb_total
 from integration.review r
 join integration.work_info wi on (wi.work_refid = r.work_refid)
 where
@@ -13,6 +17,19 @@ wi.title in ('1984', 'The Hobbit', 'Brave New World')
 group by 1,2
 order by 1,2
 ;
+
+select title
+        , date_id
+        , avg(rating) as avg_rating
+        , count(*)  as nb_rating
+        , sum(count()) OVER (partition by title) as nb_total
+from presentation.review
+join presentation.dim_book d using (book_id)
+where title in ('1984', 'The Hobbit', 'Brave New World')
+group by 1,2
+order by 1,2
+;
+
 
 --------------------------------------------------------------------
 -- Report: Trend of rating (time series) for a Books given their ISBNs
@@ -34,6 +51,18 @@ join integration.work_info wi on (wi.work_refid = r.work_refid)
 join integration.language l on (l.code = r.review_lang)
 where
 wi.title in ('The Kite Runner', 'The Hunger Games', 'Jane Eyre')
+group by 1,2
+order by 1,2
+;
+
+select title
+        , lang_code as review_language
+        , avg(rating) as avg_rating
+        , count(*)  as nb_rating
+from presentation.review r
+join presentation.dim_book d using (book_id)
+join presentation.dim_language dl on dl.code = r.lang_code
+where title in ('1984', 'The Hobbit', 'Brave New World')
 group by 1,2
 order by 1,2
 ;
@@ -61,6 +90,9 @@ wi.title in ('The Kite Runner', 'The Hunger Games', 'Jane Eyre')
 group by 1,2,3,4,5
 order by 1
 ;
+
+
+
 
 --------------------------------------------------------------------
 -- Report: Difference in rating between helpful review (at least one like) or none helpful
