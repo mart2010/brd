@@ -6,7 +6,7 @@
 -- Report: Trend (time series) of rating for Books
 --------------------------------------------------------------------
 select wi.title
-        , r.review_date
+        , date_trunc('year',r.review_date) as year
         , avg(r.parsed_rating) as avg_rating
         , count(r.id) as nb_rating
         , sum(count(r.id)) OVER (partition by title) as nb_total
@@ -18,14 +18,14 @@ group by 1,2
 order by 1,2
 ;
 
-select title
-        , date_id
+select english_title
+        , date_trunc('year',date_id) as year
         , avg(rating) as avg_rating
         , count(*)  as nb_rating
-        , sum(count()) OVER (partition by title) as nb_total
+        , sum(count(*)) OVER (partition by english_title) as nb_total
 from presentation.review
 join presentation.dim_book d using (book_id)
-where title in ('1984', 'The Hobbit', 'Brave New World')
+where english_title in ('1984', 'The Hobbit', 'Brave New World')
 group by 1,2
 order by 1,2
 ;
@@ -52,19 +52,19 @@ join integration.language l on (l.code = r.review_lang)
 where
 wi.title in ('The Kite Runner', 'The Hunger Games', 'Jane Eyre')
 group by 1,2
-order by 1,2
+order by 1,4 desc
 ;
 
-select title
+select english_title
         , lang_code as review_language
         , avg(rating) as avg_rating
         , count(*)  as nb_rating
 from presentation.review r
 join presentation.dim_book d using (book_id)
 join presentation.dim_language dl on dl.code = r.lang_code
-where title in ('1984', 'The Hobbit', 'Brave New World')
+where english_title in ('The Kite Runner', 'The Hunger Games', 'Jane Eyre')
 group by 1,2
-order by 1,2
+order by 1,4 desc
 ;
 
 
@@ -103,7 +103,7 @@ select title
         , count(1) as nb_rating
 from
     (select wi.title
-            , case when likes > 0 then 'Helpful' else 'Not helpful' end  as helpful
+            , case when parsed_likes > 0 then 'Helpful' else 'Not helpful' end  as helpful
             , r.parsed_rating
     from integration.review r
     join integration.work_info wi on (wi.work_refid = r.work_refid)
