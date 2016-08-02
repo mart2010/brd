@@ -46,6 +46,8 @@ select wi.title
         , l.english_name as review_language
         , avg(r.parsed_rating) as avg_rating
         , count(r.id) as nb_rating
+        , sum( avg(r.parsed_rating) * count(r.id) ) over (partition by wi.title)
+            / sum (count(r.id)) over (partition by wi.title)  as avg_overall
 from integration.review r
 join integration.work_info wi on (wi.work_refid = r.work_refid)
 join integration.language l on (l.code = r.review_lang)
@@ -59,6 +61,9 @@ select english_title
         , lang_code as review_language
         , avg(rating) as avg_rating
         , count(*)  as nb_rating
+        -- weighted average
+        , sum(avg(rating) * count(*)) over (partition by english_title)
+            / sum(count(*)) over (partition by english_title) as avg_overall
 from presentation.review r
 join presentation.dim_book d using (book_id)
 join presentation.dim_language dl on dl.code = r.lang_code
@@ -91,6 +96,20 @@ group by 1,2,3,4,5
 order by 1
 ;
 
+
+select english_title
+        , gender
+        , status
+        , avg(rating) as avg_rating
+        , count(*) as nb_rating
+        , sum ( avg(rating) * count(*) ) over (partition by english_title)
+            / sum (count(*)) over (partition by english_title) as avg_overall
+from presentation.review r
+join presentation.dim_book db using (book_id)
+join presentation.dim_reviewer dr using (reviewer_id)
+group by 1,2,3
+order by 1,2,3
+;
 
 
 
@@ -203,67 +222,6 @@ group by coalesce(usame.same_user_id, u.id), wi.work_refid
 ;
 
 
-
--- Query for review-text similarity:
--- requires an index on FK work_refid
--- install as root: create extension pg_trgm;
-
--- Very Slowww (just the cross-join takes 2-3min) (kill after 45min) CPU bound!! need alternative!!!
--- Must employ solution with 'integration.review_similarto' where I load this incrementally!!!!
---Many issues with that logic:
--- 1. Cross-product not perf and similariyt re-calculated each time (need to build index and use gist.. see below)
--- 2. does unneeded comparison nX(n-1)  will do r2233-r3232 and its opposite (should do combination irrespective of ordering.. n choose m ..binomial stuff)
--- 3. only based on trigram comparison, could quickly eliminate couple using simpler calculation (ex. length of text..)
-select r1.work_refid, r1.id as r1_id, r2.id as r2_id, similarity(r1.review, r2.review)
-from integration.review as r1
-join integration.review as r2 on (r1.work_refid = r2.work_refid
-                                  and r1.review_lang = r2.review_lang
-                                  and r1.id > r2.id)
-where
-r1.work_refid between 2000 and 2500;
-
---To avoid having to calculate similarity across each review text, must add an index:
--- CREATE INDEX reviewt_gist ON integration.review USING gist(review gist_trgm_ops);
--- and do:
---
-select set_limit(0.8);
-
-select r1.work_refid, r1.id as r1_id, r2.id as r2_id, similarity(r1.review, r2.review)
-from integration.review as r1
-join integration.review as r2 on (r1.work_refid = r2.work_refid
-                                  and r1.review_lang = r2.review_lang
-                                  and r1.site_id != r2.site_id
-                                  and r1.id != r2.id)
-where
-r1.review % r2.review
--- rules simpler to calculate
-and char_len(r1.review)
-
-
-
-select * from
-(select r1.work_refid, r1.id as r1_id, r2.id as r2_id, r1.review as r1_review, r2.review as r2_review
-from integration.review as r1
-join integration.review as r2 on (r1.work_refid = r2.work_refid
-                                  and r1.review_lang = r2.review_lang
-                                  and r1.site_id != r2.site_id
-                                  and r1.id != r2.id
-                                  and char_length(r1.review) between char_length(r2.review) -10 and char_length(r2.review) + 10)
-where r1.work_refid between 2000 and 2500
-) as foo
-;
-
-
-
-select r.site_id, o.site_id as other_site_id
-       ,sim.review_id, sim.other_review_id
-       ,u.user_uid, ou.user_uid as other_user_uid
-       ,sim.similarity, r.review, o.review as other_review
-from integration.review_similarto sim
-join integration.review r on sim.review_id = r.id
-join integration.user u on r.user_id = u.id
-join integration.review o on sim.other_review_id = o.id
-join integration.user ou on o.user_id = ou.id
 
 
 

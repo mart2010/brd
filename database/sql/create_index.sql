@@ -10,8 +10,8 @@
 
 create index review_widx on integration.review (work_refid);
 
-
-
+create index on presentation.review (reviewer_id);
+create index on presentation.review (book_id);
 
 
 
