@@ -169,16 +169,16 @@ join integration.site s on u.site_id = s.id
 where u.username is not null
 ;
 
--- add fake city data at random based on Normal dist (assumption: staging.city exist)
-update presentation.dim_reviewer r set city = c.city, lati = c.lat + (random()*2-1) , longi = c.long + (random()*2-1)
-from (select reviewer_id, (SELECT abs(normal_rand(1, 0, 200))::int + 1  WHERE s = s) as rank
+-- add fake city data at random (with larger populated city more likely chosen) and set lat/long with some noise (on Normal dist)
+update presentation.dim_reviewer r set city = c.city, lati = c.lat + normal_rand(1,0,0.3), longi = c.long + normal_rand(1,0,0.3)
+from (select reviewer_id, (SELECT random()*2289584999 WHERE s = s) as p_cum
       from presentation.dim_reviewer s) sub
-      join staging.city c on c.rank = sub.rank
+join staging.city c on (sub.p_cum between c.pop_cum - c.pop and c.pop_cum)
 where sub.reviewer_id = r.reviewer_id
 ;
 
 ---------------------------------------------------------------
-insert into presentation.review(id, similarto_id, book_id, reviewer_id, site_id, date_id, rating, nb_likes, lang_code)
+insert into presentation.review(id, similarto_id, book_id, reviewer_id, site_id, date_id, rating, nb_likes, lang_code, review)
 select r.id
         , s.other_review_id
         , r.work_refid
@@ -188,6 +188,7 @@ select r.id
         , r.parsed_rating
         , r.parsed_likes
         , r.review_lang
+        , r.review
 from integration.review r
 join presentation.dim_book db on db.book_id = r.work_refid
 join presentation.dim_reviewer pr on pr.reviewer_uuid = r.user_id

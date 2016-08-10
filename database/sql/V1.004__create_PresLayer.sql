@@ -159,7 +159,7 @@ create table presentation.review (
     rating smallint,
     nb_likes int,
     lang_code char(3),
-    -- review varchar(30000),  --based on max found
+    review varchar(65100),  --based on max found
     foreign key (book_id) references presentation.dim_book(book_id),
     foreign key (reviewer_id) references presentation.dim_reviewer(reviewer_id),
     foreign key (site_id) references presentation.dim_site(site_id),
