@@ -14,6 +14,10 @@ where s.id in (1,2,4)
 insert into presentation.dim_language
 select code, english_name, french_name
 from integration.language
+union
+select '---', 'Not found', 'Pas trouvé';
+union
+select 'unk', 'Unknown', 'Inconnu';
 ;
 
 
@@ -82,7 +86,9 @@ insert into presentation.dim_book(book_id, title_ori, lang_ori, mds_code,
                 english_title, french_title, german_title)
 select w.work_refid
         , w.title
-        , lower(w.ori_lang_code)
+        , case when w.ori_lang_code is null then 'unk'
+							 when w.ori_lang_code = '-- ' then '---'
+							 else lower(w.ori_lang_code) end
         , mds_code
         , w.title as english_title
         , max(case when wt.lang_code = 'fre' then wt.title else NULL end) as french_title
@@ -194,4 +200,3 @@ join presentation.dim_book db on db.book_id = r.work_refid
 join presentation.dim_reviewer pr on pr.reviewer_uuid = r.user_id
 left join integration.review_similarto s on s.review_id = r.id
 ;
-

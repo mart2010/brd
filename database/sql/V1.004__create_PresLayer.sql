@@ -68,11 +68,11 @@ create table presentation.dim_mds (
 ---------------------------------------------------------------
 create table presentation.dim_book (
     book_id bigint primary key,
-    title_ori text,
-    lang_ori char(3),
+    title_ori text not null,
+    lang_ori char(3) not null,
     mds_code varchar(30),
     --pivot most popular lang
-    english_title varchar(550),
+    english_title varchar(550) not null,
     french_title varchar(430),
     german_title varchar(480),
     dutch_title varchar(450),
@@ -82,7 +82,8 @@ create table presentation.dim_book (
     finish_title varchar(360),
     danish_title varchar(320),
     portuguese_title varchar(350),
-    foreign key (mds_code) references presentation.dim_mds(code)
+    foreign key (mds_code) references presentation.dim_mds(code),
+    foreign key (lang_ori) references presentation.dim_language(code)
 )
 --diststyle key distkey (id);
 ;
@@ -91,8 +92,9 @@ create table presentation.dim_book (
 create table presentation.dim_tag (
     tag_id int primary key,
     -- capitalized form (aggregation)
-    tag varchar(255) unique not null,
-    lang_code char(3) not null
+    tag varchar(80) unique not null,
+    lang_code char(3) not null,
+    foreign key (lang_code) references presentation.dim_language(code)
 )
 --diststyle ALL
 ;
@@ -133,12 +135,12 @@ create table presentation.rel_author (
 create table presentation.dim_reviewer (
     reviewer_id serial primary key,
     reviewer_uuid uuid unique,  -- for lookup only (not exported to RS)
-    username varchar(200),
-    gender char(1),
-    birth_year smallint,
-    status varchar(20),
+    username varchar(200) not null,
+    gender char(1) not null,
+    birth_year smallint not null,
+    status varchar(20) not null,
     occupation varchar(100),
-    city varchar(200),
+    city varchar(200) not null,
     lati float,
     longi float,
     site_name varchar(20) not null
@@ -158,12 +160,13 @@ create table presentation.review (
     -- all facts
     rating smallint,
     nb_likes int,
-    lang_code char(3),
-    review varchar(65100),  --based on max found
+    lang_code char(3) not null,
+    review varchar(65100),  --based on max bytes not character (octet_length(review))
     foreign key (book_id) references presentation.dim_book(book_id),
     foreign key (reviewer_id) references presentation.dim_reviewer(reviewer_id),
     foreign key (site_id) references presentation.dim_site(site_id),
-    foreign key (date_id) references presentation.dim_date(date_id)
+    foreign key (date_id) references presentation.dim_date(date_id),
+    foreign key (lang_code) references presentation.dim_language(code)
 )
 --diststyle key distkey (book_id)
 ;
