@@ -10,14 +10,13 @@
 --              (efficiently stored in relation model) (that should be an sql extract)
 ---------------------------------------------------------------------------------------------------
 
--- TODO:  not nullable definition.. to add to all fields mandatory
 ---------------------------------------------------------------
 create table presentation.dim_site (
     site_id smallint primary key,
     name varchar(20) not null,
     hostname varchar(30) not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 ---------------------------------------------------------------
@@ -26,7 +25,7 @@ create table presentation.dim_language (
     name varchar(85) not null,
     french_name varchar(65) not null --etc..
 )
---diststyle ALL
+diststyle ALL
 ;
 
 
@@ -51,7 +50,7 @@ create table presentation.dim_date (
     month_start date not null,
     month_end date not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 ---------------------------------------------------------------
@@ -61,7 +60,7 @@ create table presentation.dim_mds (
     original_code varchar(20),
     text varchar(450) not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 
@@ -85,18 +84,18 @@ create table presentation.dim_book (
     foreign key (mds_code) references presentation.dim_mds(code),
     foreign key (lang_ori) references presentation.dim_language(code)
 )
---diststyle key distkey (id);
+diststyle key distkey (book_id)
 ;
 
 ---------------------------------------------------------------
+--Redshift chokes on the tag field name (so change to tag_name)
 create table presentation.dim_tag (
     tag_id int primary key,
-    -- capitalized form (aggregation)
-    tag varchar(80) unique not null,
+    tag_name varchar(80) unique not null,
     lang_code char(3) not null,
     foreign key (lang_code) references presentation.dim_language(code)
 )
---diststyle ALL
+diststyle ALL
 ;
 
 --colocate rel_tag with its book
@@ -107,7 +106,7 @@ create table presentation.rel_tag (
     foreign key (tag_id) references presentation.dim_tag(tag_id),
     foreign key (book_id) references presentation.dim_book(book_id)
 )
---diststyle key distkey (book_id)
+diststyle key distkey (book_id)
 ;
 
 ---------------------------------------------------------------
@@ -116,7 +115,7 @@ create table presentation.dim_author (
     code varchar(100) unique not null,
     name varchar(250) not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 --co-locate rel_author with book
@@ -127,14 +126,14 @@ create table presentation.rel_author (
     foreign key (author_id) references presentation.dim_author(author_id),
     foreign key (book_id) references presentation.dim_book(book_id)
 )
---diststyle key distkey (book_id)
+diststyle key distkey (book_id)
 ;
 
 
 ---------------------------------------------------------------
 create table presentation.dim_reviewer (
-    reviewer_id serial primary key,
-    reviewer_uuid uuid unique,  -- for lookup only (not exported to RS)
+    reviewer_id bigint primary key,
+    --reviewer_uuid uuid unique,  -- for lookup only (not exported to RS)
     username varchar(200) not null,
     gender char(1) not null,
     birth_year smallint not null,
@@ -145,7 +144,7 @@ create table presentation.dim_reviewer (
     longi float,
     site_name varchar(20) not null
 )
---diststyle key distkey (id);
+diststyle key distkey (id);
 ;
 
 
@@ -168,5 +167,5 @@ create table presentation.review (
     foreign key (date_id) references presentation.dim_date(date_id),
     foreign key (lang_code) references presentation.dim_language(code)
 )
---diststyle key distkey (book_id)
+diststyle key distkey (book_id)
 ;
