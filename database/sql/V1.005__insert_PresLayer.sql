@@ -200,3 +200,56 @@ join presentation.dim_book db on db.book_id = r.work_refid
 join presentation.dim_reviewer pr on pr.reviewer_uuid = r.user_id
 left join integration.review_similarto s on s.review_id = r.id
 ;
+
+--------------------------------------------------------------------------------------
+-- For Redshift
+--------------------------------------------------------------------------------------
+
+copy dim_date from 's3://brdbucket16/dimdate.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy dim_language from 's3://brdbucket16/dimlanguage.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy dim_site from 's3://brdbucket16/dimsite.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy dim_mds from 's3://brdbucket16/dimmds.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy dim_book from 's3://brdbucket16/dimbook.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1'
+gzip;
+
+copy dim_tag from 's3://brdbucket16/dimtag.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy rel_tag from 's3://brdbucket16/reltag.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy dim_author from 's3://brdbucket16/dimauthor.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy rel_author from 's3://brdbucket16/relauthor.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+copy dim_reviewer from 's3://brdbucket16/dimreviewer.txt'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1';
+
+--Use multiple files (some UTF-8 characters are not supported in review so we use MAXERROR)
+copy review from 's3://brdbucket16/review/review_part'
+credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
+delimiter '|' region 'eu-central-1'
+gzip
+maxerror 1000
+;
