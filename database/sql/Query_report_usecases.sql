@@ -13,7 +13,7 @@ select wi.title
 from integration.review r
 join integration.work_info wi on (wi.work_refid = r.work_refid)
 where
-wi.title in ('1984', 'The Hobbit', 'Brave New World')
+wi.title in ('1984', 'The Hobbit', 'Brave New World', 'The Awakening', 'Into the Wild', 'Beowulf', 'The Canterbury Tales')
 group by 1,2
 order by 1,2
 ;
@@ -25,23 +25,15 @@ select english_title
         , sum(count(*)) OVER (partition by english_title) as nb_total
 from presentation.review
 join presentation.dim_book d using (book_id)
-where english_title in ('1984', 'The Hobbit', 'Brave New World')
+where english_title in ('1984', 'The Hobbit', 'Brave New World', 'The Awakening', 'Into the Wild', 'Beowulf', 'The Canterbury Tales')
 group by 1,2
 order by 1,2
 ;
 
 
 --------------------------------------------------------------------
--- Report: Trend of rating (time series) for a Books given their ISBNs
---------------------------------------------------------------------
--- <same as above> appending these additional tables:
-join integration.work_isbn wis on (wis.work_refid = r.work_refid)
-join integration.isbn i on (i.ean = wis.ean)
-where
-i.isbn13 in ('9780141036144', '9781402536946', '9780754054375')
-
-
 --Report:  Cultural/language appreciation differences
+--------------------------------------------------------------------
 select wi.title
         , l.english_name as review_language
         , avg(r.parsed_rating) as avg_rating
@@ -133,6 +125,23 @@ group by 1,2
 order by 1,2
 ;
 
+select title_ori
+        , helpful
+        , avg(rating) as avg_rating
+        , count(1) as nb_rating
+from
+    (select title_ori
+            , case when nb_likes > 0 then 'Helpful' else 'Not helpful' end  as helpful
+            , rating
+    from presentation.review r
+    join presentation.dim_book b using (book_id)
+    where
+    title_ori in ('Sense and Sensibility', 'Northern Lights', 'On the Road', 'Little Women', 'A Tale of Two Cities', 'The Alchemist')
+    ) as foo
+group by 1,2
+order by 1,2
+;
+
 
 --------------------------------------------------------------------
 --Report: Reviews statistics difference per site for given Books
@@ -156,6 +165,51 @@ where wi.title in ( 'Harry Potter and the Goblet of Fire',
 group by 1,2
 order by 1,2
 ;
+
+
+select  title_ori
+        , s.name
+        , count(1) as nb_reviews
+        , avg(rating) as avg_rating
+        , min(rating) as min_rating
+        , max(rating) as max_rating
+from presentation.review r
+join presentation.dim_book b using (book_id)
+join presentation.dim_site s using (site_id)
+where title_ori in ( 'Harry Potter and the Goblet of Fire',
+ 'Harry Potter and the Order of the Phoenix',
+ 'Harry Potter and the Half-Blood Prince',
+ 'Harry Potter and the Prisoner of Azkaban',
+ 'Harry Potter and the Sorcerer''s Stone (Book 1)',
+ 'Harry Potter and the Chamber of Secrets',
+ 'Harry Potter and the Deathly Hallows' )
+group by 1,2
+order by 1,2
+;
+
+
+--------------------------------------------------------------------
+--Report: Who are the best authors in terms of average rating
+-- for those having at least 100 reviews with not null rating
+--------------------------------------------------------------------
+
+
+select author_id
+        , a.name
+        , count(distinct r.book_id) as nb_books
+        , count(1) as nb_reviews
+        , avg(rating::float) as avg_rating
+from review r
+join rel_author ra using (book_id)
+join dim_author a using (author_id)
+where rating is not null
+group by 1, 2
+having count(1) > 100
+order by 5 desc
+;
+
+
+
 
 
 --------------------------------------------------------------------
@@ -192,11 +246,10 @@ as ct ("title" text,
 -- User-key: the uuid coming from hashing user_uid + site_name (Matrix rows)
 -- Book-key: 'title::athor1_author2..' (compact representation for very sparse Matrix Cols Books)
 
-select u.id as user_key
+select r.user_id as user_key
         , concat( wi.title,'::', array_to_string(array_agg(ai.name),'_')) as book_key
         , avg(r.parsed_rating) as rating  --user could've rated many times same work
 from integration.review r
-join integration.user u on (r.user_id = u.id)
 join integration.work_info wi on (wi.work_refid = r.work_refid)
 join integration.work_author wa on (wa.work_refid = r.work_refid)
 join integration.author_info ai on (ai.author_id = wa.author_id)
@@ -220,13 +273,3 @@ join integration.work_author wa on (wa.work_refid = r.work_refid)
 join integration.author_info ai on (ai.author_id = wa.author_id)
 group by coalesce(usame.same_user_id, u.id), wi.work_refid
 ;
-
-
-
-
-
-
-
-
-
-

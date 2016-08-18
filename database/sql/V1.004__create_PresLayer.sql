@@ -10,23 +10,22 @@
 --              (efficiently stored in relation model) (that should be an sql extract)
 ---------------------------------------------------------------------------------------------------
 
--- TODO:  not nullable definition.. to add to all fields mandatory
 ---------------------------------------------------------------
 create table presentation.dim_site (
     site_id smallint primary key,
     name varchar(20) not null,
     hostname varchar(30) not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 ---------------------------------------------------------------
 create table presentation.dim_language (
     code char(3) primary key,
     name varchar(85) not null,
-    french_name varchar(65) not null --etc..
+    french_name varchar(85) not null --etc..
 )
---diststyle ALL
+diststyle ALL
 ;
 
 
@@ -51,7 +50,7 @@ create table presentation.dim_date (
     month_start date not null,
     month_end date not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 ---------------------------------------------------------------
@@ -61,40 +60,42 @@ create table presentation.dim_mds (
     original_code varchar(20),
     text varchar(450) not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 
 ---------------------------------------------------------------
 create table presentation.dim_book (
     book_id bigint primary key,
-    title_ori text,
-    lang_ori char(3),
+    title_ori varchar(600) not null,
+    lang_ori char(3) not null,
     mds_code varchar(30),
     --pivot most popular lang
-    english_title varchar(550),
-    french_title varchar(430),
-    german_title varchar(480),
-    dutch_title varchar(450),
-    spanish_title varchar(360),
-    italian_title varchar(460),
-    swedish_title varchar(290),
-    finish_title varchar(360),
-    danish_title varchar(320),
-    portuguese_title varchar(350),
-    foreign key (mds_code) references presentation.dim_mds(code)
+    english_title varchar(600) not null,
+    french_title varchar(600),
+--    german_title varchar(480),
+--    dutch_title varchar(450),
+--    spanish_title varchar(360),
+--    italian_title varchar(460),
+--    swedish_title varchar(290),
+--    finish_title varchar(360),
+--    danish_title varchar(320),
+--    portuguese_title varchar(350),
+    foreign key (mds_code) references presentation.dim_mds(code),
+    foreign key (lang_ori) references presentation.dim_language(code)
 )
---diststyle key distkey (id);
+diststyle key distkey (book_id)
 ;
 
 ---------------------------------------------------------------
+--Redshift chokes on the tag field name (so change to tag_name)
 create table presentation.dim_tag (
     tag_id int primary key,
-    -- capitalized form (aggregation)
-    tag varchar(255) unique not null,
-    lang_code char(3) not null
+    tag_name varchar(80) unique not null,
+    lang_code char(3) not null,
+    foreign key (lang_code) references presentation.dim_language(code)
 )
---diststyle ALL
+diststyle ALL
 ;
 
 --colocate rel_tag with its book
@@ -105,7 +106,7 @@ create table presentation.rel_tag (
     foreign key (tag_id) references presentation.dim_tag(tag_id),
     foreign key (book_id) references presentation.dim_book(book_id)
 )
---diststyle key distkey (book_id)
+diststyle key distkey (book_id)
 ;
 
 ---------------------------------------------------------------
@@ -114,7 +115,7 @@ create table presentation.dim_author (
     code varchar(100) unique not null,
     name varchar(250) not null
 )
---diststyle ALL
+diststyle ALL
 ;
 
 --co-locate rel_author with book
@@ -125,25 +126,25 @@ create table presentation.rel_author (
     foreign key (author_id) references presentation.dim_author(author_id),
     foreign key (book_id) references presentation.dim_book(book_id)
 )
---diststyle key distkey (book_id)
+diststyle key distkey (book_id)
 ;
 
 
 ---------------------------------------------------------------
 create table presentation.dim_reviewer (
-    reviewer_id serial primary key,
-    reviewer_uuid uuid unique,  -- for lookup only (not exported to RS)
-    username varchar(200),
-    gender char(1),
-    birth_year smallint,
-    status varchar(20),
+    reviewer_id bigint primary key,
+    --reviewer_uuid uuid unique,  -- for lookup only (not exported to RS)
+    username varchar(350) not null,
+    gender char(1) not null,
+    birth_year smallint not null,
+    status varchar(20) not null,
     occupation varchar(100),
-    city varchar(200),
+    city varchar(200) not null,
     lati float,
     longi float,
     site_name varchar(20) not null
 )
---diststyle key distkey (id);
+diststyle key distkey (reviewer_id);
 ;
 
 
@@ -159,11 +160,12 @@ create table presentation.review (
     rating smallint,
     nb_likes int,
     lang_code char(3),
-    review varchar(66000),  --based on max found
+    review varchar(66000),  --based on max bytes not character (octet_length(review))
     foreign key (book_id) references presentation.dim_book(book_id),
     foreign key (reviewer_id) references presentation.dim_reviewer(reviewer_id),
     foreign key (site_id) references presentation.dim_site(site_id),
-    foreign key (date_id) references presentation.dim_date(date_id)
+    foreign key (date_id) references presentation.dim_date(date_id),
+    foreign key (lang_code) references presentation.dim_language(code)
 )
---diststyle key distkey (book_id)
+diststyle key distkey (book_id)
 ;
