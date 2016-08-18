@@ -209,7 +209,7 @@ copy dim_date from 's3://brdbucket16/dimdate.txt'
 credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
 delimiter '|' region 'eu-central-1';
 
-copy dim_language from 's3://brdbucket16/dimlanguage.txt'
+copy dim_language from 's3://brdbucket16/dimlang.txt'
 credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
 delimiter '|' region 'eu-central-1';
 
@@ -244,12 +244,12 @@ delimiter '|' region 'eu-central-1';
 
 copy dim_reviewer from 's3://brdbucket16/dimreviewer.txt'
 credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
-delimiter '|' region 'eu-central-1';
+delimiter '|' region 'eu-central-1'
+gzip;
 
 --Use multiple files (some UTF-8 characters are not supported in review so we use MAXERROR)
 copy review from 's3://brdbucket16/review/review_part'
 credentials 'aws_iam_role=arn:aws:iam::462971347104:role/readonly_redshift_role'
 delimiter '|' region 'eu-central-1'
 gzip
-maxerror 1000
-;
+maxerror 1000;
