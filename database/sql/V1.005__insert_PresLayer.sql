@@ -194,3 +194,31 @@ join presentation.dim_reviewer pr on pr.reviewer_uuid = r.user_id
 left join integration.review_similarto s on s.review_id = r.id
 ;
 
+
+
+--- Stuff for Redshift
+
+--create flat files export
+\copy presentation.dim_language to '/Users/mart/Temp/export_brd/export_brd/dimlang.txt' with (format text, delimiter '|')
+
+\copy presentation.dim_site to '/Users/mart/Temp/export_brd/dimsite.txt' with (format text, delimiter '|')
+\copy presentation.dim_date to '/Users/mart/Temp/export_brd/dimdate.txt' with (format text, delimiter '|')
+\copy presentation.dim_mds to '/Users/mart/Temp/export_brd/dimmds.txt' with (format text, delimiter '|')
+
+--some title contains '|':
+\copy (select book_id, replace(title_ori, '|', ' '), lang_ori, mds_code, replace(english_title, '|', ' '), replace(french_title, '|', ' ') from presentation.dim_book) to '/Users/mart/Temp/export_brd/dimbook.txt' with (format text, delimiter '|');
+
+\copy (select tag_id, replace(tag, '|', ' '), lang_code from presentation.dim_tag) to '/Users/mart/Temp/export_brd/dimtag.txt' with (format text, delimiter '|');
+
+\copy presentation.rel_tag to '/Users/mart/Temp/export_brd/reltag.txt' with (format text, delimiter '|')
+
+\copy (select author_id, code, replace(name, '|', ',') from presentation.dim_author) to '/Users/mart/Temp/export_brd/dimauthor.txt' with (format text, delimiter '|')
+\copy presentation.rel_author to '/Users/mart/Temp/export_brd/relauthor.txt' with (format text, delimiter '|')
+
+\copy (select reviewer_id, replace(username,'|', ' '), gender, birth_year, status, occupation, city, lati, longi, site_name from presentation.dim_reviewer) to '/Users/mart/Temp/export_brd/dimreviewer.txt' with (format text, delimiter '|')
+
+
+\copy (select id, similarto_id, book_id, reviewer_id, site_id, date_id, rating, nb_likes, lang_code, replace(review, '|', ' ') from presentation.review) to '/Users/mart/Temp/export_brd/review.txt' with (format text, delimiter '|')
+
+
+
