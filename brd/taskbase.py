@@ -139,7 +139,7 @@ class BaseBulkLoadTask(luigi.postgres.CopyToTable):
         self.audit_id, self.run_dts = brd.elt.insert_auditing(batch_name, self.task_id)
         super(BaseBulkLoadTask, self).run()
 
-
+        
     # the override copy() is needed to handle file with col headers (and return rowscount)
     # TODO: suggest to add to luigi:  accept headers and populate columns based on these..
     def copy(self, cursor, file):
